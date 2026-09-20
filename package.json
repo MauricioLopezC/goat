@@ -14,7 +14,7 @@
     "db:studio": "prisma studio",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run db:validate",
     "db:validate": "prisma validate"
   },

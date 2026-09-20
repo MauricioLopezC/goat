@@ -30,7 +30,7 @@ Next.js (App Router) + TypeScript + Prisma 7 + PostgreSQL en Docker.
 
 Antes de dar por terminado un feature, arreglo o cambio de código, correr `npm run check` y dejarlo en verde. Un cambio con `check` en rojo no está terminado y no se entrega ni se commitea.
 
-`check` corre, en orden: `format:check` (Prettier), `lint` (ESLint), `typecheck` (`tsc --noEmit`) y `db:validate` (`prisma validate`).
+`check` corre, en orden: `format:check` (Prettier), `lint` (ESLint), `typecheck` (`next typegen` + `tsc --noEmit`) y `db:validate` (`prisma validate`).
 
 - Si falla el formato: `npm run format` lo corrige solo; volver a correr `check`.
 - Si falla lint o tipos: arreglar la causa. No silenciar con `eslint-disable`, `@ts-ignore`, `@ts-expect-error` ni `any` para que pase; si de verdad no hay otra salida, decirlo explícitamente en el resumen.
