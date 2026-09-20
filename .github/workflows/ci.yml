@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # El cliente de Prisma no se commitea; `typecheck` lo necesita.
+      - name: Generar cliente de Prisma
+        run: npm run db:generate
+
+      # Formato, lint, tipos y schema de Prisma (ver AGENTS.md).
+      - name: Verificar
+        run: npm run check
