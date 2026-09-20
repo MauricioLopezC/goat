@@ -14,6 +14,7 @@ src/
       auth.ts                #   getSession(), requireRole()
       appointments.ts        #   createAppointment(), cancelAppointment(), ...
     validation/              # schemas Zod, fuente única de la entrada
+      zod.ts                 #   `z` con los mensajes en español (único import de "zod")
     actions/                 # ActionResult, ErrorCode, DomainError, defineAction
 ```
 
@@ -74,6 +75,14 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `REASON_REQUIRED` | Falta el motivo en una operación trazable (por ejemplo, cancelar). |
 
 Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
+
+## Mensajes de validación
+
+Los schemas importan `z` de `@/lib/validation/zod`, nunca de `"zod"` (una regla de ESLint lo impide). Ese módulo configura los mensajes por defecto en español y en un tono neutro apto para mostrar (`Este campo es obligatorio`, `Debe tener al menos 3 caracteres`, `Correo electrónico inválido`).
+
+- Los mensajes genéricos cubren campo vacío, largo, rango, opción inválida y formatos comunes. Un `regex` devuelve solo `Formato inválido`.
+- Cuando el campo necesita un mensaje propio, se pasa en el schema: `z.string().regex(/^\d{7,8}$/, "El DNI debe tener 7 u 8 dígitos")`.
+- `fieldErrors` de `ActionError` sale de `z.flattenError(error).fieldErrors`, ya en español.
 
 ## Reglas que toda ficha debe reflejar
 

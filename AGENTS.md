@@ -33,6 +33,7 @@ Decisión completa en `docs/adr/0001-server-actions-y-capa-de-acceso-a-datos.md`
 - Lecturas en Server Components; mutaciones con Server Actions. Route Handlers solo para consumidores externos, no para la UI propia.
 - Las reglas de negocio y el acceso a Prisma viven en `src/lib/dal/` (`server-only`). Las acciones son adaptadores finos y devuelven `ActionResult<T>`.
 - Cada acción es un endpoint POST público: verificar sesión y rol dentro de ella (`proxy.ts` no alcanza) y validar la entrada con Zod.
+- Zod: importar `z` de `@/lib/validation/zod`, nunca de `"zod"`, para que los mensajes salgan en español (lo impone ESLint).
 - Cada operación nueva se especifica con la plantilla de ficha de `docs/acciones.md`, en el mismo cambio.
 
 ## Interfaz
