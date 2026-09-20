@@ -115,7 +115,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 #### `createAppointment`
 
-**Historia de usuario:** _pendiente de enlazar_
+**Historia de usuario:** [HU-09 — Asignar un turno](hu/HU-09-asignar-turno.md)
 **Roles:** `RECEPTIONIST`, `PROFESSIONAL`
 **Entrada:** `patientId`, `professionalId`, `serviceId`, `startsAt`. La duración la fija la `Service`.
 **Precondiciones:** el `startsAt` más la duración de la `Service` cae dentro de una `AvailabilityWindow` del profesional. No hay otro turno activo del profesional en ese intervalo. Si el rol es `PROFESSIONAL`, `professionalId` es el suyo.
@@ -126,6 +126,6 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 ## Catálogo
 
-Una ficha por operación implementada o acordada. Se agregan a medida que se trabaja cada historia de usuario y se mantienen junto con el código: si una regla cambia, cambia la ficha en el mismo commit.
+Una ficha por operación implementada o acordada. Se agregan a medida que se trabaja cada historia de usuario ([`docs/hu/`](hu/README.md)) y se mantienen junto con el código: si una regla cambia, cambia la ficha en el mismo commit.
 
 _Todavía no hay operaciones especificadas._

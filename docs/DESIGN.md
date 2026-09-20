@@ -76,8 +76,8 @@ Estilo: **minimalismo de precisión clínica** — bordes definidos, superficies
 |---|---|---|
 | **Primario** `#0D47A1` (azul zafiro) | `primary` | Navegación activa, acciones principales, selección, foco. |
 | **Info** `#00838F` (cian diagnóstico) | `info` | Turnos programados, etiquetas informativas, acciones secundarias técnicas. |
-| **Advertencia** `#E65100` (ámbar) | `warning` | Ausencias, avisos que requieren atención sin ser críticos. |
-| **Éxito** `#00897B` (verde recuperación) | `success` | Atendido, pagado, confirmaciones completadas. |
+| **Advertencia** `#E65100` (ámbar) | `warning` | Turnos vencidos, avisos que requieren atención sin ser críticos. |
+| **Éxito** `#00897B` (verde recuperación) | `success` | Turno completado, pagado, confirmaciones completadas. |
 | **Crítico** `#C62828` | `destructive` | Urgencia/prioridad, errores de validación, acciones destructivas. |
 
 **Superficies:** lienzo `#F8FAFC` (`background`), tarjetas y paneles `#FFFFFF` (`card`), bandejas/columnas laterales `#F1F5F9` (`tray`, `muted`, `sidebar`), bordes `#E2E8F0` (`border`) y `#CBD5E1` (`input`, bordes de paneles activos).
@@ -87,10 +87,9 @@ Estilo: **minimalismo de precisión clínica** — bordes definidos, superficies
 | `AppointmentStatus` | Badge (fondo suave) | Borde izquierdo del bloque en agenda |
 |---|---|---|
 | `SCHEDULED` (Programado) | `info-soft` | `info` |
-| `CONFIRMED` (Confirmado) | `primary-soft` | `primary` |
-| `ATTENDED` (Atendido) | `success-soft` | `success` |
+| `COMPLETED` (Completado) | `success-soft` | `success` |
 | `CANCELLED` (Cancelado) | neutro: `muted` + `border-input` + texto `muted-foreground` | `#94A3B8` (`placeholder`) |
-| `NO_SHOW` (Ausente) | `warning-soft` | `warning` |
+| `EXPIRED` (Vencido) | `warning-soft` | `warning` |
 
 La **urgencia/prioridad** es independiente del estado: se marca con un badge `destructive-soft` "Urgente". No se pinta de rojo el bloque entero.
 

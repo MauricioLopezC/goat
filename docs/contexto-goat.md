@@ -84,7 +84,7 @@ El cliente pidió explícitamente formato **policonsultorio**: varios profesiona
 | **Coseguro / copago** | Monto que paga el paciente aunque tenga cobertura. |
 | **Prescripción médica** | Indicación que deja el profesional tras atender: receta, pedido de estudios, indicaciones, reposo. |
 | **Historial del paciente** | Cronología de atenciones, prestaciones, fechas y prescripciones. |
-| **Estado del turno** | Programado → Confirmado → Atendido, o Cancelado, o Ausente. |
+| **Estado del turno** | Programado → Completado, o Cancelado, o Vencido. |
 
 Los nombres en inglés que se usan en el código para estos términos están en [`glossary.md`](glossary.md).
 
