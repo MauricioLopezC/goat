@@ -23,6 +23,7 @@ Next.js (App Router) + TypeScript + Prisma 7 + PostgreSQL en Docker.
 ## Convenciones
 
 - Todo el código va en inglés: modelos, campos, enums, funciones, variables y rutas (ej. `Appointment`, `Patient`). La UI y la documentación quedan en español.
+- Nombres de dominio: usar los de `docs/glossary.md` y consultarlo antes de crear modelos, campos o enums. No inventar sinónimos; si falta un término, agregarlo ahí en el mismo cambio.
 - Contexto completo del producto (glosario, alcance, decisiones del cliente, riesgos, preguntas abiertas): `docs/contexto-goat.md`. Consultarlo ante dudas de dominio; no hace falta leerlo entero en cada sesión.
 
 ## Dominio

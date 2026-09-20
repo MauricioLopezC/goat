@@ -86,6 +86,8 @@ El cliente pidió explícitamente formato **policonsultorio**: varios profesiona
 | **Historial del paciente** | Cronología de atenciones, prestaciones, fechas y prescripciones. |
 | **Estado del turno** | Programado → Confirmado → Atendido, o Cancelado, o Ausente. |
 
+Los nombres en inglés que se usan en el código para estos términos están en [`glossary.md`](glossary.md).
+
 ---
 
 ## 6. Actores
@@ -180,7 +182,7 @@ Falta ubicar **historial y prescripciones** en un incremento. No figura explíci
 - El cliente evalúa la **demo funcional** y la **documentación**, y en el examen hay que poder explicar lo hecho.
 - Hay que **documentar mientras se desarrolla**, no al final.
 - El mapa de historias debe versionarse por incremento.
-- Stack tecnológico: a definir por el equipo (pendiente).
+- Stack tecnológico: Next.js (App Router) con TypeScript, Prisma 7 como ORM y PostgreSQL (con Docker Compose para el desarrollo local).
 
 ---
 
