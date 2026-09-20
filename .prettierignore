@@ -1,0 +1,12 @@
+# Generado o de terceros
+.next/
+.agents/
+.claude/
+node_modules/
+src/generated/
+package-lock.json
+next-env.d.ts
+
+# Documentación escrita a mano (tablas, wrapping deliberado)
+docs/
+*.md

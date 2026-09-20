@@ -46,8 +46,8 @@ export default function Home() {
           </h1>
           <p className="max-w-2xl text-body-lg text-muted-foreground">
             Gestión de turnos y atención ambulatoria para un policonsultorio de
-            traumatología. Esta es una página de bienvenida provisoria: acá
-            va a vivir el panel principal del centro.
+            traumatología. Esta es una página de bienvenida provisoria: acá va a
+            vivir el panel principal del centro.
           </p>
           <div className="flex flex-wrap gap-3">
             <Button size="lg">
@@ -61,8 +61,14 @@ export default function Home() {
           </div>
         </section>
 
-        <section aria-labelledby="modules-heading" className="flex flex-col gap-4">
-          <h2 id="modules-heading" className="text-label-md uppercase text-muted-foreground">
+        <section
+          aria-labelledby="modules-heading"
+          className="flex flex-col gap-4"
+        >
+          <h2
+            id="modules-heading"
+            className="text-label-md uppercase text-muted-foreground"
+          >
             Qué vas a poder hacer
           </h2>
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

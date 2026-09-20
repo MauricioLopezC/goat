@@ -26,6 +26,18 @@ Next.js (App Router) + TypeScript + Prisma 7 + PostgreSQL en Docker.
 - Nombres de dominio: usar los de `docs/glossary.md` y consultarlo antes de crear modelos, campos o enums. No inventar sinónimos; si falta un término, agregarlo ahí en el mismo cambio.
 - Contexto completo del producto (glosario, alcance, decisiones del cliente, riesgos, preguntas abiertas): `docs/contexto-goat.md`. Consultarlo ante dudas de dominio; no hace falta leerlo entero en cada sesión.
 
+## Verificación antes de terminar
+
+Antes de dar por terminado un feature, arreglo o cambio de código, correr `npm run check` y dejarlo en verde. Un cambio con `check` en rojo no está terminado y no se entrega ni se commitea.
+
+`check` corre, en orden: `format:check` (Prettier), `lint` (ESLint), `typecheck` (`tsc --noEmit`) y `db:validate` (`prisma validate`).
+
+- Si falla el formato: `npm run format` lo corrige solo; volver a correr `check`.
+- Si falla lint o tipos: arreglar la causa. No silenciar con `eslint-disable`, `@ts-ignore`, `@ts-expect-error` ni `any` para que pase; si de verdad no hay otra salida, decirlo explícitamente en el resumen.
+- `typecheck` necesita el cliente de Prisma generado: tras clonar o cambiar `schema.prisma`, correr `npm run db:generate` primero.
+- No hay tests automatizados todavía. Cuando se agregue un runner, sumarlo a `check` y actualizar esta sección.
+- Al reportar el resultado, decir qué comandos se corrieron y cuál fue el resultado real; no afirmar que pasó sin haberlo corrido.
+
 ## Arquitectura
 
 Decisión completa en `docs/adr/0001-server-actions-y-capa-de-acceso-a-datos.md`; convención y catálogo de operaciones en `docs/acciones.md`. Consultarlos antes de crear una acción o tocar el acceso a datos.
