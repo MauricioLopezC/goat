@@ -27,12 +27,22 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Prescripción | `Prescription` | |
 | Pago | `Payment` | |
 | Medio de pago | `PaymentMethod` | |
+| Usuario | `User` | Cuenta con la que se ingresa al sistema. Lleva el `Role`. |
+| Título profesional | `ProfessionalTitle` | Traumatólogo, kinesiólogo. Un `Professional` puede tener más de uno. No confundir con `Specialty` (área) ni con `Service` (prestación). |
+| Excepción de agenda | `AvailabilityException` | Día u horario en que el profesional no atiende, contra su patrón de `AvailabilityWindow`. |
+| Consultorio / box | `Room` | En el Incremento 1 cada profesional tiene el suyo. |
 
 ## Enums
 
-**Estado del turno** (`AppointmentStatus`): `SCHEDULED` → `CONFIRMED` → `ATTENDED`, o `CANCELLED`, o `NO_SHOW`. Se usa `CANCELLED` (grafía británica) en todo el código.
+**Estado del turno** (`AppointmentStatus`): `SCHEDULED` (Programado) → `COMPLETED` (Completado), o `CANCELLED` (Cancelado), o `EXPIRED` (Vencido). Se usa `CANCELLED` (grafía británica) en todo el código.
+
+- `SCHEDULED` es el único estado desde el que se puede transicionar: los otros tres son finales.
+- `EXPIRED` es el turno cuya hora pasó sin que se registrara la atención. En el Incremento 1 lo marca el usuario desde el detalle del turno; no hay proceso automático.
+- No existen `CONFIRMED` ni `NO_SHOW`: el equipo los reemplazó por este juego de cuatro estados.
 
 **Rol** (`Role`): `RECEPTIONIST` (mesa de entradas), `PROFESSIONAL`, `MANAGER` (gerente), `PATIENT` (opcional).
+
+**Alta y baja** (activo/inactivo): campo `active` de tipo booleano, con el mismo nombre en `User`, `Patient`, `Professional` y `Service`. La baja siempre es lógica: no se borra el registro.
 
 ## Sin nombre todavía
 

@@ -47,6 +47,22 @@ Guía completa en `CONTRIBUTING.md`; leerla antes de crear una rama, commitear o
 - Commits con formato `tipo: descripción` en español (`feat`, `fix`, `docs`, `chore`, `ci`, `refactor`, `test`).
 - Un PR necesita el check `check` en verde y 1 aprobación de otra persona. El agente no mergea ni aprueba, y no hace push ni abre el PR sin que se lo pidan.
 
+## Flujo de trabajo de una historia
+
+Las historias de usuario están en `docs/hu/` (una por archivo, con su índice y el Definition of Done en `docs/hu/README.md`). La planificación y el cierre de cada incremento, en `docs/incrementos/`. La prioridad y el estado se gestionan en Trello, no en el repositorio.
+
+Orden de trabajo de una historia, todo en la misma rama y el mismo PR:
+
+```
+HU (docs/hu/HU-XX.md)  →  ficha en docs/acciones.md  →  schema + migración
+   →  DAL  →  acción  →  UI  →  npm run check  →  PR
+```
+
+- La historia y las fichas se escriben y se revisan **antes** de implementar. Si al implementar aparece una regla que la historia no dice, se agrega a la historia en el mismo commit, no solo al código.
+- La historia referencia los modelos y términos que ya están en `glossary.md`; no los redefine. Si falta un término, se agrega ahí.
+- Lo que no está acordado con el cliente va a la sección *A conversar* de la historia. No se inventa.
+- **Umbral:** esto aplica a las historias del backbone. Un `fix`, un `chore`, un cambio de documentación o de una línea van directo, sin ficha ni historia.
+
 ## Arquitectura
 
 Decisión completa en `docs/adr/0001-server-actions-y-capa-de-acceso-a-datos.md`; convención y catálogo de operaciones en `docs/acciones.md`. Consultarlos antes de crear una acción o tocar el acceso a datos.
@@ -66,7 +82,7 @@ Decisión completa en `docs/adr/0001-server-actions-y-capa-de-acceso-a-datos.md`
 ## Dominio
 
 - **Actores:** mesa de entradas (usuario más intensivo, optimizar su UX), profesional, gerente. El paciente es opcional. Control de acceso por rol en todo el sistema.
-- **Turno:** reserva de la agenda de un profesional para un paciente, con una prestación (que fija duración y valor). Estados: Programado → Confirmado → Atendido, o Cancelado, o Ausente. Considera servicio, prioridad/urgencia y obra social.
+- **Turno:** reserva de la agenda de un profesional para un paciente, con una prestación (que fija duración y valor). Estados: Programado → Completado, o Cancelado, o Vencido. Considera servicio, prioridad/urgencia y obra social.
 - **Cobertura:** particular u obra social (plan, nº de afiliado, orden/autorización, coseguro).
 
 ## Reglas que no se negocian

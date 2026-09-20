@@ -23,7 +23,7 @@ El acceso se controla por rol en todo el sistema.
 
 Gestión de pacientes, de profesionales, de servicios y prestaciones, y de turnos; calendario; atención e historial; pagos con varios medios de pago; e indicadores para profesionales y gerencia. Transversales: auditoría y control de acceso por rol.
 
-Un **turno** reserva la agenda de un profesional para un paciente con una prestación, que fija su duración y su valor. Pasa por los estados Programado → Confirmado → Atendido, o termina Cancelado o Ausente. La cobertura puede ser particular u obra social.
+Un **turno** reserva la agenda de un profesional para un paciente con una prestación, que fija su duración y su valor. Queda Programado y termina Completado, Cancelado o Vencido. La cobertura puede ser particular u obra social.
 
 **Reglas que no se negocian**
 
