@@ -90,6 +90,23 @@ Para poder mergear, el PR necesita:
 
 Después de mergear, borrar la rama.
 
+### Ayudar en el PR de otra persona
+
+Todo el equipo tiene permiso de escritura en el repo, así que cualquiera puede sumar commits a la rama de un PR ajeno (por ejemplo, si su autor pidió ayuda y no está disponible):
+
+```bash
+git fetch origin
+git switch <rama-del-pr>
+# ...cambios...
+npm run check
+git push
+```
+
+- Pushear a la misma rama, sin `--force`, para no pisar el trabajo de la otra persona.
+- Dejar un comentario en el PR que cuente qué se cambió y por qué.
+- Quien sumó commits a un PR ajeno sí puede aprobarlo: la única restricción es que el autor del PR no puede aprobar el propio.
+- Solo funciona con ramas de este mismo repo. No trabajar desde forks.
+
 ## Reglas para agentes de IA
 
 Además de todo lo anterior:
@@ -98,7 +115,7 @@ Además de todo lo anterior:
 - No mergear el PR ni aprobarlo: eso lo hace una persona del equipo.
 - No saltear las protecciones de la rama (ni con permisos de administrador, ni con `--force`, ni con `--no-verify`).
 - No abrir el PR con `npm run check` en rojo, ni silenciar errores para que pase.
-- No hacer push ni abrir el PR sin que la persona que dirige al agente lo haya pedido.
+- No hacer push ni abrir el PR sin que la persona que dirige al agente lo haya pedido. Esto incluye pushear a la rama de un PR ajeno: solo si la persona lo pidió, sin `--force` y comentando en el PR qué se cambió.
 - Si el PR falla en el CI, leer el log (`gh run view --log-failed`), arreglar la causa y pushear el arreglo a la misma rama.
 
 ## Reglas configuradas en GitHub
@@ -109,4 +126,5 @@ Están aplicadas como protección de la rama `master` (**Settings → Branches**
 - Se requiere el check `check` en verde.
 - Se requiere 1 aprobación de review.
 - Sin force-push ni borrado de la rama.
+- Sin restricciones de push sobre las demás ramas: cualquier colaborador con permiso de escritura puede pushear a la rama de un PR ajeno, y la aprobación no exige que el último push sea de otra persona.
 - Quien administra el repositorio puede saltearse estas reglas de forma excepcional; el resto del equipo, no.
