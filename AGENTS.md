@@ -26,6 +26,12 @@ Next.js (App Router) + TypeScript + Prisma 7 + PostgreSQL en Docker.
 - Nombres de dominio: usar los de `docs/glossary.md` y consultarlo antes de crear modelos, campos o enums. No inventar sinónimos; si falta un término, agregarlo ahí en el mismo cambio.
 - Contexto completo del producto (glosario, alcance, decisiones del cliente, riesgos, preguntas abiertas): `docs/contexto-goat.md`. Consultarlo ante dudas de dominio; no hace falta leerlo entero en cada sesión.
 
+## Interfaz
+
+- shadcn/ui (Radix, preset `nova`) + Tailwind 4. El diseño está en `docs/DESIGN.md`: consultarlo antes de crear UI. El tema (tokens) vive en `src/app/globals.css` y debe mantenerse sincronizado con ese documento.
+- Usar tokens semánticos (`bg-primary`, `text-muted-foreground`, `bg-success-soft`, etc.), nunca colores hex sueltos. Solo tema claro.
+- Componentes nuevos con `npx shadcn@latest add <nombre>`; al agregarlos, aplicar los ajustes de radio que indica `docs/DESIGN.md`.
+
 ## Dominio
 
 - **Actores:** mesa de entradas (usuario más intensivo, optimizar su UX), profesional, gerente. El paciente es opcional. Control de acceso por rol en todo el sistema.
