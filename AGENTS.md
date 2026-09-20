@@ -35,8 +35,17 @@ Antes de dar por terminado un feature, arreglo o cambio de código, correr `npm 
 - Si falla el formato: `npm run format` lo corrige solo; volver a correr `check`.
 - Si falla lint o tipos: arreglar la causa. No silenciar con `eslint-disable`, `@ts-ignore`, `@ts-expect-error` ni `any` para que pase; si de verdad no hay otra salida, decirlo explícitamente en el resumen.
 - `typecheck` necesita el cliente de Prisma generado: tras clonar o cambiar `schema.prisma`, correr `npm run db:generate` primero.
+- Si `check` pasa en local pero falla en el CI, sospechar de estado viejo: `tsc` es incremental y reutiliza `tsconfig.tsbuildinfo`, y los tipos de Next viven en `.next/`. Para reproducir el CI, borrar `.next/`, `tsconfig.tsbuildinfo` y `next-env.d.ts` y volver a correr `check`.
 - No hay tests automatizados todavía. Cuando se agregue un runner, sumarlo a `check` y actualizar esta sección.
 - Al reportar el resultado, decir qué comandos se corrieron y cuál fue el resultado real; no afirmar que pasó sin haberlo corrido.
+
+## Ramas y Pull Requests
+
+Guía completa en `CONTRIBUTING.md`; leerla antes de crear una rama, commitear o abrir un PR. Lo esencial:
+
+- La rama principal es `master` y está protegida: nunca commitear ni pushear a `master`. Cada cambio va en una rama propia (`feature/HU-<n>-slug`, `fix/slug`, `docs/slug`, `chore/slug`) y entra por Pull Request.
+- Commits con formato `tipo: descripción` en español (`feat`, `fix`, `docs`, `chore`, `ci`, `refactor`, `test`).
+- Un PR necesita el check `check` en verde y 1 aprobación de otra persona. El agente no mergea ni aprueba, y no hace push ni abre el PR sin que se lo pidan.
 
 ## Arquitectura
 
