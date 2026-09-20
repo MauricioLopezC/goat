@@ -26,6 +26,15 @@ Next.js (App Router) + TypeScript + Prisma 7 + PostgreSQL en Docker.
 - Nombres de dominio: usar los de `docs/glossary.md` y consultarlo antes de crear modelos, campos o enums. No inventar sinónimos; si falta un término, agregarlo ahí en el mismo cambio.
 - Contexto completo del producto (glosario, alcance, decisiones del cliente, riesgos, preguntas abiertas): `docs/contexto-goat.md`. Consultarlo ante dudas de dominio; no hace falta leerlo entero en cada sesión.
 
+## Arquitectura
+
+Decisión completa en `docs/adr/0001-server-actions-y-capa-de-acceso-a-datos.md`; convención y catálogo de operaciones en `docs/acciones.md`. Consultarlos antes de crear una acción o tocar el acceso a datos.
+
+- Lecturas en Server Components; mutaciones con Server Actions. Route Handlers solo para consumidores externos, no para la UI propia.
+- Las reglas de negocio y el acceso a Prisma viven en `src/lib/dal/` (`server-only`). Las acciones son adaptadores finos y devuelven `ActionResult<T>`.
+- Cada acción es un endpoint POST público: verificar sesión y rol dentro de ella (`proxy.ts` no alcanza) y validar la entrada con Zod.
+- Cada operación nueva se especifica con la plantilla de ficha de `docs/acciones.md`, en el mismo cambio.
+
 ## Interfaz
 
 - shadcn/ui (Radix, preset `nova`) + Tailwind 4. El diseño está en `docs/DESIGN.md`: consultarlo antes de crear UI. El tema (tokens) vive en `src/app/globals.css` y debe mantenerse sincronizado con ese documento.
