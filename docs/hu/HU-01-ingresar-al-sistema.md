@@ -45,3 +45,4 @@ La sesión está decidida en el [ADR 0002](../adr/0002-autenticacion-y-sesion.md
 - ¿Hace falta recuperación de contraseña en el Inc. 1, o alcanza con que el gerente la resetee?
   - **Cliente:** no existe la recuperación de contraseña.
 - El ingreso es por email, que pasa a ser obligatorio y único en el alta ([ADR 0002](../adr/0002-autenticacion-y-sesion.md)). ¿Todo el personal del centro tiene una casilla propia? Si alguno no tiene, el gerente le asigna una interna al darlo de alta.
+- La historia no fija política de contraseñas ni qué pasa ante intentos fallidos repetidos. Al escribir las fichas se asumió un mínimo de 8 caracteres y ningún bloqueo por intentos. Confirmar con el cliente: ¿alcanza para el centro, o quiere un mínimo distinto o que la cuenta se bloquee tras N intentos?
