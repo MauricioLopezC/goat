@@ -58,6 +58,12 @@ export default function Home() {
               <Users data-icon="inline-start" />
               Registrar paciente
             </Button>
+            <Button size="lg" variant="outline" asChild>
+              <a href="/professionals">
+                <Stethoscope data-icon="inline-start" />
+                Profesionales
+              </a>
+            </Button>
           </div>
         </section>
 
