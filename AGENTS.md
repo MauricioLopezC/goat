@@ -79,6 +79,8 @@ Decisión completa en `docs/adr/0001-server-actions-y-capa-de-acceso-a-datos.md`
 - Usar tokens semánticos (`bg-primary`, `text-muted-foreground`, `bg-success-soft`, etc.), nunca colores hex sueltos. Solo tema claro.
 - Componentes nuevos con `npx shadcn@latest add <nombre>`; al agregarlos, aplicar los ajustes de radio que indica `docs/DESIGN.md`.
 - No crear desde cero componentes primitivos (botón, input, select, dialog, tabla, tarjeta, etc.) si shadcn/ui ya los ofrece: agregarlos con `npx shadcn@latest add` y usarlos desde `@/components/ui`. El tema ya está configurado, así que no hace falta reestilizarlos. Solo se arma un componente propio cuando no existe en shadcn, y en ese caso se compone a partir de los primitivos de shadcn (en `src/components/`, fuera de `ui/`).
+- La skill `shadcn` (`.agents/skills/shadcn`) se aplica al trabajar con componentes de shadcn/ui. Si sus indicaciones chocan con este documento o con `docs/DESIGN.md`, mandan estos.
+- No correr `npx shadcn@latest apply`, `init --force`, `add --all` ni `add --overwrite` sin consultar: pisarían los ajustes de `docs/DESIGN.md` (radios, alto de controles) y los tokens de `src/app/globals.css`.
 
 ## Dominio
 
