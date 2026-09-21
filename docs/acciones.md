@@ -70,7 +70,8 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `FORBIDDEN` | Hay sesión, pero el rol no permite la operación o el recurso no le corresponde. |
 | `NOT_FOUND` | El recurso referenciado no existe. |
 | `APPOINTMENT_OVERLAP` | El turno se superpone con otro del mismo profesional. |
-| `OUTSIDE_AVAILABILITY_WINDOW` | El turno queda fuera de la `AvailabilityWindow` del profesional. |
+| `PATIENT_APPOINTMENT_OVERLAP` | El paciente ya tiene otro turno en ese horario, con cualquier profesional. |
+| `OUTSIDE_AVAILABILITY_WINDOW` | El turno queda fuera de la `AvailabilityWindow` del profesional, o cae en una `AvailabilityException` suya o en un `Holiday`. |
 | `INVALID_STATUS_TRANSITION` | El cambio de `AppointmentStatus` no está permitido (ver `glossary.md`). |
 | `REASON_REQUIRED` | Falta el motivo en una operación trazable (por ejemplo, cancelar). |
 
@@ -88,7 +89,7 @@ Los schemas importan `z` de `@/lib/validation/zod`, nunca de `"zod"` (una regla 
 
 Vienen de `AGENTS.md` y no se negocian:
 
-- **Trazabilidad:** toda operación que crea, modifica o cancela un turno registra quién, cuándo y con qué motivo. El nombre del modelo de auditoría todavía no está definido en el glosario y se resuelve antes de implementar la primera de estas operaciones.
+- **Trazabilidad:** toda operación que crea, modifica o cancela un turno registra quién, cuándo y con qué motivo. El alta guarda su autor en `Appointment.createdById`; todo cambio posterior (cancelar, completar, vencer, modificar) agrega un `AppointmentEvent` con el usuario, el instante, el motivo y quién lo solicitó. La operación que cambia el estado de un turno actualiza el `Appointment` y crea su `AppointmentEvent` en la misma transacción.
 - **Valores separados:** el valor de la `Service`, la `Coverage` y lo que paga el paciente (`Copay`, `Payment`) son datos distintos. Ninguna operación los mezcla en un solo campo.
 - **Rol:** toda operación declara los `Role` permitidos.
 

@@ -1,7 +1,17 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// Modelo de datos del Incremento 1.
+//
+// Nombres de dominio: docs/glossary.md. Historias: docs/hu/.
+// Documentación en español, código en inglés (AGENTS.md).
+//
+// Convenciones de este schema:
+// - Las horas del patrón semanal se guardan como minutos desde la medianoche
+//   (0 a 1440), no como `time`: simplifica comparaciones y la restricción de
+//   solapamiento en la base.
+// - Los instantes (`startsAt`, `endsAt`, auditoría) son `timestamptz`.
+// - Las bajas son lógicas: campo `active`, nunca se borra el registro.
+// - Las restricciones de solapamiento son `EXCLUDE ... USING gist`, escritas a
+//   mano en la migración: Prisma no las declara (ver ADR 0001, "Concurrencia
+//   en turnos").
 
 generator client {
   provider = "prisma-client"
@@ -10,4 +20,381 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─────────────────────────────── Enums ───────────────────────────────
+
+/// Rol del usuario. `PATIENT` está declarado pero no se usa en el Inc. 1.
+enum Role {
+  RECEPTIONIST
+  PROFESSIONAL
+  MANAGER
+  PATIENT
+}
+
+enum DocumentType {
+  DNI
+  LC
+  LE
+  CI
+  PASSPORT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+/// Cobertura del paciente: particular u obra social.
+enum CoverageType {
+  PRIVATE
+  HEALTH_INSURANCE
+}
+
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+/// `SCHEDULED` es el único estado desde el que se transiciona; los otros tres
+/// son finales. `EXPIRED` lo marca el usuario a mano (no hay proceso automático).
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+/// Tipo de cambio registrado sobre un turno ya creado. El alta no genera
+/// evento: su autoría vive en `Appointment.createdById`.
+enum AppointmentEventType {
+  UPDATED
+  CANCELLED
+  COMPLETED
+  EXPIRED
+}
+
+// ────────────────────────────── Acceso ───────────────────────────────
+
+/// Cuenta con la que se ingresa al sistema (HU-01). El modelo de sesión se
+/// define en el ADR de autenticación, todavía pendiente: acá solo está la
+/// credencial.
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  email        String?  @unique
+  passwordHash String
+  lastName     String
+  firstName    String
+  /// Teléfono de contacto interno.
+  phone        String?
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  /// Ficha del profesional, cuando el usuario atiende en el centro.
+  professional Professional? @relation("ProfessionalUser")
+
+  createdProfessionals     Professional[]          @relation("ProfessionalCreatedBy")
+  updatedProfessionals     Professional[]          @relation("ProfessionalUpdatedBy")
+  deactivatedProfessionals Professional[]          @relation("ProfessionalDeactivatedBy")
+  createdPatients          Patient[]               @relation("PatientCreatedBy")
+  updatedPatients          Patient[]               @relation("PatientUpdatedBy")
+  createdExceptions        AvailabilityException[] @relation("AvailabilityExceptionCreatedBy")
+  createdAppointments      Appointment[]           @relation("AppointmentCreatedBy")
+  appointmentEvents        AppointmentEvent[]
+
+  @@index([lastName, firstName])
+}
+
+// ───────────────────────── Profesionales ─────────────────────────────
+
+/// Título de profesión (traumatólogo, kinesiólogo). Un profesional puede
+/// tener más de uno. No confundir con `Specialty` ni con `Service`.
+model ProfessionalTitle {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  active Boolean @default(true)
+
+  professionals Professional[]
+}
+
+/// Área o línea de atención del centro (columna, rodilla, infantil…).
+model Specialty {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  active Boolean @default(true)
+
+  services Service[]
+}
+
+/// Consultorio o box. En el Inc. 1 cada profesional atiende en el suyo.
+model Room {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  active Boolean @default(true)
+
+  availabilityWindows AvailabilityWindow[]
+}
+
+model Professional {
+  id String @id @default(cuid())
+
+  /// Cuenta con la que ingresa, si tiene acceso al sistema (HU-12).
+  userId String? @unique
+  user   User?   @relation("ProfessionalUser", fields: [userId], references: [id])
+
+  lastName       String
+  firstName      String
+  documentType   DocumentType
+  documentNumber String
+  /// Matrícula: numérica, de 1 a 8 dígitos (el formato lo valida Zod).
+  licenseNumber  String       @unique
+  phone          String?
+  email          String?
+  photoUrl       String?
+  notes          String?
+  active         Boolean      @default(true)
+
+  /// Baja lógica (HU-03): fecha efectiva, motivo y quién la hizo.
+  deactivatedAt      DateTime?
+  deactivationReason String?
+  deactivatedById    String?
+  deactivatedBy      User?     @relation("ProfessionalDeactivatedBy", fields: [deactivatedById], references: [id])
+
+  createdById String
+  createdBy   User    @relation("ProfessionalCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("ProfessionalUpdatedBy", fields: [updatedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  titles              ProfessionalTitle[]
+  services            Service[]
+  availabilityWindows AvailabilityWindow[]
+  exceptions          AvailabilityException[]
+  appointments        Appointment[]
+
+  @@unique([documentType, documentNumber])
+  @@index([lastName, firstName])
+  @@index([active])
+}
+
+// ─────────────────────── Catálogo de servicios ───────────────────────
+
+/// Prestación: lo que se hace en el turno. Fija la duración del bloque.
+model Service {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  description      String?
+  /// Duración del bloque que ocupa en la agenda. En el Inc. 1 son 30 para
+  /// todos los servicios, pero el valor es propio de cada uno.
+  durationMinutes  Int
+  /// Requiere orden médica.
+  requiresReferral Boolean  @default(false)
+  /// Valor de la prestación. Se mantiene separado de la cobertura y de lo que
+  /// paga el paciente. Opcional: no se cobra en el Inc. 1.
+  price            Decimal? @db.Decimal(12, 2)
+  active           Boolean  @default(true)
+
+  specialtyId String?
+  specialty   Specialty? @relation(fields: [specialtyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  professionals       Professional[]
+  availabilityWindows AvailabilityWindow[]
+  appointments        Appointment[]
+
+  @@index([active])
+}
+
+// ───────────────────────────── Agenda ────────────────────────────────
+
+/// Franja de atención del patrón semanal de un profesional (HU-05).
+/// Se repite todas las semanas hasta que se modifique.
+model AvailabilityWindow {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  weekday        Weekday
+  /// Minutos desde la medianoche. `startMinute` < `endMinute`.
+  startMinute    Int
+  endMinute      Int
+
+  roomId String?
+  room   Room?   @relation(fields: [roomId], references: [id])
+
+  /// Servicios habilitados en esta franja. Vacío significa todos los que
+  /// presta el profesional.
+  services Service[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([professionalId, weekday])
+}
+
+/// Excepción al patrón semanal: día u horario en que el profesional no
+/// atiende (ausencia puntual, vacaciones, congreso).
+model AvailabilityException {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  date           DateTime     @db.Date
+  /// Minutos desde la medianoche. Ambos nulos = el día entero.
+  startMinute    Int?
+  endMinute      Int?
+  reason         String
+
+  createdById String
+  createdBy   User   @relation("AvailabilityExceptionCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([professionalId, date])
+}
+
+/// Feriado: el centro permanece cerrado y no genera disponibilidad para
+/// ningún profesional (HU-05).
+model Holiday {
+  id          String   @id @default(cuid())
+  date        DateTime @unique @db.Date
+  description String
+}
+
+// ──────────────────────────── Pacientes ──────────────────────────────
+
+model Patient {
+  id             String       @id @default(cuid())
+  lastName       String
+  firstName      String
+  gender         Gender
+  documentType   DocumentType
+  documentNumber String
+  birthDate      DateTime     @db.Date
+  phone          String
+  email          String
+  coverageType   CoverageType
+  /// Responsable o tutor, para pacientes menores de edad.
+  guardianName   String?
+  guardianPhone  String?
+  active         Boolean      @default(true)
+
+  createdById String
+  createdBy   User    @relation("PatientCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("PatientUpdatedBy", fields: [updatedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Presente solo cuando `coverageType` es `HEALTH_INSURANCE`.
+  coverage     Coverage?
+  appointments Appointment[]
+
+  @@unique([documentType, documentNumber])
+  @@index([lastName, firstName])
+  @@index([documentNumber])
+}
+
+/// Obra social.
+model HealthInsurer {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  active Boolean @default(true)
+
+  plans InsurancePlan[]
+}
+
+/// Plan dentro de una obra social.
+model InsurancePlan {
+  id              String        @id @default(cuid())
+  healthInsurerId String
+  healthInsurer   HealthInsurer @relation(fields: [healthInsurerId], references: [id])
+  name            String
+  active          Boolean       @default(true)
+
+  coverages Coverage[]
+
+  @@unique([healthInsurerId, name])
+}
+
+/// Afiliación del paciente: plan, número de afiliado y coseguro.
+model Coverage {
+  id        String  @id @default(cuid())
+  patientId String  @unique
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  insurancePlanId String
+  insurancePlan   InsurancePlan @relation(fields: [insurancePlanId], references: [id])
+  /// Número de afiliado.
+  memberNumber    String
+  /// Coseguro: lo que paga el paciente aunque tenga cobertura.
+  copayAmount     Decimal       @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ───────────────────────────── Turnos ────────────────────────────────
+
+/// Reserva de la agenda de un profesional para un paciente, con una
+/// prestación. `endsAt` lo calcula la DAL con la duración del `Service`.
+model Appointment {
+  id             String       @id @default(cuid())
+  patientId      String
+  patient        Patient      @relation(fields: [patientId], references: [id])
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  serviceId      String
+  service        Service      @relation(fields: [serviceId], references: [id])
+
+  startsAt DateTime
+  endsAt   DateTime
+  status   AppointmentStatus @default(SCHEDULED)
+  notes    String?
+
+  createdById String
+  createdBy   User   @relation("AppointmentCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Todo cambio posterior al alta (cancelación, cierre, vencimiento).
+  events AppointmentEvent[]
+
+  @@index([professionalId, startsAt])
+  @@index([patientId, startsAt])
+  @@index([startsAt])
+  @@index([status])
+}
+
+/// Traza de los cambios de un turno: qué cambió, quién, cuándo y por qué.
+/// El alta no genera evento (ver `Appointment.createdById`).
+model AppointmentEvent {
+  id            String               @id @default(cuid())
+  appointmentId String
+  appointment   Appointment          @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  type          AppointmentEventType
+  /// Motivo. Obligatorio al cancelar (HU-10); lo exige la DAL.
+  reason        String?
+  /// Quién solicitó el cambio (el paciente, el profesional, el centro).
+  requestedBy   String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([appointmentId, createdAt])
 }
