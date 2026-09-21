@@ -1,5 +1,5 @@
 import { z } from "@/lib/validation/zod";
-import { Role } from "@/generated/prisma/enums";
+import { STAFF_ROLES } from "@/lib/dal/auth";
 
 // Schemas de entrada de las operaciones de HU-01. Ver las fichas en
 // docs/acciones.md.
@@ -32,7 +32,8 @@ export const createUserSchema = z.object({
       `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`,
     )
     .max(200),
-  role: z.enum(Role),
+  // Solo los tres roles del centro: el paciente no accede (HU-01).
+  role: z.enum(STAFF_ROLES),
   phone: z
     .string()
     .trim()

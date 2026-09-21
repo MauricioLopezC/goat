@@ -31,17 +31,16 @@ export default async function proxy(request: NextRequest) {
     sessionOptions(),
   );
 
-  const isPublic = PUBLIC_PATHS.includes(pathname);
-
-  if (!session.userId) {
-    if (isPublic) return response;
-    const url = new URL("/login", request.nextUrl);
-    return NextResponse.redirect(url);
+  if (PUBLIC_PATHS.includes(pathname)) {
+    // El login se deja pasar siempre. Mandar a otro lado al que ya tiene
+    // cookie sería decidir con información vieja: si lo dieron de baja, la
+    // página lo devolvería acá y quedaría un bucle. Esa decisión la toma
+    // `/login`, que relee la base.
+    return response;
   }
 
-  // Ya autenticado: el login no tiene nada que ofrecerle.
-  if (isPublic) {
-    return NextResponse.redirect(new URL("/", request.nextUrl));
+  if (!session.userId) {
+    return NextResponse.redirect(new URL("/login", request.nextUrl));
   }
 
   const rule = BY_ROLE.find((entry) => pathname.startsWith(entry.prefix));

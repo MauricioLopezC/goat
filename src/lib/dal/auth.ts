@@ -87,8 +87,35 @@ export function landingPath(role: Role): string {
     case Role.MANAGER:
       return "/professionals";
     case Role.PATIENT:
-      return "/";
+      // El paciente no accede al sistema en el Inc. 1 y `createUser` no permite
+      // ese rol. Devolver "/" haría un bucle, porque "/" manda acá.
+      return "/login";
   }
+}
+
+/// Los tres roles que trabajan en el centro. `PATIENT` está declarado en el
+/// enum pero no accede al sistema en el Inc. 1.
+export const STAFF_ROLES = [
+  Role.RECEPTIONIST,
+  Role.PROFESSIONAL,
+  Role.MANAGER,
+] as const;
+
+/// Variante de `requireRole` para páginas.
+///
+/// `requireRole` lanza `DomainError`, que `defineAction` traduce a
+/// `ActionResult`; en una página nadie lo atrapa y sale un error 500. Acá, en
+/// cambio, al usuario se lo manda a su propia pantalla: escribir a mano la URL
+/// de otro rol no es un error que valga una pantalla de error.
+export async function requirePageRole(...roles: Role[]): Promise<Actor> {
+  const actor = await getSession();
+  if (!actor) redirect("/login");
+
+  if (roles.length > 0 && !roles.includes(actor.role)) {
+    redirect(landingPath(actor.role));
+  }
+
+  return actor;
 }
 
 /// Verifica las credenciales y abre la sesión. Devuelve a dónde ir.
