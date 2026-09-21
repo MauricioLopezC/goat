@@ -10,6 +10,7 @@ Una historia por archivo. Este índice dice qué historias existen y a qué incr
 | Prioridad, estado, quién la toma | **Trello** |
 | Objetivo, estimación, riesgos y cierre de un incremento | [`docs/incrementos/`](../incrementos/) |
 | Contrato de cada operación | [`docs/acciones.md`](../acciones.md) |
+| Diagrama entidad-relación y reglas de la base | [`docs/modelo-de-datos.md`](../modelo-de-datos.md) |
 | Nombres de dominio en código | [`glossary.md`](../glossary.md) |
 
 El repositorio guarda la especificación, que es estable. Trello guarda el estado, que cambia todos los días. Nada de lo que se mueve a diario entra acá.
@@ -67,5 +68,6 @@ Una historia está terminada cuando:
 - Los permisos por rol están verificados con los tres usuarios.
 - `npm run check` pasa y el código está en `master` por Pull Request aprobado.
 - La ficha de cada operación está en `acciones.md`, y el glosario tiene los términos nuevos.
+- Si la historia cambió el schema, el DER de [`modelo-de-datos.md`](../modelo-de-datos.md) está actualizado.
 - Sus decisiones y recortes quedaron registrados en el documento del incremento.
 - El cliente la aprobó en la revisión del incremento.

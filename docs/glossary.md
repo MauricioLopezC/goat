@@ -31,6 +31,8 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Título profesional | `ProfessionalTitle` | Traumatólogo, kinesiólogo. Un `Professional` puede tener más de uno. No confundir con `Specialty` (área) ni con `Service` (prestación). |
 | Excepción de agenda | `AvailabilityException` | Día u horario en que el profesional no atiende, contra su patrón de `AvailabilityWindow`. |
 | Consultorio / box | `Room` | En el Incremento 1 cada profesional tiene el suyo. |
+| Feriado | `Holiday` | Día en que el centro permanece cerrado. No genera disponibilidad para nadie. |
+| Traza de cambios de un turno | `AppointmentEvent` | Qué cambió en un turno ya creado, quién, cuándo y por qué. El alta no genera evento: su autoría vive en `Appointment.createdById`. |
 
 ## Enums
 
@@ -42,8 +44,18 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 
 **Rol** (`Role`): `RECEPTIONIST` (mesa de entradas), `PROFESSIONAL`, `MANAGER` (gerente), `PATIENT` (opcional).
 
+**Tipo de documento** (`DocumentType`): `DNI`, `LC`, `LE`, `CI`, `PASSPORT`. Junto con el número forma la identificación única de un `Patient` y de un `Professional`.
+
+**Género** (`Gender`): `MALE`, `FEMALE`, `OTHER`.
+
+**Tipo de cobertura** (`CoverageType`): `PRIVATE` (particular) o `HEALTH_INSURANCE` (obra social). Cuando es `HEALTH_INSURANCE`, el paciente tiene además una `Coverage`.
+
+**Día de la semana** (`Weekday`): `MONDAY` a `SUNDAY`. Es el día del patrón semanal de una `AvailabilityWindow`, no una fecha.
+
+**Tipo de cambio en un turno** (`AppointmentEventType`): `UPDATED`, `CANCELLED`, `COMPLETED`, `EXPIRED`.
+
 **Alta y baja** (activo/inactivo): campo `active` de tipo booleano, con el mismo nombre en `User`, `Patient`, `Professional` y `Service`. La baja siempre es lógica: no se borra el registro.
 
 ## Sin nombre todavía
 
-Definir antes de modelarlos: tipo de turno (primera consulta, control, post-quirúrgico, práctica, kinesiología, urgencia), prioridad/urgencia, series o packs de kinesiología, auditoría de cambios.
+Definir antes de modelarlos: tipo de turno (primera consulta, control, post-quirúrgico, práctica, kinesiología, urgencia), prioridad/urgencia, series o packs de kinesiología.

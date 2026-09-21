@@ -59,7 +59,7 @@ Tipos usados: `feat`, `fix`, `docs`, `chore`, `ci`, `refactor`, `test`.
 
 1. Correr `npm run check` y dejarlo en verde (formato, lint, tipos y schema de Prisma). Si falla, el PR no se abre: se arregla primero. Si algo falla solo en el CI, ver la nota de `AGENTS.md` sobre `.next/` y `tsconfig.tsbuildinfo`.
 2. Si el cambio toca el dominio, actualizar en el mismo cambio `docs/glossary.md` (términos nuevos) y la ficha de `docs/acciones.md` (operaciones nuevas o modificadas).
-3. Si el cambio toca `schema.prisma`, incluir la migración (`npm run db:migrate`).
+3. Si el cambio toca `schema.prisma`, incluir la migración (`npm run db:migrate`) y actualizar el diagrama y las tablas de reglas de `docs/modelo-de-datos.md`.
 4. Traer los cambios de `master` si hace falta, con un merge (sin rebase ni force-push sobre ramas compartidas):
 
    ```bash
