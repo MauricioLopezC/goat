@@ -74,6 +74,8 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `OUTSIDE_AVAILABILITY_WINDOW` | El turno queda fuera de la `AvailabilityWindow` del profesional, o cae en una `AvailabilityException` suya o en un `Holiday`. |
 | `INVALID_STATUS_TRANSITION` | El cambio de `AppointmentStatus` no está permitido (ver `glossary.md`). |
 | `REASON_REQUIRED` | Falta el motivo en una operación trazable (por ejemplo, cancelar). |
+| `INVALID_CREDENTIALS` | El ingreso falló. Cubre email inexistente, contraseña incorrecta y usuario inactivo: los tres devuelven lo mismo, a propósito (HU-01). |
+| `EMAIL_TAKEN` | Ya existe un usuario con ese email. |
 
 Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
 
@@ -129,4 +131,63 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 Una ficha por operación implementada o acordada. Se agregan a medida que se trabaja cada historia de usuario ([`docs/hu/`](hu/README.md)) y se mantienen junto con el código: si una regla cambia, cambia la ficha en el mismo commit.
 
-_Todavía no hay operaciones especificadas._
+### `signIn`
+
+**Historia de usuario:** [HU-01 — Ingresar al sistema con mi rol](hu/HU-01-ingresar-al-sistema.md)
+**Roles:** ninguno. Es la operación que *crea* la sesión, así que es la única —junto con `signOut`— que no pasa por `requireRole`. Ver la nota al final de la ficha.
+**Entrada:** `email`, `password`.
+**Precondiciones:** existe un `User` con ese email, está `active` y la contraseña verifica contra su `passwordHash` (argon2id, [ADR 0002](adr/0002-autenticacion-y-sesion.md)).
+**Efectos:** sella la cookie de sesión con `{ userId, role }`. No escribe en la base.
+**Errores:** `VALIDATION` (email mal formado o campo vacío), `INVALID_CREDENTIALS`.
+**Revalida:** nada. Redirige.
+**Devuelve:** en el camino feliz no devuelve: redirige a la pantalla inicial del rol (`RECEPTIONIST` → calendario del día del centro, `PROFESSIONAL` → su agenda del día, `MANAGER` → listado de profesionales). `ActionResult` solo viaja en el caso de error.
+
+Dos cosas que esta ficha fija y conviene no perder al implementar:
+
+- **Un solo error para tres causas distintas.** Email inexistente, contraseña incorrecta y usuario inactivo devuelven `INVALID_CREDENTIALS` con el mismo mensaje. Distinguir el usuario inactivo revelaría que ese email existe en el sistema, y HU-01 pide mensaje genérico.
+- **El hash se verifica siempre**, incluso cuando el email no existe, contra un hash descartable. Si no, el tiempo de respuesta delata qué emails están registrados.
+
+### `signOut`
+
+**Historia de usuario:** [HU-01 — Ingresar al sistema con mi rol](hu/HU-01-ingresar-al-sistema.md)
+**Roles:** cualquier sesión válida. No discrimina por rol.
+**Entrada:** ninguna.
+**Precondiciones:** ninguna. Es idempotente: sin sesión abierta también termina bien.
+**Efectos:** borra la cookie de sesión. No escribe en la base.
+**Errores:** ninguno.
+**Revalida:** nada. Redirige.
+**Devuelve:** no devuelve: redirige a `/login`.
+
+### `createUser`
+
+**Historia de usuario:** [HU-01 — Ingresar al sistema con mi rol](hu/HU-01-ingresar-al-sistema.md)
+**Roles:** `MANAGER`. Es el único que crea usuarios y asigna roles.
+**Entrada:** `firstName`, `lastName`, `email`, `password` (inicial, la fija el gerente), `role`, `phone` (opcional).
+**Precondiciones:** no existe otro `User` con ese email.
+**Efectos:** crea un `User` con `active: true` y la contraseña hasheada con argon2id. La contraseña en claro no se guarda ni se registra en ningún lado.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `EMAIL_TAKEN`.
+**Revalida:** el listado de usuarios.
+**Devuelve:** `{ id, firstName, lastName, email, role }`. Nunca el `passwordHash`.
+
+No vincula la cuenta con un `Professional`: esa relación (`Professional.userId`) la maneja el alta de profesional, [HU-02](hu/HU-02-registrar-profesional.md).
+
+### `listUsers`
+
+**Historia de usuario:** [HU-01 — Ingresar al sistema con mi rol](hu/HU-01-ingresar-al-sistema.md)
+**Roles:** `MANAGER`.
+**Entrada:** ninguna.
+**Precondiciones:** ninguna.
+**Efectos:** ninguno. Es una lectura.
+**Errores:** ninguno propio. Sin permiso, la página redirige antes de llamarla.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, firstName, lastName, email, role, active, createdAt }[]`, ordenado por estado y apellido. Nunca el `passwordHash`.
+
+No es una Server Action: es una lectura que el Server Component de `/users`
+llama directo a la DAL (ADR 0001). Lleva ficha igual porque tiene una
+restricción de rol y decide qué datos del usuario salen a la interfaz.
+
+### Nota: `signIn` y `signOut` frente a `defineAction`
+
+`defineAction` exige declarar roles, y estas dos operaciones no tienen ninguno que exigir: una corre sin sesión por definición y la otra acepta cualquiera. Ambas siguen igual el resto del flujo del [ADR 0001](adr/0001-server-actions-y-capa-de-acceso-a-datos.md) —validar con Zod, delegar en la DAL, devolver `ActionResult` ante el error— y siguen siendo endpoints POST públicos.
+
+`getSession()` y `requireRole()` no llevan ficha: no son acciones, son las funciones de `src/lib/dal/auth.ts` sobre las que se apoya todo lo demás.

@@ -82,13 +82,15 @@ enum AppointmentEventType {
 
 // ────────────────────────────── Acceso ───────────────────────────────
 
-/// Cuenta con la que se ingresa al sistema (HU-01). El modelo de sesión se
-/// define en el ADR de autenticación, todavía pendiente: acá solo está la
-/// credencial.
+/// Cuenta con la que se ingresa al sistema (HU-01). El ingreso es por email y
+/// contraseña; la sesión es una cookie sellada y no se persiste (ADR 0002),
+/// así que acá solo vive la credencial.
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique
-  email        String?  @unique
+  id Int @id @default(autoincrement())
+
+  /// Identificador de ingreso (ADR 0002): obligatorio y único.
+  email        String @unique
+  /// argon2id, con sus parámetros incluidos. Nunca la contraseña en claro.
   passwordHash String
   lastName     String
   firstName    String
