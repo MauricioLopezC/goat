@@ -4,10 +4,13 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/enums";
+import { STAFF_ROLES } from "@/lib/roles";
 import { readSession, startSession, clearSession } from "@/lib/session";
 import { dummyHash, hashPassword, verifyPassword } from "@/lib/password";
 import { DomainError } from "@/lib/actions";
 import type { SignInInput, CreateUserInput } from "@/lib/validation/auth";
+
+export { STAFF_ROLES };
 
 // Único punto del sistema que sabe cómo está implementada la sesión (ADR 0001
 // y ADR 0002). Todo lo demás llama a `getSession()` o a `requireRole()`.
@@ -93,14 +96,6 @@ export function landingPath(role: Role): string {
   }
 }
 
-/// Los tres roles que trabajan en el centro. `PATIENT` está declarado en el
-/// enum pero no accede al sistema en el Inc. 1.
-export const STAFF_ROLES = [
-  Role.RECEPTIONIST,
-  Role.PROFESSIONAL,
-  Role.MANAGER,
-] as const;
-
 /// Variante de `requireRole` para páginas.
 ///
 /// `requireRole` lanza `DomainError`, que `defineAction` traduce a
@@ -148,6 +143,26 @@ export async function signIn(input: SignInInput): Promise<string> {
 
 export async function signOut(): Promise<void> {
   await clearSession();
+}
+
+/// Listado de usuarios del centro, para la pantalla del gerente.
+///
+/// Es una lectura: la consume un Server Component llamando directo a la DAL
+/// (ADR 0001). Devuelve solo lo que la pantalla muestra, nunca el
+/// `passwordHash`.
+export async function listUsers() {
+  return prisma.user.findMany({
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      role: true,
+      active: true,
+      createdAt: true,
+    },
+    orderBy: [{ active: "desc" }, { lastName: "asc" }, { firstName: "asc" }],
+  });
 }
 
 /// Alta de usuario. Solo el gerente (el rol lo verifica la acción).

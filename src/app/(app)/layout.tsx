@@ -1,14 +1,9 @@
+import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
+import { ROLE_LABEL } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/app/(auth)/login/actions";
-
-const ROLE_LABEL = {
-  RECEPTIONIST: "Mesa de entradas",
-  PROFESSIONAL: "Profesional",
-  MANAGER: "Gerente",
-  PATIENT: "Paciente",
-} as const;
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   // Barrera autoritativa: `proxy.ts` ya hizo el chequeo optimista, pero es
@@ -23,6 +18,17 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             G
           </span>
           <span className="text-title-lg">Goat</span>
+
+          {actor.role === "MANAGER" && (
+            <nav className="ml-6">
+              <Link
+                href="/users"
+                className="text-title-md text-muted-foreground hover:text-foreground"
+              >
+                Usuarios
+              </Link>
+            </nav>
+          )}
 
           <div className="ml-auto flex items-center gap-4">
             <div className="hidden text-right sm:block">

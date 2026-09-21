@@ -171,6 +171,21 @@ Dos cosas que esta ficha fija y conviene no perder al implementar:
 
 No vincula la cuenta con un `Professional`: esa relación (`Professional.userId`) la maneja el alta de profesional, [HU-02](hu/HU-02-registrar-profesional.md).
 
+### `listUsers`
+
+**Historia de usuario:** [HU-01 — Ingresar al sistema con mi rol](hu/HU-01-ingresar-al-sistema.md)
+**Roles:** `MANAGER`.
+**Entrada:** ninguna.
+**Precondiciones:** ninguna.
+**Efectos:** ninguno. Es una lectura.
+**Errores:** ninguno propio. Sin permiso, la página redirige antes de llamarla.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, firstName, lastName, email, role, active, createdAt }[]`, ordenado por estado y apellido. Nunca el `passwordHash`.
+
+No es una Server Action: es una lectura que el Server Component de `/users`
+llama directo a la DAL (ADR 0001). Lleva ficha igual porque tiene una
+restricción de rol y decide qué datos del usuario salen a la interfaz.
+
 ### Nota: `signIn` y `signOut` frente a `defineAction`
 
 `defineAction` exige declarar roles, y estas dos operaciones no tienen ninguno que exigir: una corre sin sesión por definición y la otra acepta cualquiera. Ambas siguen igual el resto del flujo del [ADR 0001](adr/0001-server-actions-y-capa-de-acceso-a-datos.md) —validar con Zod, delegar en la DAL, devolver `ActionResult` ante el error— y siguen siendo endpoints POST públicos.

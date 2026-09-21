@@ -1,5 +1,5 @@
 import { z } from "@/lib/validation/zod";
-import { STAFF_ROLES } from "@/lib/dal/auth";
+import { STAFF_ROLES } from "@/lib/roles";
 
 // Schemas de entrada de las operaciones de HU-01. Ver las fichas en
 // docs/acciones.md.
