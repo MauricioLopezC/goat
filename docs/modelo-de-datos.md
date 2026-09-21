@@ -33,8 +33,8 @@ erDiagram
 
     User {
         int id PK
-        string username UK
-        string passwordHash
+        string email UK "identificador de ingreso"
+        string passwordHash "argon2id"
         Role role
         boolean active
     }
@@ -154,7 +154,7 @@ erDiagram
 
 | Grupo | Entidades | Qué resuelve |
 |---|---|---|
-| Acceso | `User` | Cuenta, rol y credencial (HU-01). |
+| Acceso | `User` | Cuenta, rol y credencial (HU-01). Se ingresa con email y contraseña; la sesión no se persiste ([ADR 0002](adr/0002-autenticacion-y-sesion.md)). |
 | Profesionales | `Professional`, `ProfessionalTitle` | Ficha del profesional y sus títulos (HU-02 a HU-04). |
 | Catálogo | `Service`, `Specialty` | Qué se hace en un turno, cuánto dura y cuánto vale (HU-06). |
 | Agenda | `AvailabilityWindow`, `AvailabilityException`, `Holiday`, `Room` | Cuándo y dónde atiende cada profesional, y cuándo el centro no atiende (HU-05). |
@@ -187,7 +187,7 @@ Prisma no las declara, así que están escritas a mano en la migración `prisma/
 | `Service_duration_positive` | La duración de una prestación es mayor que cero. |
 | `Service_price_not_negative` | El valor de una prestación no es negativo. |
 
-También hay unicidad en la identificación de las personas (`documentType` + `documentNumber` en `Patient` y en `Professional`), en la matrícula (`Professional.licenseNumber`), en `Holiday.date`, en el plan dentro de su obra social y en `Coverage.patientId`.
+También hay unicidad en el email de ingreso (`User.email`), en la identificación de las personas (`documentType` + `documentNumber` en `Patient` y en `Professional`), en la matrícula (`Professional.licenseNumber`), en `Holiday.date`, en el plan dentro de su obra social y en `Coverage.patientId`.
 
 ## Reglas que hace cumplir la DAL
 
@@ -198,6 +198,7 @@ No se pueden expresar en el schema: las hace cumplir la DAL (`src/lib/dal/`, tod
 - Un turno solo cambia de estado desde `SCHEDULED`; los otros tres estados son finales.
 - El motivo es obligatorio al cancelar (HU-10).
 - `Coverage` existe si y solo si `coverageType` es `HEALTH_INSURANCE`.
+- Un usuario inactivo no puede ingresar ni sostener una sesión abierta: `getSession()` relee `active` en cada request ([ADR 0002](adr/0002-autenticacion-y-sesion.md)).
 - El formato de la matrícula y el resto de la validación de entrada lo hace Zod en cada acción.
 
 ## Todavía no modelado
