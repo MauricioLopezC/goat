@@ -21,7 +21,7 @@ CREATE TYPE "AppointmentEventType" AS ENUM ('UPDATED', 'CANCELLED', 'COMPLETED',
 
 -- CreateTable
 CREATE TABLE "User" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "username" TEXT NOT NULL,
     "email" TEXT,
     "passwordHash" TEXT NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE "User" (
 
 -- CreateTable
 CREATE TABLE "ProfessionalTitle" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "active" BOOLEAN NOT NULL DEFAULT true,
 
@@ -47,7 +47,7 @@ CREATE TABLE "ProfessionalTitle" (
 
 -- CreateTable
 CREATE TABLE "Specialty" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "active" BOOLEAN NOT NULL DEFAULT true,
 
@@ -56,7 +56,7 @@ CREATE TABLE "Specialty" (
 
 -- CreateTable
 CREATE TABLE "Room" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "active" BOOLEAN NOT NULL DEFAULT true,
 
@@ -65,8 +65,8 @@ CREATE TABLE "Room" (
 
 -- CreateTable
 CREATE TABLE "Professional" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT,
+    "id" SERIAL NOT NULL,
+    "userId" INTEGER,
     "lastName" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "documentType" "DocumentType" NOT NULL,
@@ -79,9 +79,9 @@ CREATE TABLE "Professional" (
     "active" BOOLEAN NOT NULL DEFAULT true,
     "deactivatedAt" TIMESTAMP(3),
     "deactivationReason" TEXT,
-    "deactivatedById" TEXT,
-    "createdById" TEXT NOT NULL,
-    "updatedById" TEXT,
+    "deactivatedById" INTEGER,
+    "createdById" INTEGER NOT NULL,
+    "updatedById" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -90,14 +90,14 @@ CREATE TABLE "Professional" (
 
 -- CreateTable
 CREATE TABLE "Service" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
     "durationMinutes" INTEGER NOT NULL,
     "requiresReferral" BOOLEAN NOT NULL DEFAULT false,
     "price" DECIMAL(12,2),
     "active" BOOLEAN NOT NULL DEFAULT true,
-    "specialtyId" TEXT,
+    "specialtyId" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -106,12 +106,12 @@ CREATE TABLE "Service" (
 
 -- CreateTable
 CREATE TABLE "AvailabilityWindow" (
-    "id" TEXT NOT NULL,
-    "professionalId" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
+    "professionalId" INTEGER NOT NULL,
     "weekday" "Weekday" NOT NULL,
     "startMinute" INTEGER NOT NULL,
     "endMinute" INTEGER NOT NULL,
-    "roomId" TEXT,
+    "roomId" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -120,13 +120,13 @@ CREATE TABLE "AvailabilityWindow" (
 
 -- CreateTable
 CREATE TABLE "AvailabilityException" (
-    "id" TEXT NOT NULL,
-    "professionalId" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
+    "professionalId" INTEGER NOT NULL,
     "date" DATE NOT NULL,
     "startMinute" INTEGER,
     "endMinute" INTEGER,
     "reason" TEXT NOT NULL,
-    "createdById" TEXT NOT NULL,
+    "createdById" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AvailabilityException_pkey" PRIMARY KEY ("id")
@@ -134,7 +134,7 @@ CREATE TABLE "AvailabilityException" (
 
 -- CreateTable
 CREATE TABLE "Holiday" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "date" DATE NOT NULL,
     "description" TEXT NOT NULL,
 
@@ -143,7 +143,7 @@ CREATE TABLE "Holiday" (
 
 -- CreateTable
 CREATE TABLE "Patient" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "lastName" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "gender" "Gender" NOT NULL,
@@ -156,8 +156,8 @@ CREATE TABLE "Patient" (
     "guardianName" TEXT,
     "guardianPhone" TEXT,
     "active" BOOLEAN NOT NULL DEFAULT true,
-    "createdById" TEXT NOT NULL,
-    "updatedById" TEXT,
+    "createdById" INTEGER NOT NULL,
+    "updatedById" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -166,7 +166,7 @@ CREATE TABLE "Patient" (
 
 -- CreateTable
 CREATE TABLE "HealthInsurer" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "active" BOOLEAN NOT NULL DEFAULT true,
 
@@ -175,8 +175,8 @@ CREATE TABLE "HealthInsurer" (
 
 -- CreateTable
 CREATE TABLE "InsurancePlan" (
-    "id" TEXT NOT NULL,
-    "healthInsurerId" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
+    "healthInsurerId" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "active" BOOLEAN NOT NULL DEFAULT true,
 
@@ -185,9 +185,9 @@ CREATE TABLE "InsurancePlan" (
 
 -- CreateTable
 CREATE TABLE "Coverage" (
-    "id" TEXT NOT NULL,
-    "patientId" TEXT NOT NULL,
-    "insurancePlanId" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
+    "patientId" INTEGER NOT NULL,
+    "insurancePlanId" INTEGER NOT NULL,
     "memberNumber" TEXT NOT NULL,
     "copayAmount" DECIMAL(12,2) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -198,15 +198,15 @@ CREATE TABLE "Coverage" (
 
 -- CreateTable
 CREATE TABLE "Appointment" (
-    "id" TEXT NOT NULL,
-    "patientId" TEXT NOT NULL,
-    "professionalId" TEXT NOT NULL,
-    "serviceId" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
+    "patientId" INTEGER NOT NULL,
+    "professionalId" INTEGER NOT NULL,
+    "serviceId" INTEGER NOT NULL,
     "startsAt" TIMESTAMP(3) NOT NULL,
     "endsAt" TIMESTAMP(3) NOT NULL,
     "status" "AppointmentStatus" NOT NULL DEFAULT 'SCHEDULED',
     "notes" TEXT,
-    "createdById" TEXT NOT NULL,
+    "createdById" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -215,12 +215,12 @@ CREATE TABLE "Appointment" (
 
 -- CreateTable
 CREATE TABLE "AppointmentEvent" (
-    "id" TEXT NOT NULL,
-    "appointmentId" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
+    "appointmentId" INTEGER NOT NULL,
     "type" "AppointmentEventType" NOT NULL,
     "reason" TEXT,
     "requestedBy" TEXT,
-    "userId" TEXT NOT NULL,
+    "userId" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AppointmentEvent_pkey" PRIMARY KEY ("id")
@@ -228,24 +228,24 @@ CREATE TABLE "AppointmentEvent" (
 
 -- CreateTable
 CREATE TABLE "_ProfessionalToProfessionalTitle" (
-    "A" TEXT NOT NULL,
-    "B" TEXT NOT NULL,
+    "A" INTEGER NOT NULL,
+    "B" INTEGER NOT NULL,
 
     CONSTRAINT "_ProfessionalToProfessionalTitle_AB_pkey" PRIMARY KEY ("A","B")
 );
 
 -- CreateTable
 CREATE TABLE "_ProfessionalToService" (
-    "A" TEXT NOT NULL,
-    "B" TEXT NOT NULL,
+    "A" INTEGER NOT NULL,
+    "B" INTEGER NOT NULL,
 
     CONSTRAINT "_ProfessionalToService_AB_pkey" PRIMARY KEY ("A","B")
 );
 
 -- CreateTable
 CREATE TABLE "_AvailabilityWindowToService" (
-    "A" TEXT NOT NULL,
-    "B" TEXT NOT NULL,
+    "A" INTEGER NOT NULL,
+    "B" INTEGER NOT NULL,
 
     CONSTRAINT "_AvailabilityWindowToService_AB_pkey" PRIMARY KEY ("A","B")
 );
