@@ -78,6 +78,7 @@ Decisión completa en `docs/adr/0001-server-actions-y-capa-de-acceso-a-datos.md`
 - shadcn/ui (Radix, preset `nova`) + Tailwind 4. El diseño está en `docs/DESIGN.md`: consultarlo antes de crear UI. El tema (tokens) vive en `src/app/globals.css` y debe mantenerse sincronizado con ese documento.
 - Usar tokens semánticos (`bg-primary`, `text-muted-foreground`, `bg-success-soft`, etc.), nunca colores hex sueltos. Solo tema claro.
 - Componentes nuevos con `npx shadcn@latest add <nombre>`; al agregarlos, aplicar los ajustes de radio que indica `docs/DESIGN.md`.
+- No crear desde cero componentes primitivos (botón, input, select, dialog, tabla, tarjeta, etc.) si shadcn/ui ya los ofrece: agregarlos con `npx shadcn@latest add` y usarlos desde `@/components/ui`. El tema ya está configurado, así que no hace falta reestilizarlos. Solo se arma un componente propio cuando no existe en shadcn, y en ese caso se compone a partir de los primitivos de shadcn (en `src/components/`, fuera de `ui/`).
 
 ## Dominio
 
