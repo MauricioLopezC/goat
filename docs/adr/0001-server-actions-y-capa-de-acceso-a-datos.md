@@ -35,7 +35,7 @@ Formulario / evento
 
 ### Autenticación
 
-La elección de librería y el modelo de sesión se deciden en un ADR aparte (pendiente). Lo que sí queda fijado acá es la interfaz que el resto del código puede usar:
+La elección de librería y el modelo de sesión se deciden en un ADR aparte: [ADR 0002](0002-autenticacion-y-sesion.md). Lo que sí queda fijado acá es la interfaz que el resto del código puede usar:
 
 - `getSession()` en `src/lib/dal/auth.ts` es el único punto que conoce la librería o el mecanismo de sesión.
 - `requireRole(...roles: Role[])` se apoya en `getSession()` y es lo que llaman las acciones y la DAL.

@@ -6,15 +6,16 @@
 
 ## Datos
 
-- **Obligatorios:** usuario (o email), contraseña.
-- **Del usuario, en su alta por el gerente:** apellido, nombre, usuario, contraseña inicial, rol, estado.
+- **Obligatorios:** email, contraseña.
+- **Del usuario, en su alta por el gerente:** apellido, nombre, email, contraseña inicial, rol, estado.
 - **Opcionales:** teléfono de contacto interno.
 
 ## Validaciones
 
-- Usuario y contraseña obligatorios.
+- Email y contraseña obligatorios.
+- El email tiene formato válido y es único: no puede haber dos usuarios con el mismo.
 - Credenciales inválidas: mensaje genérico, sin indicar cuál de los dos campos falló.
-- Usuario inactivo: no puede ingresar, aunque la contraseña sea correcta.
+- Usuario inactivo: no puede ingresar, aunque la contraseña sea correcta. Si se lo da de baja con la sesión ya abierta, queda afuera en el siguiente movimiento, sin esperar a que la sesión expire.
 - La contraseña nunca se guarda en texto plano.
 
 ## Comportamiento
@@ -35,7 +36,7 @@ Previstas; cada ficha se escribe en [`acciones.md`](../acciones.md) al implement
 - `signIn`, `signOut` — inicio y cierre de sesión.
 - `createUser` — alta de usuario con rol, solo `MANAGER`.
 
-La librería de sesión y el modelo de sesión se deciden en un ADR aparte, pendiente ([ADR 0001](../adr/0001-server-actions-y-capa-de-acceso-a-datos.md)). Lo que ya está fijado es que `getSession()` y `requireRole()` viven en `src/lib/dal/auth.ts`.
+La sesión está decidida en el [ADR 0002](../adr/0002-autenticacion-y-sesion.md): cookie sellada con `iron-session`, contraseñas con argon2id y el rol verificado contra la base en cada request. `getSession()` y `requireRole()` viven en `src/lib/dal/auth.ts`, como fijó el [ADR 0001](../adr/0001-server-actions-y-capa-de-acceso-a-datos.md).
 
 ## A conversar
 
@@ -43,4 +44,4 @@ La librería de sesión y el modelo de sesión se deciden en un ADR aparte, pend
   - **Cliente:** el gerente no es un profesional que atienda en este centro. Su único rol es el de gerente.
 - ¿Hace falta recuperación de contraseña en el Inc. 1, o alcanza con que el gerente la resetee?
   - **Cliente:** no existe la recuperación de contraseña.
-- **Pendiente:** el usuario del sistema no está en [`glossary.md`](../glossary.md). Definir su nombre en código antes de modelarlo.
+- El ingreso es por email, que pasa a ser obligatorio y único en el alta ([ADR 0002](../adr/0002-autenticacion-y-sesion.md)). ¿Todo el personal del centro tiene una casilla propia? Si alguno no tiene, el gerente le asigna una interna al darlo de alta.
