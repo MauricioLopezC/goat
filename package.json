@@ -10,6 +10,7 @@
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "format": "prettier --write .",
@@ -48,6 +49,7 @@
     "prettier": "^3.9.8",
     "prisma": "^7.10.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }
