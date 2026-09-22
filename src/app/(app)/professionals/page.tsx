@@ -14,16 +14,7 @@ import { listActiveServices, listProfessionals } from "@/lib/dal/professionals";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ProfessionalFilters } from "./professional-filters";
 
 export const metadata: Metadata = {
   title: "Profesionales · Goat",
@@ -89,59 +80,13 @@ export default async function ProfessionalsPage({
         )}
       </div>
 
-      <Card>
-        <CardContent>
-          <form method="get" className="flex flex-wrap items-end gap-4">
-            <div className="flex min-w-56 flex-1 flex-col gap-2">
-              <Label htmlFor="professional-query">Buscar profesional</Label>
-              <Input
-                id="professional-query"
-                name="q"
-                defaultValue={query}
-                placeholder="Apellido, nombre, documento o matrícula"
-                minLength={2}
-              />
-            </div>
-            <div className="flex min-w-44 flex-col gap-2">
-              <Label htmlFor="professional-service">Servicio</Label>
-              <Select name="serviceId" defaultValue={serviceValue || "all"}>
-                <SelectTrigger id="professional-service" className="w-full">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {services.map((service) => (
-                      <SelectItem key={service.id} value={String(service.id)}>
-                        {service.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex min-w-36 flex-col gap-2">
-              <Label htmlFor="professional-status">Estado</Label>
-              <Select name="status" defaultValue={status}>
-                <SelectTrigger id="professional-status" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="active">Activos</SelectItem>
-                    <SelectItem value="inactive">Inactivos</SelectItem>
-                    <SelectItem value="all">Todos</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button type="submit">Buscar</Button>
-            <Button asChild variant="outline">
-              <Link href="/professionals">Limpiar</Link>
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <ProfessionalFilters
+        key={query}
+        query={query}
+        serviceId={serviceValue || "all"}
+        status={status}
+        services={services}
+      />
 
       {tooShort ? (
         <p className="text-sm text-muted-foreground">
