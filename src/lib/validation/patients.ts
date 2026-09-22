@@ -82,10 +82,6 @@ export const createPatientSchema = z
       .max(50)
       .optional()
       .transform((val) => val || undefined),
-    copayAmount: z.preprocess(
-      parseOptionalNumber,
-      z.number().min(0, "El coseguro no puede ser negativo").optional(),
-    ),
     guardianName: z
       .string()
       .trim()
@@ -153,13 +149,6 @@ export const createPatientSchema = z
           code: "custom",
           message: "El número de afiliado es obligatorio",
           path: ["memberNumber"],
-        });
-      }
-      if (data.copayAmount === undefined || data.copayAmount === null) {
-        ctx.addIssue({
-          code: "custom",
-          message: "El coseguro es obligatorio",
-          path: ["copayAmount"],
         });
       }
     }

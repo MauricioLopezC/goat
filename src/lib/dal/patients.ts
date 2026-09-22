@@ -94,7 +94,7 @@ export async function createPatient(
               create: {
                 insurancePlanId: input.insurancePlanId,
                 memberNumber: input.memberNumber ?? "",
-                copayAmount: input.copayAmount ?? 0,
+                copayAmount: 0,
               },
             },
           }

@@ -75,7 +75,6 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
   const [healthInsurerId, setHealthInsurerId] = useState("");
   const [insurancePlanId, setInsurancePlanId] = useState("");
   const [memberNumber, setMemberNumber] = useState("");
-  const [copayAmount, setCopayAmount] = useState("0");
   const [guardianName, setGuardianName] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
 
@@ -103,7 +102,6 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
     setHealthInsurerId("");
     setInsurancePlanId("");
     setMemberNumber("");
-    setCopayAmount("0");
     setGuardianName("");
     setGuardianPhone("");
     setTouched({});
@@ -197,14 +195,6 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
     if (!memberNumber.trim()) {
       clientErrors.memberNumber = "El número de afiliado es obligatorio";
     }
-    if (
-      copayAmount === "" ||
-      isNaN(Number(copayAmount)) ||
-      Number(copayAmount) < 0
-    ) {
-      clientErrors.copayAmount =
-        "El coseguro es obligatorio y no puede ser negativo";
-    }
   }
 
   if (guardianName.trim()) {
@@ -275,7 +265,6 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
         healthInsurerId: true,
         insurancePlanId: true,
         memberNumber: true,
-        copayAmount: true,
         guardianName: true,
         guardianPhone: true,
       });
@@ -305,10 +294,6 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
           coverageType === CoverageType.HEALTH_INSURANCE
             ? memberNumber.trim()
             : undefined,
-        copayAmount:
-          coverageType === CoverageType.HEALTH_INSURANCE && copayAmount !== ""
-            ? Number(copayAmount)
-            : undefined,
         guardianName: guardianName.trim() || undefined,
         guardianPhone: guardianPhone.trim() || undefined,
       };
@@ -333,7 +318,6 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
           setHealthInsurerId("");
           setInsurancePlanId("");
           setMemberNumber("");
-          setCopayAmount("0");
           setGuardianName("");
           setGuardianPhone("");
           setTouched({});
@@ -721,7 +705,6 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                         setHealthInsurerId("");
                         setInsurancePlanId("");
                         setMemberNumber("");
-                        setCopayAmount("0");
                       }
                     }}
                     className={`flex-1 rounded-lg border p-3 text-left transition-colors ${
@@ -744,7 +727,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
 
               {/* Campos condicionales para obra social */}
               {coverageType === CoverageType.HEALTH_INSURANCE && (
-                <div className="rounded-lg border border-border p-4 bg-tray/40 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in duration-200">
+                <div className="rounded-lg border border-border p-4 bg-tray/40 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in duration-200">
                   {/* Obra Social */}
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="healthInsurerId">
@@ -857,35 +840,6 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     {getFieldError("memberNumber") && (
                       <p className="text-body-sm text-destructive">
                         {getFieldError("memberNumber")}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Coseguro */}
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="copayAmount">
-                      Coseguro ($) <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="copayAmount"
-                      name="copayAmount"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={copayAmount}
-                      onChange={(e) => setCopayAmount(e.target.value)}
-                      onBlur={() => markTouched("copayAmount")}
-                      placeholder="0.00"
-                      className={cn(
-                        "bg-card tabular-nums",
-                        getFieldBorderClass("copayAmount"),
-                      )}
-                      aria-invalid={!!getFieldError("copayAmount")}
-                      disabled={isPending}
-                    />
-                    {getFieldError("copayAmount") && (
-                      <p className="text-body-sm text-destructive">
-                        {getFieldError("copayAmount")}
                       </p>
                     )}
                   </div>

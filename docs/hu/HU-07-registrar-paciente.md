@@ -7,8 +7,8 @@
 ## Datos
 
 - **Obligatorios:** apellido, nombre, género (lista precargada: masculino, femenino, otro), tipo de documento, número de documento, fecha de nacimiento, teléfono, email de contacto, cobertura (particular u obra social), estado (activo o inactivo).
-- **Opcionales en este incremento:** obra social, plan, coseguro, número de afiliado; nombre y teléfono del responsable o tutor.
-- **Fuera del Inc. 1**, van a la ficha completa del Inc. 2: domicilio, contacto de emergencia, datos ampliados de cobertura.
+- **Opcionales en este incremento:** obra social, plan, número de afiliado; nombre y teléfono del responsable o tutor.
+- **Fuera del Inc. 1**, van a la ficha completa del Inc. 2: domicilio, contacto de emergencia, coseguro, datos ampliados de cobertura.
 
 ## Validaciones
 
@@ -16,7 +16,7 @@
 - Fecha de nacimiento no puede ser futura.
 - Teléfono con formato válido.
 - Email con formato válido.
-- Si se elige cobertura por obra social, entonces obra social, plan, coseguro y número de afiliado pasan a ser obligatorios.
+- Si se elige cobertura por obra social, entonces obra social, plan y número de afiliado pasan a ser obligatorios.
 - Campo obligatorio vacío: se marca el campo y no se guarda nada.
 
 ## Comportamiento

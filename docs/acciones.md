@@ -191,7 +191,7 @@ restricción de rol y decide qué datos del usuario salen a la interfaz.
 
 **Historia de usuario:** [HU-07 — Registrar un paciente nuevo](hu/HU-07-registrar-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`
-**Entrada:** `lastName`, `firstName`, `gender`, `documentType`, `documentNumber`, `birthDate`, `phone`, `email`, `coverageType`, `insurancePlanId` (si `coverageType` es `HEALTH_INSURANCE`), `memberNumber` (si `coverageType` es `HEALTH_INSURANCE`), `copayAmount` (si `coverageType` es `HEALTH_INSURANCE`), `guardianName` (opcional), `guardianPhone` (opcional).
+**Entrada:** `lastName`, `firstName`, `gender`, `documentType`, `documentNumber`, `birthDate`, `phone`, `email`, `coverageType`, `insurancePlanId` (si `coverageType` es `HEALTH_INSURANCE`), `memberNumber` (si `coverageType` es `HEALTH_INSURANCE`), `guardianName` (opcional), `guardianPhone` (opcional).
 **Precondiciones:** no existe otro paciente con la misma combinación de `documentType` y `documentNumber`. Si `coverageType` es `HEALTH_INSURANCE`, el `insurancePlanId` existe y está activo.
 **Efectos:** crea un `Patient` con `active: true` y `createdById`. Si `coverageType` es `HEALTH_INSURANCE`, crea además su `Coverage` asociada.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `DUPLICATE_PATIENT`.
