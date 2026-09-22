@@ -146,10 +146,10 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
                 </Link>
               </Button>
               <Button asChild variant="secondary" size="sm">
-                <a href="/professionals/new">
+                <Link href="/professionals/new">
                   <PlusCircle className="size-4 mr-1.5" />
                   Registrar otro
-                </a>
+                </Link>
               </Button>
             </div>
           </AlertDescription>

@@ -138,11 +138,42 @@ export async function createProfessional(
  * Es una lectura: la consume un Server Component llamando directo a la DAL
  * (ADR 0001). Devuelve la ficha resumida con títulos y servicios asociados.
  */
-export async function listProfessionals(actor: Actor) {
+export interface ProfessionalFilters {
+  query?: string;
+  serviceId?: number;
+  status?: "active" | "inactive" | "all";
+}
+
+export async function listProfessionals(
+  filters: ProfessionalFilters,
+  actor: Actor,
+) {
   assertRole(actor, ...STAFF_ROLES);
 
+  const query = filters.query?.trim();
+  if (query && query.length < 2) return [];
+
   return prisma.professional.findMany({
-    orderBy: [{ active: "desc" }, { lastName: "asc" }, { firstName: "asc" }],
+    where: {
+      active:
+        filters.status === "all"
+          ? undefined
+          : filters.status === "inactive"
+            ? false
+            : true,
+      services: filters.serviceId
+        ? { some: { id: filters.serviceId } }
+        : undefined,
+      OR: query
+        ? [
+            { lastName: { contains: query, mode: "insensitive" } },
+            { firstName: { contains: query, mode: "insensitive" } },
+            { documentNumber: { contains: query, mode: "insensitive" } },
+            { licenseNumber: { contains: query, mode: "insensitive" } },
+          ]
+        : undefined,
+    },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     select: {
       id: true,
       lastName: true,
@@ -158,6 +189,43 @@ export async function listProfessionals(actor: Actor) {
       },
       services: {
         select: { id: true, name: true, durationMinutes: true },
+      },
+    },
+  });
+}
+
+/** Devuelve la ficha completa y las franjas semanales del profesional. */
+export async function getProfessional(id: number, actor: Actor) {
+  assertRole(actor, ...STAFF_ROLES);
+
+  return prisma.professional.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      lastName: true,
+      firstName: true,
+      documentType: true,
+      documentNumber: true,
+      licenseNumber: true,
+      phone: true,
+      email: true,
+      photoUrl: true,
+      notes: true,
+      active: true,
+      createdAt: true,
+      updatedAt: true,
+      titles: { select: { id: true, name: true } },
+      services: { select: { id: true, name: true } },
+      availabilityWindows: {
+        select: {
+          id: true,
+          weekday: true,
+          startMinute: true,
+          endMinute: true,
+          room: { select: { name: true } },
+          services: { select: { id: true, name: true } },
+        },
+        orderBy: [{ weekday: "asc" }, { startMinute: "asc" }],
       },
     },
   });

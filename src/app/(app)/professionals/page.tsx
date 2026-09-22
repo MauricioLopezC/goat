@@ -10,20 +10,60 @@ import {
 } from "lucide-react";
 
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
-import { listProfessionals } from "@/lib/dal/professionals";
+import { listActiveServices, listProfessionals } from "@/lib/dal/professionals";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const metadata: Metadata = {
   title: "Profesionales · Goat",
   description: "Gestión y listado de profesionales del centro.",
 };
 
-export default async function ProfessionalsPage() {
-  // HU-02: MANAGER crea; RECEPTIONIST y PROFESSIONAL tienen solo lectura.
+type SearchParams = Promise<{
+  q?: string | string[];
+  serviceId?: string | string[];
+  status?: string | string[];
+}>;
+
+function single(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : "";
+}
+
+export default async function ProfessionalsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const actor = await requirePageRole(...STAFF_ROLES);
-  const professionals = await listProfessionals(actor);
+  const params = await searchParams;
+  const query = single(params.q).trim();
+  const serviceValue = single(params.serviceId);
+  const serviceId = /^[1-9]\d*$/.test(serviceValue)
+    ? Number(serviceValue)
+    : undefined;
+  const statusValue = single(params.status);
+  const status =
+    statusValue === "inactive" || statusValue === "all"
+      ? statusValue
+      : "active";
+  const tooShort = query.length === 1;
+  const [professionals, services] = await Promise.all([
+    tooShort
+      ? Promise.resolve([])
+      : listProfessionals({ query, serviceId, status }, actor),
+    listActiveServices(actor),
+  ]);
 
   const isManager = actor.role === "MANAGER";
 
@@ -49,7 +89,65 @@ export default async function ProfessionalsPage() {
         )}
       </div>
 
-      {professionals.length === 0 ? (
+      <Card>
+        <CardContent>
+          <form method="get" className="flex flex-wrap items-end gap-4">
+            <div className="flex min-w-56 flex-1 flex-col gap-2">
+              <Label htmlFor="professional-query">Buscar profesional</Label>
+              <Input
+                id="professional-query"
+                name="q"
+                defaultValue={query}
+                placeholder="Apellido, nombre, documento o matrícula"
+                minLength={2}
+              />
+            </div>
+            <div className="flex min-w-44 flex-col gap-2">
+              <Label htmlFor="professional-service">Servicio</Label>
+              <Select name="serviceId" defaultValue={serviceValue || "all"}>
+                <SelectTrigger id="professional-service" className="w-full">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {services.map((service) => (
+                      <SelectItem key={service.id} value={String(service.id)}>
+                        {service.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex min-w-36 flex-col gap-2">
+              <Label htmlFor="professional-status">Estado</Label>
+              <Select name="status" defaultValue={status}>
+                <SelectTrigger id="professional-status" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="active">Activos</SelectItem>
+                    <SelectItem value="inactive">Inactivos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit">Buscar</Button>
+            <Button asChild variant="outline">
+              <Link href="/professionals">Limpiar</Link>
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {tooShort ? (
+        <p className="text-sm text-muted-foreground">
+          Ingresá al menos 2 caracteres para buscar. No se realizó la consulta.
+        </p>
+      ) : professionals.length === 0 ? (
         <Card className="rounded-xl border-dashed border-2 border-border p-12 text-center bg-card">
           <CardContent className="flex flex-col items-center justify-center gap-4 p-0">
             <div className="size-12 rounded-lg bg-primary-soft text-primary-soft-foreground flex items-center justify-center">
@@ -57,21 +155,15 @@ export default async function ProfessionalsPage() {
             </div>
             <div className="space-y-1">
               <h3 className="text-base font-semibold text-foreground">
-                No hay profesionales registrados
+                No se encontraron profesionales
               </h3>
               <p className="text-sm text-muted-foreground max-w-md">
-                Comience registrando al primer profesional del centro con su
-                matrícula y prestaciones habilitadas.
+                Probá con otros criterios o limpiá los filtros.
               </p>
             </div>
-            {isManager && (
-              <Button asChild>
-                <Link href="/professionals/new">
-                  <Plus className="size-4 mr-1.5" />
-                  Registrar profesional
-                </Link>
-              </Button>
-            )}
+            <Button asChild variant="outline">
+              <Link href="/professionals">Limpiar filtros</Link>
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -93,10 +185,7 @@ export default async function ProfessionalsPage() {
                         Activo
                       </Badge>
                     ) : (
-                      <Badge
-                        variant="outline"
-                        className="text-muted-foreground rounded-lg text-xs font-medium gap-1"
-                      >
+                      <Badge className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border rounded-lg text-xs font-medium gap-1">
                         <UserX className="size-3" />
                         Inactivo
                       </Badge>
@@ -152,8 +241,13 @@ export default async function ProfessionalsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-                  <Button variant="outline" size="sm" className="text-xs">
-                    Ver ficha
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    <Link href={`/professionals/${prof.id}`}>Ver ficha</Link>
                   </Button>
                 </div>
               </CardContent>

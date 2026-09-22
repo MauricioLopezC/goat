@@ -238,14 +238,27 @@ restricción de rol y decide qué datos del usuario salen a la interfaz.
 
 **Historia de usuario:** [HU-02 — Registrar un profesional](hu/HU-02-registrar-profesional.md) / [HU-04 — Buscar y listar profesionales](hu/HU-04-buscar-profesionales.md)
 **Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
-**Entrada:** el `actor`. No recibe parámetros de la interfaz.
+**Entrada:** `filters` (`query`, `serviceId`, `status`) y `actor`. La búsqueda parcial aplica a apellido, nombre, documento y matrícula. Con menos de 2 caracteres no consulta la base.
 **Precondiciones:** el actor pertenece a `STAFF_ROLES` (`MANAGER`, `RECEPTIONIST` o `PROFESSIONAL`).
 **Efectos:** ninguno. Es una lectura.
 **Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro. En `/professionals` no llega a dispararse: `requirePageRole` redirige antes. Queda como barrera por si la función se llama desde otro lado.
 **Revalida:** no aplica.
-**Devuelve:** `{ id, lastName, firstName, documentType, documentNumber, licenseNumber, phone, email, active, titles: { id, name }[], services: { id, name, durationMinutes }[] }[]`, ordenado por estado activo, apellido y nombre.
+**Devuelve:** `{ id, lastName, firstName, documentType, documentNumber, licenseNumber, phone, email, active, titles: { id, name }[], services: { id, name, durationMinutes }[] }[]`, filtrado por activos por defecto y ordenado por apellido y nombre.
 
 No es una Server Action: es una lectura que el Server Component de `/professionals` llama directo a la DAL (ADR 0001).
+
+### `getProfessional`
+
+**Historia de usuario:** [HU-04 — Buscar y consultar profesionales](hu/HU-04-buscar-profesionales.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
+**Entrada:** `id` del profesional y `actor`.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`.
+**Efectos:** ninguno. Es una lectura.
+**Errores:** `FORBIDDEN` si el actor no pertenece al personal. Si no existe el profesional, devuelve `null` y la página muestra 404.
+**Revalida:** no aplica.
+**Devuelve:** datos personales, matrícula, contacto, estado, títulos, servicios y franjas semanales con horario, consultorio y servicios específicos.
+
+No es una Server Action: la ficha en `/professionals/[id]` llama directo a la DAL.
 
 ### `listActiveProfessionalTitles`
 
