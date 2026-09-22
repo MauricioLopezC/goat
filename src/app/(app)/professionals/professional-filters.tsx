@@ -59,6 +59,15 @@ export function ProfessionalFilters({
     return () => window.clearTimeout(timer);
   }, [query, initialQuery, initialServiceId, initialStatus, router]);
 
+  useEffect(() => {
+    function syncQueryFromHistory() {
+      setQuery(new URLSearchParams(window.location.search).get("q") ?? "");
+    }
+
+    window.addEventListener("popstate", syncQueryFromHistory);
+    return () => window.removeEventListener("popstate", syncQueryFromHistory);
+  }, []);
+
   function applyFilters(next: {
     query?: string;
     serviceId?: string;

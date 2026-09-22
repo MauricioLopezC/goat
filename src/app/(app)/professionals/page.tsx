@@ -81,7 +81,6 @@ export default async function ProfessionalsPage({
       </div>
 
       <ProfessionalFilters
-        key={query}
         query={query}
         serviceId={serviceValue || "all"}
         status={status}
