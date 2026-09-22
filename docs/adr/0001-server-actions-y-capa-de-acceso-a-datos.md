@@ -16,7 +16,7 @@ Esta decisión se apoya en la documentación de la versión instalada (Next.js 1
 
 1. **Lecturas:** en Server Components, llamando directamente a la DAL. No se consumen Route Handlers propios desde el servidor.
 2. **Mutaciones:** Server Actions (`"use server"`).
-3. **Capa de acceso a datos (DAL):** módulos `server-only` en `src/lib/dal/`. Concentran autorización, reglas de negocio y acceso a Prisma. Las Server Actions son adaptadores finos que no contienen reglas de negocio.
+3. **Capa de acceso a datos (DAL):** módulos `server-only` en `src/lib/dal/`. Concentran autorización, reglas de negocio y acceso a Prisma. Las Server Actions son adaptadores finos que no contienen reglas de negocio. Ver [Dónde se autoriza](#dónde-se-autoriza).
 4. **Contrato uniforme:** todas las acciones devuelven `ActionResult<T>` y siguen el mismo flujo. Ver [`docs/acciones.md`](../acciones.md).
 5. **Route Handlers:** solo cuando exista un consumidor externo (webhooks, integraciones con obras sociales, una futura app móvil) o una lectura del lado del cliente con polling. No se usan para la interfaz propia.
 6. **Proxy (`proxy.ts`, antes middleware):** solo chequeos optimistas leyendo la cookie de sesión (hay sesión, el rol puede entrar a la sección). Nunca es la única barrera.
@@ -26,19 +26,33 @@ Esta decisión se apoya en la documentación de la versión instalada (Next.js 1
 ```
 Formulario / evento
   → Server Action (src/app/**/actions.ts)
-      1. sesión y rol
+      1. sesión y rol (corte temprano)
       2. validar entrada (Zod)
-      3. DAL: regla de negocio + Prisma (src/lib/dal/)
+      3. DAL (src/lib/dal/), con el actor: rol y pertenencia + regla de negocio + Prisma
       4. revalidatePath / revalidateTag
       5. ActionResult<T>
 ```
+
+### Dónde se autoriza
+
+La autorización se chequea en dos lugares, con responsabilidades distintas:
+
+| Dónde | Qué verifica | Con qué |
+|---|---|---|
+| Acción o página | Que el rol pueda entrar a la operación. Es un corte temprano: falla antes de validar la entrada o de dibujar la pantalla. | `defineAction({ roles })`, `requirePageRole(...)` |
+| DAL | Otra vez el rol, y todo lo que depende de los datos: que el recurso exista y le corresponda a quien lo pide (por ejemplo, que el turno sea de la agenda del profesional que lo cancela). | `assertRole(actor, ...)` y chequeos propios de cada función |
+
+**Toda función de la DAL que lee o escribe datos de negocio recibe el `actor` como parámetro**, también las lecturas que llama un Server Component. No lee la sesión por su cuenta ni confía en que quien la llama haya chequeado: la barrera tiene que valer aunque mañana la función se use desde otra página, otra acción o un Route Handler. Recibir el `actor` además deja la autorización a la vista en la firma y permite probar la función sin cookies.
+
+El chequeo de rol queda repetido entre la acción y la DAL a propósito: el de la acción corta temprano y el de la DAL es el que no se puede saltear. Quedan afuera las funciones que crean o leen la sesión (`getSession`, `requireRole`, `signIn`, `signOut`).
 
 ### Autenticación
 
 La elección de librería y el modelo de sesión se deciden en un ADR aparte: [ADR 0002](0002-autenticacion-y-sesion.md). Lo que sí queda fijado acá es la interfaz que el resto del código puede usar:
 
 - `getSession()` en `src/lib/dal/auth.ts` es el único punto que conoce la librería o el mecanismo de sesión.
-- `requireRole(...roles: Role[])` se apoya en `getSession()` y es lo que llaman las acciones y la DAL.
+- `requireRole(...roles: Role[])` se apoya en `getSession()` y es lo que llaman las acciones para obtener el `actor`. Las páginas usan su variante `requirePageRole`, que redirige en vez de lanzar.
+- `assertRole(actor, ...roles)` es el chequeo de rol dentro de la DAL. No lee la sesión: verifica el `actor` que recibe la función.
 - La autorización (qué rol puede hacer qué, y si el recurso le corresponde) es código propio en la DAL, no de la librería.
 
 ## Alternativas descartadas
