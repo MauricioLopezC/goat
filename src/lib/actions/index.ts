@@ -18,7 +18,8 @@ export type ErrorCode =
   | "PATIENT_APPOINTMENT_OVERLAP"
   | "OUTSIDE_AVAILABILITY_WINDOW"
   | "INVALID_STATUS_TRANSITION"
-  | "REASON_REQUIRED";
+  | "REASON_REQUIRED"
+  | "UNMET_DEPENDENCY";
 
 export type ActionError = {
   code: ErrorCode;
