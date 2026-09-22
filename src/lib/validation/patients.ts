@@ -1,7 +1,9 @@
 import { z } from "@/lib/validation/zod";
-import { DOCUMENT_TYPES, GENDERS, COVERAGE_TYPES } from "@/lib/patients";
+import { GENDERS, COVERAGE_TYPES } from "@/lib/patients";
 
-const phoneRegex = /^[\d\s+\-()]{7,25}$/;
+const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
+const phoneRegex = /^\+?\d{7,15}$/;
+const dniRegex = /^\d{7,8}$/;
 
 const parseOptionalNumber = (val: unknown) => {
   if (val === "" || val === undefined || val === null) return undefined;
@@ -11,22 +13,36 @@ const parseOptionalNumber = (val: unknown) => {
 
 export const createPatientSchema = z
   .object({
-    lastName: z.string().trim().min(1, "El apellido es obligatorio").max(60),
-    firstName: z.string().trim().min(1, "El nombre es obligatorio").max(60),
+    lastName: z
+      .string()
+      .trim()
+      .min(2, "El apellido debe tener al menos 2 caracteres")
+      .max(60, "El apellido debe tener como máximo 60 caracteres")
+      .regex(
+        nameRegex,
+        "El apellido solo puede contener letras, espacios, tildes y apóstrofes",
+      ),
+    firstName: z
+      .string()
+      .trim()
+      .min(2, "El nombre debe tener al menos 2 caracteres")
+      .max(60, "El nombre debe tener como máximo 60 caracteres")
+      .regex(
+        nameRegex,
+        "El nombre solo puede contener letras, espacios, tildes y apóstrofes",
+      ),
     gender: z.enum(GENDERS, {
       message: "Seleccioná un género válido",
     }),
-    documentType: z.enum(DOCUMENT_TYPES, {
-      message: "Seleccioná un tipo de documento válido",
+    documentType: z.literal("DNI", {
+      message: "Solo se permite DNI como tipo de documento",
     }),
     documentNumber: z
       .string()
       .trim()
-      .min(1, "El número de documento es obligatorio")
-      .max(20)
       .regex(
-        /^[\w\d.-]+$/,
-        "El número de documento contiene caracteres inválidos",
+        dniRegex,
+        "El DNI debe tener exactamente 7 u 8 dígitos numéricos sin puntos ni espacios",
       ),
     birthDate: z
       .string()
@@ -36,8 +52,10 @@ export const createPatientSchema = z
     phone: z
       .string()
       .trim()
-      .min(1, "El teléfono es obligatorio")
-      .regex(phoneRegex, "Formato de teléfono inválido (mínimo 7 dígitos)"),
+      .regex(
+        phoneRegex,
+        "El teléfono debe contener únicamente números y puede comenzar con el signo + (entre 7 y 15 dígitos)",
+      ),
     email: z
       .email("Correo electrónico inválido")
       .trim()
@@ -71,7 +89,14 @@ export const createPatientSchema = z
     guardianName: z
       .string()
       .trim()
-      .max(120)
+      .max(
+        120,
+        "El nombre del responsable debe tener como máximo 120 caracteres",
+      )
+      .refine(
+        (val) => !val || nameRegex.test(val),
+        "El nombre del responsable solo puede contener letras, espacios, tildes y apóstrofes",
+      )
       .optional()
       .transform((val) => val || undefined),
     guardianPhone: z
@@ -92,6 +117,19 @@ export const createPatientSchema = z
           message: "La fecha de nacimiento no puede ser futura",
           path: ["birthDate"],
         });
+      } else {
+        const minDate = new Date(
+          now.getFullYear() - 120,
+          now.getMonth(),
+          now.getDate(),
+        );
+        if (birth < minDate) {
+          ctx.addIssue({
+            code: "custom",
+            message: "La fecha de nacimiento no puede ser anterior a 120 años",
+            path: ["birthDate"],
+          });
+        }
       }
     }
 
@@ -129,7 +167,8 @@ export const createPatientSchema = z
     if (data.guardianPhone && !phoneRegex.test(data.guardianPhone)) {
       ctx.addIssue({
         code: "custom",
-        message: "Formato de teléfono de contacto inválido",
+        message:
+          "El teléfono del responsable debe contener únicamente números y puede comenzar con el signo + (entre 7 y 15 dígitos)",
         path: ["guardianPhone"],
       });
     }

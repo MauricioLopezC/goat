@@ -37,9 +37,11 @@ export async function createPatient(
   if (existing) {
     throw new DomainError(
       "DUPLICATE_PATIENT",
-      `Ya existe un paciente registrado con el documento ${existing.documentType} ${existing.documentNumber}.`,
+      `Ya existe un paciente registrado con el dni: ${existing.documentNumber}`,
       {
-        documentNumber: ["Ya existe un paciente con este documento."],
+        documentNumber: [
+          `Ya existe un paciente registrado con el dni: ${existing.documentNumber}`,
+        ],
         existingPatientId: [String(existing.id)],
         existingPatientName: [`${existing.lastName}, ${existing.firstName}`],
       },

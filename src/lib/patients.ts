@@ -1,12 +1,6 @@
 import { DocumentType, Gender, CoverageType } from "@/generated/prisma/enums";
 
-export const DOCUMENT_TYPES = [
-  DocumentType.DNI,
-  DocumentType.LC,
-  DocumentType.LE,
-  DocumentType.CI,
-  DocumentType.PASSPORT,
-] as const;
+export const DOCUMENT_TYPES = [DocumentType.DNI] as const;
 
 export const DOCUMENT_TYPE_LABEL: Record<DocumentType, string> = {
   DNI: "DNI",
