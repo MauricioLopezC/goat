@@ -12,8 +12,8 @@ import { defineAction, type ActionResult } from "@/lib/actions";
 const create = defineAction({
   roles: ["MANAGER"],
   input: createUserSchema,
-  handler: async (input) => {
-    const user = await dal.createUser(input);
+  handler: async (input, actor) => {
+    const user = await dal.createUser(input, actor);
     // Revalidar es responsabilidad de la acción, no de la DAL (ADR 0001).
     revalidatePath("/users");
     return user;

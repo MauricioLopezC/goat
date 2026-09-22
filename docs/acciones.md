@@ -11,7 +11,7 @@ src/
   app/<route>/actions.ts     # "use server": adaptadores finos, una acción por operación
   lib/
     dal/                     # import "server-only": autorización, reglas de negocio, Prisma
-      auth.ts                #   getSession(), requireRole()
+      auth.ts                #   getSession(), requireRole(), assertRole()
       appointments.ts        #   createAppointment(), cancelAppointment(), ...
     validation/              # schemas Zod, fuente única de la entrada
       zod.ts                 #   `z` con los mensajes en español (único import de "zod")
@@ -21,12 +21,13 @@ src/
 - Las rutas y los archivos van en inglés (`appointments`, no `turnos`).
 - Solo la DAL importa `prisma` y lee `process.env`. Las páginas y las acciones no acceden a la base directamente.
 - La regla de negocio vive en la función de la DAL, no en la acción. La ficha especifica la operación y se implementa en la DAL.
+- Toda función de la DAL que lee o escribe datos de negocio recibe el `actor` y verifica ella misma rol y pertenencia. Ver [Autorización en la DAL](#autorización-en-la-dal).
 
 ## Flujo obligatorio de una acción
 
 1. **Sesión y rol:** `requireRole(...)`. La sesión se verifica dentro de cada acción aunque `proxy.ts` ya la haya chequeado.
 2. **Validar entrada** con el schema Zod de `src/lib/validation/`. Zod valida la forma. La pertenencia del recurso (por ejemplo, que el turno sea de la agenda del profesional que lo invoca) se verifica en la DAL.
-3. **Llamar a la DAL**, que aplica la regla de negocio y escribe con Prisma.
+3. **Llamar a la DAL pasándole el `actor`**. La DAL vuelve a verificar el rol, verifica la pertenencia, aplica la regla de negocio y escribe con Prisma.
 4. **Revalidar** con `revalidatePath` o `revalidateTag` antes de cualquier `redirect` (el `redirect` corta la ejecución).
 5. **Devolver `ActionResult<T>`.**
 
@@ -39,6 +40,41 @@ export const cancelAppointment = defineAction({
   handler: (input, actor) => dal.cancelAppointment(input, actor),
 })
 ```
+
+## Autorización en la DAL
+
+El rol se chequea dos veces, a propósito. La acción (`defineAction({ roles })`) o la página (`requirePageRole`) cortan temprano. La función de la DAL lo vuelve a verificar y además chequea lo que depende de los datos, porque es la única barrera que vale sin importar desde dónde se la llame. La decisión está en el [ADR 0001](adr/0001-server-actions-y-capa-de-acceso-a-datos.md#dónde-se-autoriza).
+
+Ejemplo ilustrativo (la ficha real de `cancelAppointment` se define con su historia):
+
+```ts
+// src/lib/dal/appointments.ts
+export async function cancelAppointment(input: CancelAppointmentInput, actor: Actor) {
+  assertRole(actor, Role.RECEPTIONIST, Role.PROFESSIONAL, Role.MANAGER)
+
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: input.appointmentId },
+    select: { id: true, status: true, professional: { select: { userId: true } } },
+  })
+  if (!appointment) throw new DomainError("NOT_FOUND", "El turno no existe.")
+
+  // Pertenencia: un profesional solo cancela turnos de su propia agenda.
+  if (actor.role === Role.PROFESSIONAL && appointment.professional.userId !== actor.id) {
+    throw new DomainError("FORBIDDEN", "No tenés permiso para realizar esta operación.")
+  }
+
+  // ...regla de negocio y escritura
+}
+
+// Server Component: la lectura también recibe el actor.
+const actor = await requirePageRole("MANAGER")
+const users = await listUsers(actor)
+```
+
+- **El `actor` va como último parámetro**, también en las lecturas. La función no lee la sesión ni confía en que quien la llama haya chequeado.
+- **`assertRole` es la primera línea** de la función, antes de tocar la base.
+- **Los roles de la ficha valen para las dos barreras.** Si cambian, cambian en la acción y en la DAL en el mismo commit.
+- Sin `actor` quedan solo las funciones que crean o leen la sesión: `getSession`, `requireRole`, `requirePageRole`, `signIn` y `signOut`.
 
 ## `ActionResult`
 
@@ -163,7 +199,7 @@ Dos cosas que esta ficha fija y conviene no perder al implementar:
 **Historia de usuario:** [HU-01 — Ingresar al sistema con mi rol](hu/HU-01-ingresar-al-sistema.md)
 **Roles:** `MANAGER`. Es el único que crea usuarios y asigna roles.
 **Entrada:** `firstName`, `lastName`, `email`, `password` (inicial, la fija el gerente), `role`, `phone` (opcional).
-**Precondiciones:** no existe otro `User` con ese email.
+**Precondiciones:** el actor es `MANAGER` (lo verifican la acción y la DAL). No existe otro `User` con ese email.
 **Efectos:** crea un `User` con `active: true` y la contraseña hasheada con argon2id. La contraseña en claro no se guarda ni se registra en ningún lado.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `EMAIL_TAKEN`.
 **Revalida:** el listado de usuarios.
@@ -175,10 +211,10 @@ No vincula la cuenta con un `Professional`: esa relación (`Professional.userId`
 
 **Historia de usuario:** [HU-01 — Ingresar al sistema con mi rol](hu/HU-01-ingresar-al-sistema.md)
 **Roles:** `MANAGER`.
-**Entrada:** ninguna.
-**Precondiciones:** ninguna.
+**Entrada:** el `actor`. No recibe parámetros de la interfaz.
+**Precondiciones:** el actor es `MANAGER`.
 **Efectos:** ninguno. Es una lectura.
-**Errores:** ninguno propio. Sin permiso, la página redirige antes de llamarla.
+**Errores:** `FORBIDDEN` si el actor no es `MANAGER`. En `/users` no llega a dispararse: `requirePageRole` redirige antes a la pantalla del rol. Queda como barrera por si la función se llama desde otro lado.
 **Revalida:** no aplica.
 **Devuelve:** `{ id, firstName, lastName, email, role, active, createdAt }[]`, ordenado por estado y apellido. Nunca el `passwordHash`.
 
