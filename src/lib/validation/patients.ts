@@ -1,5 +1,5 @@
 import { z } from "@/lib/validation/zod";
-import { GENDERS, COVERAGE_TYPES } from "@/lib/patients";
+import { GENDERS, COVERAGE_TYPES, DOCUMENT_TYPES } from "@/lib/patients";
 
 const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
 const phoneRegex = /^\+?\d{7,15}$/;
@@ -34,16 +34,14 @@ export const createPatientSchema = z
     gender: z.enum(GENDERS, {
       message: "Seleccioná un género válido",
     }),
-    documentType: z.literal("DNI", {
-      message: "Solo se permite DNI como tipo de documento",
+    documentType: z.enum(DOCUMENT_TYPES, {
+      message: "Seleccioná un tipo de documento válido",
     }),
     documentNumber: z
       .string()
       .trim()
-      .regex(
-        dniRegex,
-        "El DNI debe tener exactamente 7 u 8 dígitos numéricos sin puntos ni espacios",
-      ),
+      .min(1, "El número de documento es obligatorio")
+      .max(20, "El número de documento es demasiado largo"),
     birthDate: z
       .string()
       .trim()
@@ -103,6 +101,35 @@ export const createPatientSchema = z
       .transform((val) => val || undefined),
   })
   .superRefine((data, ctx) => {
+    if (data.documentType === "DNI") {
+      if (!dniRegex.test(data.documentNumber)) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "El DNI debe tener exactamente 7 u 8 dígitos numéricos sin puntos ni espacios",
+          path: ["documentNumber"],
+        });
+      }
+    } else if (data.documentType === "PASSPORT") {
+      if (!/^[a-zA-Z0-9]{3,20}$/.test(data.documentNumber)) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "El pasaporte debe tener entre 3 y 20 caracteres alfanuméricos",
+          path: ["documentNumber"],
+        });
+      }
+    } else {
+      if (!/^\d{4,10}$/.test(data.documentNumber)) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "El número de documento debe tener entre 4 y 10 dígitos numéricos",
+          path: ["documentNumber"],
+        });
+      }
+    }
+
     if (data.birthDate) {
       const birth = new Date(`${data.birthDate}T00:00:00`);
       const now = new Date();

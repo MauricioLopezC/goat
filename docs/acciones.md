@@ -89,6 +89,7 @@ type ActionError = {
   code: ErrorCode
   message: string                          // en español, apto para mostrar
   fieldErrors?: Record<string, string[]>   // solo para VALIDATION
+  meta?: Record<string, unknown>           // metadatos del error (ej. recurso duplicado)
 }
 ```
 
@@ -111,7 +112,7 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `INVALID_STATUS_TRANSITION` | El cambio de `AppointmentStatus` no está permitido (ver `glossary.md`). |
 | `REASON_REQUIRED` | Falta el motivo en una operación trazable (por ejemplo, cancelar). |
 | `DUPLICATE` | El recurso que se intenta crear ya existe (por ejemplo, matrícula o documento duplicado). Incluye `fieldErrors` con los campos afectados. |
-| `DUPLICATE_PATIENT` | Ya existe un paciente con ese tipo y número de documento. |
+| `DUPLICATE_PATIENT` | Ya existe un paciente con ese tipo y número de documento. Incluye metadatos en `meta` (id, nombre, etc.) para que la UI pueda ofrecer abrir el paciente existente. |
 | `INVALID_CREDENTIALS` | El ingreso falló. Cubre email inexistente, contraseña incorrecta y usuario inactivo: los tres devuelven lo mismo, a propósito (HU-01). |
 | `EMAIL_TAKEN` | Ya existe un usuario con ese email. |
 
@@ -283,10 +284,10 @@ No es una Server Action: es una lectura que el Server Component de `/professiona
 
 **Historia de usuario:** [HU-07 — Registrar un paciente nuevo](hu/HU-07-registrar-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`
-**Entrada:** ninguna.
+**Entrada:** ninguna (recibe el `actor` para verificación de permisos).
 **Precondiciones:** ninguna.
 **Efectos:** ninguno. Es una lectura para poblar los selectores de cobertura y plan.
-**Errores:** ninguno propio.
+**Errores:** `FORBIDDEN` si el actor no pertenece a los roles habilitados.
 **Revalida:** no aplica.
 **Devuelve:** `{ id, name, plans: { id, name }[] }[]` de obras sociales y planes activos, ordenados alfabéticamente.
 

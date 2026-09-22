@@ -18,6 +18,8 @@ import {
   GENDER_LABEL,
   COVERAGE_TYPES,
   COVERAGE_TYPE_LABEL,
+  DOCUMENT_TYPES,
+  DOCUMENT_TYPE_LABEL,
 } from "@/lib/patients";
 import { CoverageType, DocumentType, Gender } from "@/generated/prisma/enums";
 import { Button } from "@/components/ui/button";
@@ -51,6 +53,7 @@ type HealthInsurerOption = {
 
 interface NewPatientFormProps {
   healthInsurers: HealthInsurerOption[];
+  cancelHref: string;
 }
 
 type FormState = ActionResult<CreatedPatientSummary> | null;
@@ -60,11 +63,16 @@ const dniRegex = /^\d{7,8}$/;
 const phoneRegex = /^\+?\d{7,15}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
+export function NewPatientForm({
+  healthInsurers,
+  cancelHref,
+}: NewPatientFormProps) {
   const [lastName, setLastName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [gender, setGender] = useState<Gender>(Gender.MALE);
-  const [documentType] = useState<DocumentType>(DocumentType.DNI);
+  const [documentType, setDocumentType] = useState<DocumentType>(
+    DocumentType.DNI,
+  );
   const [documentNumber, setDocumentNumber] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [phone, setPhone] = useState("");
@@ -94,6 +102,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
     setLastName("");
     setFirstName("");
     setGender(Gender.MALE);
+    setDocumentType(DocumentType.DNI);
     setDocumentNumber("");
     setBirthDate("");
     setPhone("");
@@ -141,10 +150,22 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
   }
 
   if (!documentNumber.trim()) {
-    clientErrors.documentNumber = "El número de DNI es obligatorio";
-  } else if (!dniRegex.test(documentNumber.trim())) {
-    clientErrors.documentNumber =
-      "El DNI debe tener exactamente 7 u 8 dígitos numéricos sin puntos ni espacios";
+    clientErrors.documentNumber = "El número de documento es obligatorio";
+  } else if (documentType === DocumentType.DNI) {
+    if (!dniRegex.test(documentNumber.trim())) {
+      clientErrors.documentNumber =
+        "El DNI debe tener exactamente 7 u 8 dígitos numéricos sin puntos ni espacios";
+    }
+  } else if (documentType === DocumentType.PASSPORT) {
+    if (!/^[a-zA-Z0-9]{3,20}$/.test(documentNumber.trim())) {
+      clientErrors.documentNumber =
+        "El pasaporte debe tener entre 3 y 20 caracteres alfanuméricos";
+    }
+  } else {
+    if (!/^\d{4,10}$/.test(documentNumber.trim())) {
+      clientErrors.documentNumber =
+        "El número de documento debe tener entre 4 y 10 dígitos numéricos";
+    }
   }
 
   if (!birthDate) {
@@ -222,14 +243,18 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
 
   const isDuplicate =
     state?.ok === false && state.error.code === "DUPLICATE_PATIENT";
-  const duplicateId =
-    state?.ok === false
-      ? state.error.fieldErrors?.existingPatientId?.[0]
+  const duplicateMeta =
+    isDuplicate && state?.ok === false && state.error.meta
+      ? (state.error.meta as {
+          existingPatientId?: number;
+          existingPatientName?: string;
+          documentType?: string;
+          documentNumber?: string;
+        })
       : undefined;
-  const duplicateName =
-    state?.ok === false
-      ? state.error.fieldErrors?.existingPatientName?.[0]
-      : undefined;
+
+  const duplicateId = duplicateMeta?.existingPatientId;
+  const duplicateName = duplicateMeta?.existingPatientName;
 
   const getFieldError = (fieldName: string) => {
     if (serverFieldErrors?.[fieldName]?.[0]) {
@@ -258,6 +283,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
       setTouched({
         lastName: true,
         firstName: true,
+        documentType: true,
         documentNumber: true,
         birthDate: true,
         phone: true,
@@ -340,7 +366,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
     });
   };
 
-  const isSubmitDisabled = isPending || !isFormValid;
+  const isSubmitDisabled = isPending;
 
   return (
     <div className="flex flex-col gap-6 relative">
@@ -484,10 +510,16 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="Ej. González"
                     className={cn(getFieldBorderClass("lastName"))}
                     aria-invalid={!!getFieldError("lastName")}
+                    aria-describedby={
+                      getFieldError("lastName") ? "lastName-error" : undefined
+                    }
                     disabled={isPending}
                   />
                   {getFieldError("lastName") && (
-                    <p className="text-body-sm text-destructive">
+                    <p
+                      id="lastName-error"
+                      className="text-body-sm text-destructive"
+                    >
                       {getFieldError("lastName")}
                     </p>
                   )}
@@ -508,10 +540,16 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="Ej. Martín"
                     className={cn(getFieldBorderClass("firstName"))}
                     aria-invalid={!!getFieldError("firstName")}
+                    aria-describedby={
+                      getFieldError("firstName") ? "firstName-error" : undefined
+                    }
                     disabled={isPending}
                   />
                   {getFieldError("firstName") && (
-                    <p className="text-body-sm text-destructive">
+                    <p
+                      id="firstName-error"
+                      className="text-body-sm text-destructive"
+                    >
                       {getFieldError("firstName")}
                     </p>
                   )}
@@ -540,23 +578,29 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                   </Select>
                 </div>
 
-                {/* Tipo de Documento - Restringido exclusivamente a DNI */}
+                {/* Tipo de Documento */}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="documentType">
                     Tipo de documento{" "}
                     <span className="text-destructive">*</span>
                   </Label>
-                  <Select value={documentType} disabled>
-                    <SelectTrigger
-                      id="documentType"
-                      className="h-9.5 w-full bg-tray/60 cursor-not-allowed opacity-90"
-                    >
-                      <SelectValue placeholder="DNI">DNI</SelectValue>
+                  <Select
+                    value={documentType}
+                    onValueChange={(val) => {
+                      setDocumentType(val as DocumentType);
+                      markTouched("documentType");
+                    }}
+                    disabled={isPending}
+                  >
+                    <SelectTrigger id="documentType" className="h-9.5 w-full">
+                      <SelectValue placeholder="Seleccionar tipo de documento" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="DNI">
-                        DNI (Documento Nacional de Identidad)
-                      </SelectItem>
+                      {DOCUMENT_TYPES.map((dt) => (
+                        <SelectItem key={dt} value={dt}>
+                          {DOCUMENT_TYPE_LABEL[dt]}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -564,7 +608,10 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                 {/* Número de Documento */}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="documentNumber">
-                    Número de DNI <span className="text-destructive">*</span>
+                    {documentType === DocumentType.DNI
+                      ? "Número de DNI"
+                      : "Número de documento"}{" "}
+                    <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="documentNumber"
@@ -573,7 +620,11 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     value={documentNumber}
                     onChange={(e) => setDocumentNumber(e.target.value)}
                     onBlur={() => markTouched("documentNumber")}
-                    placeholder="7 u 8 dígitos sin puntos ni espacios"
+                    placeholder={
+                      documentType === DocumentType.DNI
+                        ? "7 u 8 dígitos sin puntos ni espacios"
+                        : "Número de documento"
+                    }
                     className={cn(
                       "font-mono",
                       getFieldBorderClass("documentNumber"),
@@ -581,10 +632,18 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     aria-invalid={
                       !!getFieldError("documentNumber") || isDuplicate
                     }
+                    aria-describedby={
+                      getFieldError("documentNumber")
+                        ? "documentNumber-error"
+                        : undefined
+                    }
                     disabled={isPending}
                   />
                   {getFieldError("documentNumber") && (
-                    <p className="text-body-sm text-destructive">
+                    <p
+                      id="documentNumber-error"
+                      className="text-body-sm text-destructive"
+                    >
                       {getFieldError("documentNumber")}
                     </p>
                   )}
@@ -606,10 +665,16 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     onBlur={() => markTouched("birthDate")}
                     className={cn(getFieldBorderClass("birthDate"))}
                     aria-invalid={!!getFieldError("birthDate")}
+                    aria-describedby={
+                      getFieldError("birthDate") ? "birthDate-error" : undefined
+                    }
                     disabled={isPending}
                   />
                   {getFieldError("birthDate") && (
-                    <p className="text-body-sm text-destructive">
+                    <p
+                      id="birthDate-error"
+                      className="text-body-sm text-destructive"
+                    >
                       {getFieldError("birthDate")}
                     </p>
                   )}
@@ -642,10 +707,16 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="Ej. +5491144556677 o 1144556677"
                     className={cn(getFieldBorderClass("phone"))}
                     aria-invalid={!!getFieldError("phone")}
+                    aria-describedby={
+                      getFieldError("phone") ? "phone-error" : undefined
+                    }
                     disabled={isPending}
                   />
                   {getFieldError("phone") && (
-                    <p className="text-body-sm text-destructive">
+                    <p
+                      id="phone-error"
+                      className="text-body-sm text-destructive"
+                    >
                       {getFieldError("phone")}
                     </p>
                   )}
@@ -668,10 +739,16 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="paciente@ejemplo.com"
                     className={cn(getFieldBorderClass("email"))}
                     aria-invalid={!!getFieldError("email")}
+                    aria-describedby={
+                      getFieldError("email") ? "email-error" : undefined
+                    }
                     disabled={isPending}
                   />
                   {getFieldError("email") && (
-                    <p className="text-body-sm text-destructive">
+                    <p
+                      id="email-error"
+                      className="text-body-sm text-destructive"
+                    >
                       {getFieldError("email")}
                     </p>
                   )}
@@ -693,36 +770,45 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
               </div>
 
               {/* Selector de tipo de cobertura */}
-              <div className="flex gap-4 mb-4">
-                {COVERAGE_TYPES.map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => {
-                      setCoverageType(type);
-                      if (type === CoverageType.PRIVATE) {
-                        setHealthInsurerId("");
-                        setInsurancePlanId("");
-                        setMemberNumber("");
-                      }
-                    }}
-                    className={`flex-1 rounded-lg border p-3 text-left transition-colors ${
-                      coverageType === type
-                        ? "border-primary bg-primary-soft/20 ring-2 ring-primary/20"
-                        : "border-border bg-card hover:bg-tray"
-                    } ${isPending ? "opacity-50 cursor-not-allowed" : ""}`}
-                  >
-                    <div className="text-title-md font-medium text-foreground">
-                      {COVERAGE_TYPE_LABEL[type]}
-                    </div>
-                    <div className="text-body-sm text-muted-foreground">
-                      {type === CoverageType.PRIVATE
-                        ? "Atención particular sin obra social ni prepaga"
-                        : "Cobertura mediante obra social o seguro médico"}
-                    </div>
-                  </button>
-                ))}
+              <div
+                role="radiogroup"
+                aria-label="Tipo de cobertura"
+                className="flex gap-4 mb-4"
+              >
+                {COVERAGE_TYPES.map((type) => {
+                  const isSelected = coverageType === type;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      disabled={isPending}
+                      onClick={() => {
+                        setCoverageType(type);
+                        if (type === CoverageType.PRIVATE) {
+                          setHealthInsurerId("");
+                          setInsurancePlanId("");
+                          setMemberNumber("");
+                        }
+                      }}
+                      className={`flex-1 rounded-lg border p-3 text-left transition-colors ${
+                        isSelected
+                          ? "border-primary bg-primary-soft/20 ring-2 ring-primary/20"
+                          : "border-border bg-card hover:bg-tray"
+                      } ${isPending ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      <div className="text-title-md font-medium text-foreground">
+                        {COVERAGE_TYPE_LABEL[type]}
+                      </div>
+                      <div className="text-body-sm text-muted-foreground">
+                        {type === CoverageType.PRIVATE
+                          ? "Atención particular sin obra social ni prepaga"
+                          : "Cobertura mediante obra social o seguro médico"}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Campos condicionales para obra social */}
@@ -748,6 +834,12 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                           "h-9.5 w-full bg-card",
                           getFieldBorderClass("healthInsurerId"),
                         )}
+                        aria-invalid={!!getFieldError("healthInsurerId")}
+                        aria-describedby={
+                          getFieldError("healthInsurerId")
+                            ? "healthInsurerId-error"
+                            : undefined
+                        }
                       >
                         <SelectValue placeholder="Elegir obra social" />
                       </SelectTrigger>
@@ -763,7 +855,10 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                       </SelectContent>
                     </Select>
                     {getFieldError("healthInsurerId") && (
-                      <p className="text-body-sm text-destructive">
+                      <p
+                        id="healthInsurerId-error"
+                        className="text-body-sm text-destructive"
+                      >
                         {getFieldError("healthInsurerId")}
                       </p>
                     )}
@@ -792,6 +887,12 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                           "h-9.5 w-full bg-card",
                           getFieldBorderClass("insurancePlanId"),
                         )}
+                        aria-invalid={!!getFieldError("insurancePlanId")}
+                        aria-describedby={
+                          getFieldError("insurancePlanId")
+                            ? "insurancePlanId-error"
+                            : undefined
+                        }
                       >
                         <SelectValue
                           placeholder={
@@ -812,7 +913,10 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                       </SelectContent>
                     </Select>
                     {getFieldError("insurancePlanId") && (
-                      <p className="text-body-sm text-destructive">
+                      <p
+                        id="insurancePlanId-error"
+                        className="text-body-sm text-destructive"
+                      >
                         {getFieldError("insurancePlanId")}
                       </p>
                     )}
@@ -835,10 +939,18 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                         getFieldBorderClass("memberNumber"),
                       )}
                       aria-invalid={!!getFieldError("memberNumber")}
+                      aria-describedby={
+                        getFieldError("memberNumber")
+                          ? "memberNumber-error"
+                          : undefined
+                      }
                       disabled={isPending}
                     />
                     {getFieldError("memberNumber") && (
-                      <p className="text-body-sm text-destructive">
+                      <p
+                        id="memberNumber-error"
+                        className="text-body-sm text-destructive"
+                      >
                         {getFieldError("memberNumber")}
                       </p>
                     )}
@@ -874,10 +986,18 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="Ej. Laura González"
                     className={cn(getFieldBorderClass("guardianName"))}
                     aria-invalid={!!getFieldError("guardianName")}
+                    aria-describedby={
+                      getFieldError("guardianName")
+                        ? "guardianName-error"
+                        : undefined
+                    }
                     disabled={isPending}
                   />
                   {getFieldError("guardianName") && (
-                    <p className="text-body-sm text-destructive">
+                    <p
+                      id="guardianName-error"
+                      className="text-body-sm text-destructive"
+                    >
                       {getFieldError("guardianName")}
                     </p>
                   )}
@@ -898,10 +1018,18 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="Ej. +5491188990011 o 1188990011"
                     className={cn(getFieldBorderClass("guardianPhone"))}
                     aria-invalid={!!getFieldError("guardianPhone")}
+                    aria-describedby={
+                      getFieldError("guardianPhone")
+                        ? "guardianPhone-error"
+                        : undefined
+                    }
                     disabled={isPending}
                   />
                   {getFieldError("guardianPhone") && (
-                    <p className="text-body-sm text-destructive">
+                    <p
+                      id="guardianPhone-error"
+                      className="text-body-sm text-destructive"
+                    >
                       {getFieldError("guardianPhone")}
                     </p>
                   )}
@@ -912,7 +1040,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
             {/* Botones de acción */}
             <div className="flex items-center justify-end gap-3 pt-4">
               <Button asChild variant="outline" disabled={isPending}>
-                <Link href="/calendar">Cancelar</Link>
+                <Link href={cancelHref}>Cancelar</Link>
               </Button>
               <Button
                 type="submit"
