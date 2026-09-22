@@ -11,6 +11,7 @@ export type ErrorCode =
   | "VALIDATION"
   | "FORBIDDEN"
   | "NOT_FOUND"
+  | "DUPLICATE"
   | "INVALID_CREDENTIALS"
   | "EMAIL_TAKEN"
   | "APPOINTMENT_OVERLAP"
@@ -24,7 +25,7 @@ export type ActionError = {
   /// En español y apto para mostrar. La UI decide según `code`, nunca según
   /// este texto.
   message: string;
-  /// Solo para `VALIDATION`.
+  /// Solo para `VALIDATION` y `DUPLICATE`.
   fieldErrors?: Record<string, string[]>;
 };
 

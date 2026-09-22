@@ -6,7 +6,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { Role } from "../src/generated/prisma/enums";
 
-// Datos mínimos para poder entrar al sistema (HU-01).
+// Datos mínimos para poder entrar al sistema (HU-01) y probar profesionales (HU-02).
 //
 // Existe por un problema de arranque: solo un `MANAGER` crea usuarios, y una
 // base recién migrada no tiene ninguno. El seed crea ese primer gerente.
@@ -43,6 +43,20 @@ const USERS = [
   },
 ];
 
+const TITLES = [
+  { name: "Médico Traumatólogo" },
+  { name: "Licenciado en Kinesiología y Fisiatría" },
+  { name: "Médico Cirujano Ortopédico" },
+];
+
+const SERVICES = [
+  { name: "Consulta traumatológica general", durationMinutes: 30 },
+  { name: "Control post-quirúrgico", durationMinutes: 30 },
+  { name: "Sesión de kinesiología motora", durationMinutes: 30 },
+  { name: "Rehabilitación deportiva", durationMinutes: 30 },
+  { name: "Curación y retiro de puntos", durationMinutes: 30 },
+];
+
 async function main() {
   if (process.env.NODE_ENV === "production") {
     throw new Error(
@@ -60,6 +74,9 @@ async function main() {
   });
 
   try {
+    console.log("🌱 Sembrando datos...");
+
+    // 1. Usuarios del sistema
     const passwordHash = await hash(password, ARGON2);
 
     for (const user of USERS) {
@@ -73,7 +90,31 @@ async function main() {
       console.log(`  ${user.role.padEnd(12)}  ${user.email}`);
     }
 
-    console.log(`\nContraseña de los tres: ${password}`);
+    // 2. Títulos profesionales
+    for (const t of TITLES) {
+      await prisma.professionalTitle.upsert({
+        where: { name: t.name },
+        update: {},
+        create: { name: t.name, active: true },
+      });
+    }
+    console.log("✓ Títulos profesionales listos");
+
+    // 3. Catálogo de servicios
+    for (const s of SERVICES) {
+      await prisma.service.upsert({
+        where: { name: s.name },
+        update: {},
+        create: {
+          name: s.name,
+          durationMinutes: s.durationMinutes,
+          active: true,
+        },
+      });
+    }
+    console.log("✓ Catálogo de servicios listo");
+
+    console.log(`\nContraseña de los tres usuarios: ${password}`);
     console.log("Cambiala con SEED_PASSWORD si te molesta.");
   } finally {
     await prisma.$disconnect();
