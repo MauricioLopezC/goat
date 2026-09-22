@@ -14,7 +14,11 @@ import { Role } from "@/generated/prisma/enums";
 /// Prefijo de ruta → roles que pueden verla. Lo que no está acá solo requiere
 /// sesión.
 const BY_ROLE: Array<{ prefix: string; roles: Role[] }> = [
-  { prefix: "/professionals", roles: [Role.MANAGER] },
+  { prefix: "/professionals/new", roles: [Role.MANAGER] },
+  {
+    prefix: "/professionals",
+    roles: [Role.MANAGER, Role.RECEPTIONIST, Role.PROFESSIONAL],
+  },
   { prefix: "/users", roles: [Role.MANAGER] },
   { prefix: "/agenda", roles: [Role.PROFESSIONAL] },
   { prefix: "/calendar", roles: [Role.RECEPTIONIST, Role.MANAGER] },
