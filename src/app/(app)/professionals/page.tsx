@@ -129,7 +129,10 @@ export default async function ProfessionalsPage({
                         Activo
                       </Badge>
                     ) : (
-                      <Badge className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border rounded-lg text-xs font-medium gap-1">
+                      <Badge
+                        variant="destructive"
+                        className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border rounded-lg text-xs font-medium gap-1"
+                      >
                         <UserX className="size-3" />
                         Inactivo
                       </Badge>
@@ -191,7 +194,9 @@ export default async function ProfessionalsPage({
                     size="sm"
                     className="text-xs"
                   >
-                    <Link href={`/professionals/${prof.id}`}>Ver ficha</Link>
+                    <Link href={`/professionals/${prof.id}`}>
+                      {isManager ? "Modificar" : "Ver ficha"}
+                    </Link>
                   </Button>
                 </div>
               </CardContent>

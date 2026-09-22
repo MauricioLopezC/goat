@@ -95,3 +95,19 @@ export const createProfessionalSchema = z
   });
 
 export type CreateProfessionalInput = z.infer<typeof createProfessionalSchema>;
+
+export const updateProfessionalSchema = createProfessionalSchema.safeExtend({
+  id: z.number().int().positive(),
+  reason: z.string().trim().min(1, "El motivo es obligatorio").max(500),
+});
+
+export const deactivateProfessionalSchema = z.object({
+  id: z.number().int().positive(),
+  reason: z.string().trim().min(1, "El motivo es obligatorio").max(500),
+  deactivatedAt: z.iso.date(),
+});
+
+export const reactivateProfessionalSchema = z.object({
+  id: z.number().int().positive(),
+  reason: z.string().trim().min(1, "El motivo es obligatorio").max(500),
+});
