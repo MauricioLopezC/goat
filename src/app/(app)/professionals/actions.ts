@@ -12,7 +12,7 @@ import { createProfessionalSchema } from "@/lib/validation/professional";
  * Server Action: registrar un profesional (HU-02).
  *
  * Flujo obligatorio (docs/acciones.md):
- * 1. Sesión y rol
+ * 1. Sesión y rol (MANAGER)
  * 2. Validar entrada con Zod
  * 3. Llamar a la DAL
  * 4. Revalidar rutas
@@ -27,9 +27,9 @@ export async function createProfessional(
   formData: FormData,
 ): Promise<ActionResult<{ id: number; firstName: string; lastName: string }>> {
   // ── 1. Sesión y rol: solo MANAGER puede crear profesionales ───────
-  let session;
+  let actor;
   try {
-    session = await requireRole("MANAGER");
+    actor = await requireRole("MANAGER");
   } catch (error) {
     if (error instanceof DomainError) {
       return { ok: false, error: { code: error.code, message: error.message } };
@@ -69,12 +69,9 @@ export async function createProfessional(
     };
   }
 
-  // ── 3. Llamar a la DAL ────────────────────────────────────────────
+  // ── 3. Llamar a la DAL con el ID del usuario real logueado ────────
   try {
-    const professional = await dalCreateProfessional(
-      parsed.data,
-      session.userId,
-    );
+    const professional = await dalCreateProfessional(parsed.data, actor.id);
 
     // ── 4. Revalidar el listado de profesionales ────────────────────
     revalidatePath("/professionals");

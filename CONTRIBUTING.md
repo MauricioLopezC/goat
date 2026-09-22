@@ -9,8 +9,21 @@ npm ci
 cp .env.example .env    # y ajustar los valores si hace falta
 npm run db:up
 npm run db:generate     # el cliente de Prisma no se commitea
+npm run db:migrate
+npm run db:seed         # usuarios para poder entrar
 npm run dev
 ```
+
+El seed (`prisma/seed.ts`) crea un usuario por rol con la contraseña
+`goat1234` (cambiable con `SEED_PASSWORD`). Existe porque solo un `MANAGER`
+crea usuarios y una base recién migrada no tiene ninguno. Es idempotente y se
+niega a correr con `NODE_ENV=production`. `prisma migrate reset` lo corre solo.
+
+| Email | Rol |
+| --- | --- |
+| `gerente@goat.local` | `MANAGER` |
+| `mesa@goat.local` | `RECEPTIONIST` |
+| `profesional@goat.local` | `PROFESSIONAL` |
 
 Las convenciones de código, arquitectura y dominio están en [`AGENTS.md`](AGENTS.md).
 
