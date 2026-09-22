@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import {
   CalendarPlus,
@@ -8,6 +8,8 @@ import {
   AlertCircle,
   ExternalLink,
   UserPlus,
+  Loader2,
+  X,
 } from "lucide-react";
 import type { ActionResult } from "@/lib/actions";
 import type { CreatedPatientSummary } from "@/lib/dal/patients";
@@ -78,31 +80,12 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
   const [guardianPhone, setGuardianPhone] = useState("");
 
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [keyReset, setKeyReset] = useState<number>(0);
-
-  const [state, formAction, isPending] = useActionState(
-    async (_prev: FormState, formData: FormData): Promise<FormState> => {
-      const raw = {
-        lastName: formData.get("lastName"),
-        firstName: formData.get("firstName"),
-        gender: formData.get("gender"),
-        documentType: formData.get("documentType"),
-        documentNumber: formData.get("documentNumber"),
-        birthDate: formData.get("birthDate"),
-        phone: formData.get("phone"),
-        email: formData.get("email"),
-        coverageType: formData.get("coverageType"),
-        healthInsurerId: formData.get("healthInsurerId"),
-        insurancePlanId: formData.get("insurancePlanId"),
-        memberNumber: formData.get("memberNumber"),
-        copayAmount: formData.get("copayAmount"),
-        guardianName: formData.get("guardianName"),
-        guardianPhone: formData.get("guardianPhone"),
-      };
-      return await createPatient(raw);
-    },
+  const [isPending, startTransition] = useTransition();
+  const [state, setState] = useState<FormState>(null);
+  const [successData, setSuccessData] = useState<CreatedPatientSummary | null>(
     null,
   );
+  const [showToast, setShowToast] = useState(false);
 
   const markTouched = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -124,7 +107,9 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
     setGuardianName("");
     setGuardianPhone("");
     setTouched({});
-    setKeyReset((prev) => prev + 1);
+    setSuccessData(null);
+    setState(null);
+    setShowToast(false);
   };
 
   const selectedInsurer = healthInsurers.find(
@@ -158,7 +143,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
   }
 
   if (!documentNumber.trim()) {
-    clientErrors.documentNumber = "El número de documento es obligatorio";
+    clientErrors.documentNumber = "El número de DNI es obligatorio";
   } else if (!dniRegex.test(documentNumber.trim())) {
     clientErrors.documentNumber =
       "El DNI debe tener exactamente 7 u 8 dígitos numéricos sin puntos ni espacios";
@@ -275,9 +260,11 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (isPending) return;
+
     if (!isFormValid) {
-      e.preventDefault();
-      // Marcar todos los campos como visitados para resaltar todos los bordes rojos
       setTouched({
         lastName: true,
         firstName: true,
@@ -292,17 +279,112 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
         guardianName: true,
         guardianPhone: true,
       });
+      return;
     }
+
+    startTransition(async () => {
+      const raw = {
+        lastName: lastName.trim(),
+        firstName: firstName.trim(),
+        gender,
+        documentType,
+        documentNumber: documentNumber.trim(),
+        birthDate: birthDate.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        coverageType,
+        healthInsurerId:
+          coverageType === CoverageType.HEALTH_INSURANCE && healthInsurerId
+            ? Number(healthInsurerId)
+            : undefined,
+        insurancePlanId:
+          coverageType === CoverageType.HEALTH_INSURANCE && insurancePlanId
+            ? Number(insurancePlanId)
+            : undefined,
+        memberNumber:
+          coverageType === CoverageType.HEALTH_INSURANCE
+            ? memberNumber.trim()
+            : undefined,
+        copayAmount:
+          coverageType === CoverageType.HEALTH_INSURANCE && copayAmount !== ""
+            ? Number(copayAmount)
+            : undefined,
+        guardianName: guardianName.trim() || undefined,
+        guardianPhone: guardianPhone.trim() || undefined,
+      };
+
+      try {
+        const res = await createPatient(raw);
+        setState(res);
+
+        if (res.ok) {
+          setSuccessData(res.data);
+          setShowToast(true);
+
+          // Limpiar campos del formulario
+          setLastName("");
+          setFirstName("");
+          setGender(Gender.MALE);
+          setDocumentNumber("");
+          setBirthDate("");
+          setPhone("");
+          setEmail("");
+          setCoverageType(CoverageType.PRIVATE);
+          setHealthInsurerId("");
+          setInsurancePlanId("");
+          setMemberNumber("");
+          setCopayAmount("0");
+          setGuardianName("");
+          setGuardianPhone("");
+          setTouched({});
+
+          // Scroll hacia arriba para visualizar inmediatamente la confirmación
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } else {
+          setSuccessData(null);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      } catch {
+        setState({
+          ok: false,
+          error: {
+            code: "VALIDATION",
+            message: "Ocurrió un error inesperado al procesar la solicitud.",
+          },
+        });
+      }
+    });
   };
 
-  // El botón de envío debe permanecer deshabilitado o bloquear la acción si hay campos obligatorios vacíos o con errores
   const isSubmitDisabled = isPending || !isFormValid;
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Caso de éxito */}
-      {state?.ok === true && (
-        <Card className="border-success-soft-border bg-success-soft/30">
+    <div className="flex flex-col gap-6 relative">
+      {/* Toast flotante de éxito */}
+      {showToast && successData && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border border-success-soft-border bg-card p-4 shadow-lg animate-in fade-in slide-in-from-bottom-5 duration-300"
+        >
+          <CheckCircle2 className="size-5 text-success shrink-0" />
+          <div className="text-body-md font-medium text-foreground">
+            Paciente registrado de forma exitosa
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowToast(false)}
+            className="ml-2 text-muted-foreground hover:text-foreground"
+            aria-label="Cerrar notificación"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Caso de éxito - Alerta principal */}
+      {successData && (
+        <Card className="border-success-soft-border bg-success-soft/30 animate-in fade-in duration-300">
           <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
             <CheckCircle2 className="size-6 text-success shrink-0" />
             <div className="flex-1">
@@ -312,11 +394,11 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
               <CardDescription className="text-body-md text-muted-foreground mt-1">
                 Se guardó la ficha de{" "}
                 <strong className="text-foreground">
-                  {state.data.lastName}, {state.data.firstName}
+                  {successData.lastName}, {successData.firstName}
                 </strong>{" "}
-                con {state.data.documentType}{" "}
+                con {successData.documentType}{" "}
                 <span className="font-mono tabular-nums font-semibold">
-                  {state.data.documentNumber}
+                  {successData.documentNumber}
                 </span>
                 . El paciente ya está disponible para recibir turnos y en la
                 búsqueda.
@@ -329,7 +411,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
               size="default"
               className="bg-primary hover:bg-primary-hover"
             >
-              <Link href={`/appointments/new?patientId=${state.data.id}`}>
+              <Link href={`/appointments/new?patientId=${successData.id}`}>
                 <CalendarPlus data-icon="inline-start" />
                 Dar turno a este paciente
               </Link>
@@ -351,7 +433,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
       {isDuplicate && (
         <Alert
           variant="destructive"
-          className="border-warning-soft-border bg-warning-soft/30 text-warning-soft-foreground"
+          className="border-warning-soft-border bg-warning-soft/30 text-warning-soft-foreground animate-in fade-in duration-300"
         >
           <AlertCircle className="size-5 text-warning shrink-0" />
           <div className="flex-1">
@@ -396,12 +478,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
         </CardHeader>
 
         <CardContent>
-          <form
-            key={keyReset}
-            action={formAction}
-            onSubmit={handleSubmit}
-            className="flex flex-col gap-6"
-          >
+          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             {/* SECCIÓN 1: Identificación y datos personales */}
             <div>
               <h3 className="text-label-sm font-semibold uppercase text-muted-foreground tracking-wider mb-4">
@@ -423,6 +500,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="Ej. González"
                     className={cn(getFieldBorderClass("lastName"))}
                     aria-invalid={!!getFieldError("lastName")}
+                    disabled={isPending}
                   />
                   {getFieldError("lastName") && (
                     <p className="text-body-sm text-destructive">
@@ -446,6 +524,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="Ej. Martín"
                     className={cn(getFieldBorderClass("firstName"))}
                     aria-invalid={!!getFieldError("firstName")}
+                    disabled={isPending}
                   />
                   {getFieldError("firstName") && (
                     <p className="text-body-sm text-destructive">
@@ -459,10 +538,10 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                   <Label htmlFor="gender">
                     Género <span className="text-destructive">*</span>
                   </Label>
-                  <input type="hidden" name="gender" value={gender} />
                   <Select
                     value={gender}
                     onValueChange={(val) => setGender(val as Gender)}
+                    disabled={isPending}
                   >
                     <SelectTrigger id="gender" className="h-9.5 w-full">
                       <SelectValue placeholder="Seleccionar género" />
@@ -483,11 +562,6 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     Tipo de documento{" "}
                     <span className="text-destructive">*</span>
                   </Label>
-                  <input
-                    type="hidden"
-                    name="documentType"
-                    value={documentType}
-                  />
                   <Select value={documentType} disabled>
                     <SelectTrigger
                       id="documentType"
@@ -523,6 +597,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     aria-invalid={
                       !!getFieldError("documentNumber") || isDuplicate
                     }
+                    disabled={isPending}
                   />
                   {getFieldError("documentNumber") && (
                     <p className="text-body-sm text-destructive">
@@ -547,6 +622,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     onBlur={() => markTouched("birthDate")}
                     className={cn(getFieldBorderClass("birthDate"))}
                     aria-invalid={!!getFieldError("birthDate")}
+                    disabled={isPending}
                   />
                   {getFieldError("birthDate") && (
                     <p className="text-body-sm text-destructive">
@@ -582,6 +658,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="Ej. +5491144556677 o 1144556677"
                     className={cn(getFieldBorderClass("phone"))}
                     aria-invalid={!!getFieldError("phone")}
+                    disabled={isPending}
                   />
                   {getFieldError("phone") && (
                     <p className="text-body-sm text-destructive">
@@ -607,6 +684,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="paciente@ejemplo.com"
                     className={cn(getFieldBorderClass("email"))}
                     aria-invalid={!!getFieldError("email")}
+                    disabled={isPending}
                   />
                   {getFieldError("email") && (
                     <p className="text-body-sm text-destructive">
@@ -631,12 +709,12 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
               </div>
 
               {/* Selector de tipo de cobertura */}
-              <input type="hidden" name="coverageType" value={coverageType} />
               <div className="flex gap-4 mb-4">
                 {COVERAGE_TYPES.map((type) => (
                   <button
                     key={type}
                     type="button"
+                    disabled={isPending}
                     onClick={() => {
                       setCoverageType(type);
                       if (type === CoverageType.PRIVATE) {
@@ -650,7 +728,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                       coverageType === type
                         ? "border-primary bg-primary-soft/20 ring-2 ring-primary/20"
                         : "border-border bg-card hover:bg-tray"
-                    }`}
+                    } ${isPending ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     <div className="text-title-md font-medium text-foreground">
                       {COVERAGE_TYPE_LABEL[type]}
@@ -672,11 +750,6 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     <Label htmlFor="healthInsurerId">
                       Obra social <span className="text-destructive">*</span>
                     </Label>
-                    <input
-                      type="hidden"
-                      name="healthInsurerId"
-                      value={healthInsurerId}
-                    />
                     <Select
                       value={healthInsurerId}
                       onValueChange={(val) => {
@@ -684,6 +757,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                         setInsurancePlanId("");
                         markTouched("healthInsurerId");
                       }}
+                      disabled={isPending}
                     >
                       <SelectTrigger
                         id="healthInsurerId"
@@ -717,18 +791,17 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     <Label htmlFor="insurancePlanId">
                       Plan <span className="text-destructive">*</span>
                     </Label>
-                    <input
-                      type="hidden"
-                      name="insurancePlanId"
-                      value={insurancePlanId}
-                    />
                     <Select
                       value={insurancePlanId}
                       onValueChange={(val) => {
                         setInsurancePlanId(val);
                         markTouched("insurancePlanId");
                       }}
-                      disabled={!healthInsurerId || availablePlans.length === 0}
+                      disabled={
+                        isPending ||
+                        !healthInsurerId ||
+                        availablePlans.length === 0
+                      }
                     >
                       <SelectTrigger
                         id="insurancePlanId"
@@ -779,6 +852,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                         getFieldBorderClass("memberNumber"),
                       )}
                       aria-invalid={!!getFieldError("memberNumber")}
+                      disabled={isPending}
                     />
                     {getFieldError("memberNumber") && (
                       <p className="text-body-sm text-destructive">
@@ -807,6 +881,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                         getFieldBorderClass("copayAmount"),
                       )}
                       aria-invalid={!!getFieldError("copayAmount")}
+                      disabled={isPending}
                     />
                     {getFieldError("copayAmount") && (
                       <p className="text-body-sm text-destructive">
@@ -845,6 +920,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="Ej. Laura González"
                     className={cn(getFieldBorderClass("guardianName"))}
                     aria-invalid={!!getFieldError("guardianName")}
+                    disabled={isPending}
                   />
                   {getFieldError("guardianName") && (
                     <p className="text-body-sm text-destructive">
@@ -868,6 +944,7 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
                     placeholder="Ej. +5491188990011 o 1188990011"
                     className={cn(getFieldBorderClass("guardianPhone"))}
                     aria-invalid={!!getFieldError("guardianPhone")}
+                    disabled={isPending}
                   />
                   {getFieldError("guardianPhone") && (
                     <p className="text-body-sm text-destructive">
@@ -880,15 +957,22 @@ export function NewPatientForm({ healthInsurers }: NewPatientFormProps) {
 
             {/* Botones de acción */}
             <div className="flex items-center justify-end gap-3 pt-4">
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" disabled={isPending}>
                 <Link href="/calendar">Cancelar</Link>
               </Button>
               <Button
                 type="submit"
                 disabled={isSubmitDisabled}
-                className="bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed min-w-36"
               >
-                {isPending ? "Guardando..." : "Registrar paciente"}
+                {isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin inline-start" />
+                    Registrando...
+                  </>
+                ) : (
+                  "Registrar paciente"
+                )}
               </Button>
             </div>
           </form>
