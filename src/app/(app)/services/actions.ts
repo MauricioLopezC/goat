@@ -92,7 +92,10 @@ export async function createServiceAction(
     durationMinutes: formData.get("durationMinutes"),
     requiresReferral: formData.get("requiresReferral") === "on",
     description: formData.get("description") || null,
-    specialtyId: formData.get("specialtyId") || null,
+    specialtyId:
+      formData.get("specialtyId") && formData.get("specialtyId") !== "none"
+        ? formData.get("specialtyId")
+        : null,
   };
 
   const result = await create(raw);
@@ -117,7 +120,10 @@ export async function updateServiceAction(
     durationMinutes: formData.get("durationMinutes"),
     requiresReferral: formData.get("requiresReferral") === "on",
     description: formData.get("description") || null,
-    specialtyId: formData.get("specialtyId") || null,
+    specialtyId:
+      formData.get("specialtyId") && formData.get("specialtyId") !== "none"
+        ? formData.get("specialtyId")
+        : null,
   };
 
   const result = await update(raw);

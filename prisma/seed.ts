@@ -49,6 +49,18 @@ const TITLES = [
   { name: "Médico Cirujano Ortopédico" },
 ];
 
+const SPECIALTIES = [
+  { name: "Columna" },
+  { name: "Rodilla" },
+  { name: "Hombro y codo" },
+  { name: "Mano y muñeca" },
+  { name: "Cadera" },
+  { name: "Tobillo y pie" },
+  { name: "Traumatología infantil" },
+  { name: "Traumatología deportiva" },
+  { name: "Kinesiología y rehabilitación" },
+];
+
 const SERVICES = [
   { name: "Consulta traumatológica general", durationMinutes: 30 },
   { name: "Control post-quirúrgico", durationMinutes: 30 },
@@ -100,7 +112,17 @@ async function main() {
     }
     console.log("✓ Títulos profesionales listos");
 
-    // 3. Catálogo de servicios
+    // 3. Especialidades / Áreas clínicas (HU-06)
+    for (const spec of SPECIALTIES) {
+      await prisma.specialty.upsert({
+        where: { name: spec.name },
+        update: {},
+        create: { name: spec.name, active: true },
+      });
+    }
+    console.log("✓ Especialidades / Áreas clínicas listas");
+
+    // 4. Catálogo de servicios
     for (const s of SERVICES) {
       await prisma.service.upsert({
         where: { name: s.name },
