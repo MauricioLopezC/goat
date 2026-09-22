@@ -9,7 +9,7 @@
 El [ADR 0001](0001-server-actions-y-capa-de-acceso-a-datos.md) fijó que las reglas de negocio y el acceso a datos viven en la DAL, y dejó explícitamente pendiente la elección de la librería de sesión. Lo que ya quedó decidido ahí y este ADR **no** cambia:
 
 - `getSession()` en `src/lib/dal/auth.ts` es el único punto que conoce el mecanismo de sesión.
-- `requireRole(...roles: Role[])` se apoya en `getSession()` y es lo que llaman las acciones y la DAL.
+- `requireRole(...roles: Role[])` se apoya en `getSession()` y es lo que llaman las acciones para obtener el `actor`. La DAL recibe ese `actor` y lo verifica con `assertRole`.
 - La autorización (qué rol puede hacer qué, y si el recurso le corresponde) es código propio en la DAL, no de la librería.
 - `proxy.ts` solo hace chequeos optimistas leyendo la cookie, y nunca es la única barrera.
 

@@ -23,9 +23,10 @@ export const metadata: Metadata = {
 };
 
 export default async function UsersPage() {
-  // Solo el gerente crea usuarios y asigna roles (HU-01).
-  await requirePageRole("MANAGER");
-  const users = await listUsers();
+  // Solo el gerente crea usuarios y asigna roles (HU-01). La página redirige a
+  // otro rol; `listUsers` vuelve a verificarlo por su cuenta.
+  const actor = await requirePageRole("MANAGER");
+  const users = await listUsers(actor);
 
   return (
     <>

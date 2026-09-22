@@ -61,6 +61,8 @@ export const getSession = cache(async (): Promise<Actor | null> => {
   };
 });
 
+const FORBIDDEN_MESSAGE = "No tenés permiso para realizar esta operación.";
+
 /// Exige sesión y uno de los roles indicados. Sin roles, alcanza con estar
 /// autenticado.
 ///
@@ -71,13 +73,23 @@ export async function requireRole(...roles: Role[]): Promise<Actor> {
   if (!actor) redirect("/login");
 
   if (roles.length > 0 && !roles.includes(actor.role)) {
-    throw new DomainError(
-      "FORBIDDEN",
-      "No tenés permiso para realizar esta operación.",
-    );
+    throw new DomainError("FORBIDDEN", FORBIDDEN_MESSAGE);
   }
 
   return actor;
+}
+
+/// Barrera de rol de la propia DAL: cada función que lee o escribe datos de
+/// negocio recibe el `actor` y lo verifica acá, sin importar quién la llame.
+///
+/// La acción (`defineAction`) y la página (`requirePageRole`) ya chequean el
+/// rol antes, para cortar temprano. Esto es lo que queda si alguien llama a la
+/// función desde otro lado y se olvida de chequear (ADR 0001). Exige al menos
+/// un rol: una función de la DAL abierta a cualquiera no necesita llamarla.
+export function assertRole(actor: Actor, ...roles: [Role, ...Role[]]): void {
+  if (!roles.includes(actor.role)) {
+    throw new DomainError("FORBIDDEN", FORBIDDEN_MESSAGE);
+  }
 }
 
 /// Ruta inicial de cada rol al ingresar (HU-01).
@@ -145,12 +157,14 @@ export async function signOut(): Promise<void> {
   await clearSession();
 }
 
-/// Listado de usuarios del centro, para la pantalla del gerente.
+/// Listado de usuarios del centro. Solo el gerente.
 ///
 /// Es una lectura: la consume un Server Component llamando directo a la DAL
 /// (ADR 0001). Devuelve solo lo que la pantalla muestra, nunca el
 /// `passwordHash`.
-export async function listUsers() {
+export async function listUsers(actor: Actor) {
+  assertRole(actor, Role.MANAGER);
+
   return prisma.user.findMany({
     select: {
       id: true,
@@ -165,8 +179,13 @@ export async function listUsers() {
   });
 }
 
-/// Alta de usuario. Solo el gerente (el rol lo verifica la acción).
-export async function createUser(input: CreateUserInput): Promise<Actor> {
+/// Alta de usuario. Solo el gerente.
+export async function createUser(
+  input: CreateUserInput,
+  actor: Actor,
+): Promise<Actor> {
+  assertRole(actor, Role.MANAGER);
+
   const existing = await prisma.user.findUnique({
     where: { email: input.email },
     select: { id: true },
