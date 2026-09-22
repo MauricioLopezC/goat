@@ -76,6 +76,7 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `REASON_REQUIRED` | Falta el motivo en una operación trazable (por ejemplo, cancelar). |
 | `INVALID_CREDENTIALS` | El ingreso falló. Cubre email inexistente, contraseña incorrecta y usuario inactivo: los tres devuelven lo mismo, a propósito (HU-01). |
 | `EMAIL_TAKEN` | Ya existe un usuario con ese email. |
+| `DUPLICATE_PATIENT` | Ya existe un paciente con ese tipo y número de documento. |
 
 Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
 
@@ -185,6 +186,28 @@ No vincula la cuenta con un `Professional`: esa relación (`Professional.userId`
 No es una Server Action: es una lectura que el Server Component de `/users`
 llama directo a la DAL (ADR 0001). Lleva ficha igual porque tiene una
 restricción de rol y decide qué datos del usuario salen a la interfaz.
+
+### `createPatient`
+
+**Historia de usuario:** [HU-07 — Registrar un paciente nuevo](hu/HU-07-registrar-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`
+**Entrada:** `lastName`, `firstName`, `gender`, `documentType`, `documentNumber`, `birthDate`, `phone`, `email`, `coverageType`, `insurancePlanId` (si `coverageType` es `HEALTH_INSURANCE`), `memberNumber` (si `coverageType` es `HEALTH_INSURANCE`), `copayAmount` (si `coverageType` es `HEALTH_INSURANCE`), `guardianName` (opcional), `guardianPhone` (opcional).
+**Precondiciones:** no existe otro paciente con la misma combinación de `documentType` y `documentNumber`. Si `coverageType` es `HEALTH_INSURANCE`, el `insurancePlanId` existe y está activo.
+**Efectos:** crea un `Patient` con `active: true` y `createdById`. Si `coverageType` es `HEALTH_INSURANCE`, crea además su `Coverage` asociada.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `DUPLICATE_PATIENT`.
+**Revalida:** `/patients`.
+**Devuelve:** `{ id, firstName, lastName, documentType, documentNumber }`.
+
+### `listHealthInsurers`
+
+**Historia de usuario:** [HU-07 — Registrar un paciente nuevo](hu/HU-07-registrar-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`
+**Entrada:** ninguna.
+**Precondiciones:** ninguna.
+**Efectos:** ninguno. Es una lectura para poblar los selectores de cobertura y plan.
+**Errores:** ninguno propio.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, name, plans: { id, name }[] }[]` de obras sociales y planes activos, ordenados alfabéticamente.
 
 ### Nota: `signIn` y `signOut` frente a `defineAction`
 

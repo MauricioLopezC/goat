@@ -15,7 +15,7 @@
 - No se permite otro paciente con el mismo tipo y número de documento: el sistema avisa del duplicado, muestra el paciente existente y ofrece abrirlo en lugar de crear uno nuevo.
 - Fecha de nacimiento no puede ser futura.
 - Teléfono con formato válido.
-- Email con formato válido, si se completa.
+- Email con formato válido.
 - Si se elige cobertura por obra social, entonces obra social, plan, coseguro y número de afiliado pasan a ser obligatorios.
 - Campo obligatorio vacío: se marca el campo y no se guarda nada.
 
