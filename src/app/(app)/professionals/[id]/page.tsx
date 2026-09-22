@@ -50,7 +50,14 @@ export default async function ProfessionalDetailPage({
           <Link href="/professionals">Volver al listado</Link>
         </Button>
       </div>
-      <Badge variant={professional.active ? "secondary" : "outline"}>
+      <Badge
+        variant={professional.active ? "secondary" : "destructive"}
+        className={
+          professional.active
+            ? undefined
+            : "bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
+        }
+      >
         {professional.active ? "Activo" : "Inactivo"}
       </Badge>
       {!manager && (

@@ -94,8 +94,8 @@ export default async function ProfessionalsPage() {
                       </Badge>
                     ) : (
                       <Badge
-                        variant="outline"
-                        className="text-muted-foreground rounded-lg text-xs font-medium gap-1"
+                        variant="destructive"
+                        className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border rounded-lg text-xs font-medium gap-1"
                       >
                         <UserX className="size-3" />
                         Inactivo
@@ -158,7 +158,9 @@ export default async function ProfessionalsPage() {
                     size="sm"
                     className="text-xs"
                   >
-                    <Link href={`/professionals/${prof.id}`}>Ver ficha</Link>
+                    <Link href={`/professionals/${prof.id}`}>
+                      {isManager ? "Modificar" : "Ver ficha"}
+                    </Link>
                   </Button>
                 </div>
               </CardContent>
