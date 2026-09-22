@@ -75,7 +75,7 @@ export async function createProfessional(
     select: { id: true },
   });
 
-  if (titles.length !== input.titleIds.length) {
+  if (titles.length !== new Set(input.titleIds).size) {
     throw new DomainError(
       "NOT_FOUND",
       "Uno o más títulos profesionales no existen o no están activos.",
@@ -88,7 +88,7 @@ export async function createProfessional(
     select: { id: true },
   });
 
-  if (services.length !== input.serviceIds.length) {
+  if (services.length !== new Set(input.serviceIds).size) {
     throw new DomainError(
       "NOT_FOUND",
       "Uno o más servicios no existen o no están activos.",
@@ -120,4 +120,57 @@ export async function createProfessional(
   });
 
   return professional;
+}
+
+// ─────────────────────── Funciones de lectura ──────────────────────────
+
+/**
+ * Devuelve el listado de profesionales para las pantallas del centro.
+ *
+ * Es una lectura: la consume un Server Component llamando directo a la DAL
+ * (ADR 0001). Devuelve la ficha resumida con títulos y servicios asociados.
+ */
+export async function listProfessionals() {
+  return prisma.professional.findMany({
+    orderBy: [{ active: "desc" }, { lastName: "asc" }, { firstName: "asc" }],
+    select: {
+      id: true,
+      lastName: true,
+      firstName: true,
+      documentType: true,
+      documentNumber: true,
+      licenseNumber: true,
+      phone: true,
+      email: true,
+      active: true,
+      titles: {
+        select: { id: true, name: true },
+      },
+      services: {
+        select: { id: true, name: true, durationMinutes: true },
+      },
+    },
+  });
+}
+
+/**
+ * Devuelve los títulos profesionales activos para las opciones de formulario.
+ */
+export async function listActiveProfessionalTitles() {
+  return prisma.professionalTitle.findMany({
+    where: { active: true },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+}
+
+/**
+ * Devuelve el catálogo de servicios activos para las opciones de formulario.
+ */
+export async function listActiveServices() {
+  return prisma.service.findMany({
+    where: { active: true },
+    select: { id: true, name: true, durationMinutes: true },
+    orderBy: { name: "asc" },
+  });
 }

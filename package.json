@@ -13,7 +13,6 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "db:seed": "npx tsx prisma/seed.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit",

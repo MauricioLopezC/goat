@@ -198,6 +198,20 @@ No es una Server Action: es una lectura que el Server Component de `/users`
 llama directo a la DAL (ADR 0001). Lleva ficha igual porque tiene una
 restricción de rol y decide qué datos del usuario salen a la interfaz.
 
+### `listProfessionals`
+
+**Historia de usuario:** [HU-02 — Registrar un profesional](hu/HU-02-registrar-profesional.md) / [HU-04 — Buscar y listar profesionales](hu/HU-04-buscar-profesionales.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
+**Entrada:** ninguna.
+**Precondiciones:** ninguna.
+**Efectos:** ninguno. Es una lectura.
+**Errores:** ninguno propio. Sin sesión válida, la página redirige al login.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, lastName, firstName, documentType, documentNumber, licenseNumber, phone, email, active, titles: { id, name }[], services: { id, name, durationMinutes }[] }[]`, ordenado por estado activo, apellido y nombre.
+
+No es una Server Action: es una lectura que el Server Component de `/professionals` llama directo a la DAL (ADR 0001).
+
+
 ### Nota: `signIn` y `signOut` frente a `defineAction`
 
 `defineAction` exige declarar roles, y estas dos operaciones no tienen ninguno que exigir: una corre sin sesión por definición y la otra acepta cualquiera. Ambas siguen igual el resto del flujo del [ADR 0001](adr/0001-server-actions-y-capa-de-acceso-a-datos.md) —validar con Zod, delegar en la DAL, devolver `ActionResult` ante el error— y siguen siendo endpoints POST públicos.

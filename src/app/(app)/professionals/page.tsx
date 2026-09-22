@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   BriefcaseMedical,
@@ -8,27 +9,23 @@ import {
   UserX,
 } from "lucide-react";
 
-import { prisma } from "@/lib/prisma";
-import { requirePageRole } from "@/lib/dal/auth";
+import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
+import { listProfessionals } from "@/lib/dal/professionals";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
-export const metadata = {
-  title: "Profesionales — Goat",
+export const metadata: Metadata = {
+  title: "Profesionales · Goat",
   description: "Gestión y listado de profesionales del centro.",
 };
 
 export default async function ProfessionalsPage() {
-  await requirePageRole("MANAGER");
+  // HU-02: MANAGER crea; RECEPTIONIST y PROFESSIONAL tienen solo lectura.
+  const actor = await requirePageRole(...STAFF_ROLES);
+  const professionals = await listProfessionals();
 
-  const professionals = await prisma.professional.findMany({
-    orderBy: [{ active: "desc" }, { lastName: "asc" }, { firstName: "asc" }],
-    include: {
-      titles: { select: { id: true, name: true } },
-      services: { select: { id: true, name: true, durationMinutes: true } },
-    },
-  });
+  const isManager = actor.role === "MANAGER";
 
   return (
     <div className="flex flex-col gap-6">
@@ -42,21 +39,20 @@ export default async function ProfessionalsPage() {
             atención en el centro.
           </p>
         </div>
-        <Link href="/professionals/new">
-          <Button
-            size="lg"
-            className="rounded-xl bg-primary hover:bg-primary-hover text-white shadow-sm gap-2"
-          >
-            <Plus className="size-4 stroke-[2.5]" />
-            Nuevo profesional
+        {isManager && (
+          <Button asChild size="default" className="gap-2">
+            <Link href="/professionals/new">
+              <Plus className="size-4" />
+              Nuevo profesional
+            </Link>
           </Button>
-        </Link>
+        )}
       </div>
 
       {professionals.length === 0 ? (
-        <Card className="rounded-2xl border-dashed border-2 border-border p-12 text-center bg-card">
+        <Card className="rounded-xl border-dashed border-2 border-border p-12 text-center bg-card">
           <CardContent className="flex flex-col items-center justify-center gap-4 p-0">
-            <div className="size-12 rounded-2xl bg-primary-soft text-primary flex items-center justify-center">
+            <div className="size-12 rounded-lg bg-primary-soft text-primary-soft-foreground flex items-center justify-center">
               <Stethoscope className="size-6" />
             </div>
             <div className="space-y-1">
@@ -68,12 +64,14 @@ export default async function ProfessionalsPage() {
                 matrícula y prestaciones habilitadas.
               </p>
             </div>
-            <Link href="/professionals/new">
-              <Button className="rounded-xl bg-primary hover:bg-primary-hover text-white">
-                <Plus className="size-4 mr-1.5" />
-                Registrar profesional
+            {isManager && (
+              <Button asChild>
+                <Link href="/professionals/new">
+                  <Plus className="size-4 mr-1.5" />
+                  Registrar profesional
+                </Link>
               </Button>
-            </Link>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -81,7 +79,7 @@ export default async function ProfessionalsPage() {
           {professionals.map((prof) => (
             <Card
               key={prof.id}
-              className="rounded-2xl border-border bg-card shadow-xs hover:shadow-md transition-shadow overflow-hidden"
+              className="rounded-xl border-border bg-card shadow-xs hover:shadow-md transition-shadow overflow-hidden"
             >
               <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-2">
@@ -126,7 +124,7 @@ export default async function ProfessionalsPage() {
                         <Badge
                           key={t.id}
                           variant="secondary"
-                          className="bg-info-soft/60 text-info-soft-foreground border-info-soft-border/50 text-[11px] rounded-lg"
+                          className="bg-info-soft text-info-soft-foreground border-info-soft-border text-[11px] rounded-lg"
                         >
                           {t.name}
                         </Badge>
@@ -154,11 +152,7 @@ export default async function ProfessionalsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-xl text-xs"
-                  >
+                  <Button variant="outline" size="sm" className="text-xs">
                     Ver ficha
                   </Button>
                 </div>

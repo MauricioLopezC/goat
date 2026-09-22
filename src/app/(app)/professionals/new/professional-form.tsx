@@ -1,17 +1,17 @@
 "use client";
 
-import * as React from "react";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeft,
   BriefcaseMedical,
-  Check,
+  CalendarPlus,
   CheckCircle2,
   Clock,
   FileBadge2,
-  IdCard,
-  Loader2,
+  List,
   PlusCircle,
   User,
   UserCheck,
@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -28,7 +28,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { createProfessional } from "../actions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { createProfessional, type CreateProfessionalState } from "../actions";
 
 interface TitleOption {
   id: number;
@@ -46,704 +53,422 @@ interface ProfessionalFormProps {
   services: ServiceOption[];
 }
 
+const DOCUMENT_TYPES = [
+  { value: "DNI", label: "DNI — Documento Nacional de Identidad" },
+  { value: "LC", label: "LC — Libreta Cívica" },
+  { value: "LE", label: "LE — Libreta de Enrolamiento" },
+  { value: "CI", label: "CI — Cédula de Identidad" },
+  { value: "PASSPORT", label: "Pasaporte" },
+] as const;
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" disabled={pending}>
+      <UserCheck className="size-4 mr-2" />
+      {pending ? "Guardando…" : "Guardar profesional"}
+    </Button>
+  );
+}
+
+function FieldError({ id, errors }: { id: string; errors?: string[] }) {
+  if (!errors?.length) return null;
+  return (
+    <p id={id} className="text-body-sm text-destructive">
+      {errors[0]}
+    </p>
+  );
+}
+
 export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
-  const [state, formAction, isPending] = React.useActionState(
+  const [state, formAction] = useActionState<CreateProfessionalState, FormData>(
     createProfessional,
     null,
   );
 
-  // Estado controlado para preservar TODOS los datos ingresados ante cualquier error
-  const [values, setValues] = React.useState({
-    lastName: "",
-    firstName: "",
-    documentType: "DNI",
-    documentNumber: "",
-    licenseNumber: "",
-    phone: "",
-    email: "",
-    notes: "",
-  });
+  const created = state?.ok ? state.data : undefined;
+  const failed = state?.ok === false ? state.error : undefined;
+  const fields = failed?.fieldErrors;
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >,
-  ) => {
-    const { name, value } = e.target;
-    setValues((prev) => ({ ...prev, [name]: value }));
-  };
+  // Valores restaurados ante fallo de validación
+  const values = state?.values;
 
-  // Estados locales para multiselect interactivo
-  const [selectedTitles, setSelectedTitles] = React.useState<number[]>([]);
-  const [selectedServices, setSelectedServices] = React.useState<number[]>([]);
-
-  const toggleTitle = (id: number) => {
-    setSelectedTitles((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
-  };
-
-  const toggleService = (id: number) => {
-    setSelectedServices((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
-  };
-
-  const fieldErrors = state?.ok === false ? state.error.fieldErrors : undefined;
-
-  // Auto-scroll y foco al primer campo con error para que el usuario lo vea inmediatamente
-  React.useEffect(() => {
-    if (state?.ok === false && state.error.fieldErrors) {
-      const firstErrorField = Object.keys(state.error.fieldErrors)[0];
-      if (firstErrorField) {
-        const el = document.getElementById(firstErrorField);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          el.focus();
-        }
-      }
-    }
-  }, [state]);
-
-  // Chequeo de errores por sección para alertar en la tarjeta correspondiente
-  const personalErrors =
-    fieldErrors?.lastName ||
-    fieldErrors?.firstName ||
-    fieldErrors?.documentType ||
-    fieldErrors?.documentNumber ||
-    fieldErrors?.phone ||
-    fieldErrors?.email;
-
-  const licenseErrors = fieldErrors?.licenseNumber || fieldErrors?.titleIds;
-  const serviceErrors = fieldErrors?.serviceIds;
+  // Remontar los campos en cada intento para que defaultValue se aplique
+  const attempt = state ? (created ? "ok" : "error") : "inicial";
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6">
-      {/* Navegación y encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Link
-              href="/professionals"
-              className="hover:text-primary transition-colors inline-flex items-center gap-1"
-            >
-              <ArrowLeft className="size-4" />
-              Profesionales
-            </Link>
-            <span>/</span>
-            <span className="text-foreground font-medium">
-              Nuevo profesional
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            Registrar Profesional
+    <div className="flex flex-col gap-6 max-w-4xl">
+      {/* Cabecera de la vista */}
+      <div className="flex items-center gap-4">
+        <Button asChild variant="outline" size="sm">
+          <Link href="/professionals">
+            <ArrowLeft className="size-4 mr-1.5" />
+            Volver al listado
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-headline-lg font-bold text-foreground">
+            Alta de profesional
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Complete los datos del profesional y asigne los servicios que
-            prestará en el centro.
+          <p className="text-body-sm text-muted-foreground">
+            Registrar un nuevo miembro del cuerpo médico con su matrícula y
+            servicios asignados (HU-02).
           </p>
         </div>
       </div>
 
-      {/* Banner de éxito */}
-      {state?.ok === true && (
-        <Card className="border-success-soft-border bg-success-soft/50 shadow-sm rounded-2xl overflow-hidden animate-in fade-in-50 duration-300">
-          <CardContent className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="size-10 rounded-xl bg-success text-white flex items-center justify-center shrink-0">
-                <CheckCircle2 className="size-6" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-success-soft-foreground">
-                  ¡Profesional registrado con éxito!
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Se ha dado de alta a{" "}
-                  <span className="font-semibold text-foreground">
-                    {state.data.firstName} {state.data.lastName}
-                  </span>{" "}
-                  en el sistema. El profesional quedó activo y listo para la
-                  carga de horarios.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Link href="/professionals" className="w-full sm:w-auto">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full rounded-xl"
-                >
+      {/* Banner de éxito (HU-02) */}
+      {created && (
+        <Alert
+          role="status"
+          className="border-success-soft-border bg-success-soft text-success-soft-foreground"
+        >
+          <CheckCircle2 className="size-5 text-success" />
+          <AlertDescription className="space-y-3">
+            <p className="text-body-md text-foreground">
+              Se dio de alta con éxito a{" "}
+              <strong className="font-semibold text-foreground">
+                {created.firstName} {created.lastName}
+              </strong>
+              . El profesional quedó registrado y activo en el sistema.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <Button asChild size="sm">
+                <Link href={`/professionals/${created.id}/schedules`}>
+                  <CalendarPlus className="size-4 mr-1.5" />
+                  Cargar horarios de atención
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/professionals">
+                  <List className="size-4 mr-1.5" />
                   Ver listado
-                </Button>
-              </Link>
-              <Button
-                size="sm"
-                className="w-full sm:w-auto rounded-xl"
-                onClick={() => window.location.reload()}
-              >
-                <PlusCircle className="size-4 mr-1.5" />
-                Registrar otro
+                </Link>
+              </Button>
+              <Button asChild variant="secondary" size="sm">
+                <Link href="/professionals/new">
+                  <PlusCircle className="size-4 mr-1.5" />
+                  Registrar otro
+                </Link>
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </AlertDescription>
+        </Alert>
       )}
 
-      {/* Banner de error general detallado */}
-      {state?.ok === false && (
-        <Card className="border-destructive-soft-border bg-destructive-soft/70 shadow-sm rounded-2xl overflow-hidden animate-in fade-in-50 duration-300">
-          <CardContent className="p-5 space-y-3">
-            <div className="flex items-center gap-3 text-destructive-soft-foreground">
-              <div className="size-8 rounded-xl bg-destructive text-white flex items-center justify-center shrink-0">
-                <AlertCircle className="size-5 stroke-[2.5]" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-destructive">
-                  {state.error.message}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Por favor revise y corrija los campos marcados en rojo a
-                  continuación:
-                </p>
-              </div>
-            </div>
-
-            {/* Lista explícita de campos que fallaron */}
-            {fieldErrors && Object.keys(fieldErrors).length > 0 && (
-              <ul className="text-xs text-destructive pl-11 space-y-1 list-disc">
-                {Object.entries(fieldErrors).map(([field, msgs]) => (
+      {/* Banner de error general */}
+      {failed && (
+        <Alert variant="destructive" role="alert">
+          <AlertCircle className="size-5" />
+          <AlertDescription>
+            <p className="font-semibold">{failed.message}</p>
+            {fields && Object.keys(fields).length > 0 && (
+              <ul className="list-disc pl-5 mt-1.5 text-body-sm space-y-0.5">
+                {Object.entries(fields).map(([field, msgs]) => (
                   <li key={field}>
-                    <span className="font-semibold uppercase">{field}:</span>{" "}
+                    <span className="font-medium uppercase">{field}:</span>{" "}
                     {msgs.join(", ")}
                   </li>
                 ))}
               </ul>
             )}
-          </CardContent>
-        </Card>
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Formulario principal */}
-      <form action={formAction} className="space-y-6">
-        {/* Hidden inputs para sincronizar los arreglos seleccionados */}
-        {selectedTitles.map((id) => (
-          <input key={`title-${id}`} type="hidden" name="titleIds" value={id} />
-        ))}
-        {selectedServices.map((id) => (
-          <input
-            key={`service-${id}`}
-            type="hidden"
-            name="serviceIds"
-            value={id}
-          />
-        ))}
-
-        {/* 1. Datos Personales */}
-        <Card
-          className={`shadow-sm rounded-2xl bg-card overflow-hidden transition-all ${
-            personalErrors
-              ? "border-destructive/60 ring-2 ring-destructive/15"
-              : "border-border"
-          }`}
-        >
-          <CardHeader className="bg-tray/40 border-b border-border/60 px-6 py-4 flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-primary-soft text-primary">
-                <User className="size-5" />
-              </div>
-              <div>
-                <CardTitle className="text-base font-semibold text-foreground">
-                  Información Personal
+      <form action={formAction} className="flex flex-col gap-6">
+        <div key={attempt} className="flex flex-col gap-6">
+          {/* 1. Datos Personales */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <User className="size-5 text-primary" />
+                <CardTitle className="text-title-lg">
+                  Información personal
                 </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  Datos de filiación e identificación oficial del profesional
-                </CardDescription>
               </div>
-            </div>
-            {personalErrors && (
-              <Badge
-                variant="destructive"
-                className="rounded-lg text-[11px] gap-1 px-2.5 py-1"
-              >
-                <AlertCircle className="size-3" />
-                Errores en esta sección
-              </Badge>
-            )}
-          </CardHeader>
-          <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="lastName"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Apellido <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="lastName"
-                name="lastName"
-                value={values.lastName}
-                onChange={handleChange}
-                placeholder="Ej. Gómez"
-                required
-                className={`rounded-xl bg-background ${
-                  fieldErrors?.lastName
-                    ? "border-destructive bg-destructive/5 ring-2 ring-destructive/20 focus-visible:border-destructive"
-                    : "border-input"
-                }`}
-                aria-invalid={!!fieldErrors?.lastName}
-              />
-              {fieldErrors?.lastName && (
-                <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="size-3.5" />
-                  {fieldErrors.lastName[0]}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="firstName"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Nombre <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="firstName"
-                name="firstName"
-                value={values.firstName}
-                onChange={handleChange}
-                placeholder="Ej. Martín Lucas"
-                required
-                className={`rounded-xl bg-background ${
-                  fieldErrors?.firstName
-                    ? "border-destructive bg-destructive/5 ring-2 ring-destructive/20 focus-visible:border-destructive"
-                    : "border-input"
-                }`}
-                aria-invalid={!!fieldErrors?.firstName}
-              />
-              {fieldErrors?.firstName && (
-                <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="size-3.5" />
-                  {fieldErrors.firstName[0]}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="documentType"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Tipo de documento <span className="text-destructive">*</span>
-              </Label>
-              <div className="relative">
-                <select
-                  id="documentType"
-                  name="documentType"
-                  value={values.documentType}
-                  onChange={handleChange}
+              <CardDescription>
+                Identificación y filiación del profesional en el centro.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-5 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="firstName">
+                  Nombre <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="firstName"
+                  name="firstName"
+                  defaultValue={values?.firstName ?? ""}
+                  placeholder="Ej. Martín"
                   required
-                  className={`h-9.5 w-full rounded-xl bg-background px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 appearance-none cursor-pointer ${
-                    fieldErrors?.documentType
-                      ? "border border-destructive ring-2 ring-destructive/20 focus-visible:border-destructive"
-                      : "border border-input focus-visible:border-primary focus-visible:ring-primary/20"
-                  }`}
+                  aria-invalid={Boolean(fields?.firstName)}
+                  aria-describedby={
+                    fields?.firstName ? "firstName-error" : undefined
+                  }
+                />
+                <FieldError id="firstName-error" errors={fields?.firstName} />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="lastName">
+                  Apellido <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  defaultValue={values?.lastName ?? ""}
+                  placeholder="Ej. González"
+                  required
+                  aria-invalid={Boolean(fields?.lastName)}
+                  aria-describedby={
+                    fields?.lastName ? "lastName-error" : undefined
+                  }
+                />
+                <FieldError id="lastName-error" errors={fields?.lastName} />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="documentType">
+                  Tipo de documento <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  name="documentType"
+                  defaultValue={values?.documentType ?? "DNI"}
                 >
-                  <option value="DNI">
-                    DNI — Documento Nacional de Identidad
-                  </option>
-                  <option value="LC">LC — Libreta Cívica</option>
-                  <option value="LE">LE — Libreta de Enrolamiento</option>
-                  <option value="CI">CI — Cédula de Identidad</option>
-                  <option value="PASSPORT">Pasaporte</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground">
-                  ▾
-                </div>
+                  <SelectTrigger id="documentType" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_TYPES.map((dt) => (
+                      <SelectItem key={dt.value} value={dt.value}>
+                        {dt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError
+                  id="documentType-error"
+                  errors={fields?.documentType}
+                />
               </div>
-              {fieldErrors?.documentType && (
-                <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="size-3.5" />
-                  {fieldErrors.documentType[0]}
-                </p>
-              )}
-            </div>
 
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="documentNumber"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Número de documento <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="documentNumber"
-                name="documentNumber"
-                value={values.documentNumber}
-                onChange={handleChange}
-                placeholder="Ej. 35894120"
-                required
-                className={`rounded-xl bg-background font-mono ${
-                  fieldErrors?.documentNumber
-                    ? "border-destructive bg-destructive/5 ring-2 ring-destructive/20 focus-visible:border-destructive"
-                    : "border-input"
-                }`}
-                aria-invalid={!!fieldErrors?.documentNumber}
-              />
-              {fieldErrors?.documentNumber && (
-                <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="size-3.5" />
-                  {fieldErrors.documentNumber[0]}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="phone"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Teléfono de contacto{" "}
-                <span className="text-muted-foreground font-normal lowercase">
-                  (opcional)
-                </span>
-              </Label>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                value={values.phone}
-                onChange={handleChange}
-                placeholder="Ej. +54 9 387 555-1234"
-                className={`rounded-xl bg-background ${
-                  fieldErrors?.phone
-                    ? "border-destructive bg-destructive/5 ring-2 ring-destructive/20 focus-visible:border-destructive"
-                    : "border-input"
-                }`}
-              />
-              {fieldErrors?.phone && (
-                <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="size-3.5" />
-                  {fieldErrors.phone[0]}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="email"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Correo electrónico{" "}
-                <span className="text-muted-foreground font-normal lowercase">
-                  (opcional)
-                </span>
-              </Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={values.email}
-                onChange={handleChange}
-                placeholder="profesional@ejemplo.com"
-                className={`rounded-xl bg-background ${
-                  fieldErrors?.email
-                    ? "border-destructive bg-destructive/5 ring-2 ring-destructive/20 focus-visible:border-destructive"
-                    : "border-input"
-                }`}
-                aria-invalid={!!fieldErrors?.email}
-              />
-              {fieldErrors?.email && (
-                <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="size-3.5" />
-                  {fieldErrors.email[0]}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 2. Matrícula y Títulos Profesionales */}
-        <Card
-          className={`shadow-sm rounded-2xl bg-card overflow-hidden transition-all ${
-            licenseErrors
-              ? "border-destructive/60 ring-2 ring-destructive/15"
-              : "border-border"
-          }`}
-        >
-          <CardHeader className="bg-tray/40 border-b border-border/60 px-6 py-4 flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-info-soft text-info">
-                <FileBadge2 className="size-5" />
-              </div>
-              <div>
-                <CardTitle className="text-base font-semibold text-foreground">
-                  Matrícula y Título de Profesión
-                </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  Acreditación profesional requerida por el centro
-                </CardDescription>
-              </div>
-            </div>
-            {licenseErrors && (
-              <Badge
-                variant="destructive"
-                className="rounded-lg text-[11px] gap-1 px-2.5 py-1"
-              >
-                <AlertCircle className="size-3" />
-                Errores en esta sección
-              </Badge>
-            )}
-          </CardHeader>
-          <CardContent className="p-6 space-y-5">
-            <div className="max-w-md space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label
-                  htmlFor="licenseNumber"
-                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Matrícula Profesional{" "}
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="documentNumber">
+                  Número de documento{" "}
                   <span className="text-destructive">*</span>
                 </Label>
-                <span className="text-[11px] text-muted-foreground">
-                  1 a 8 dígitos numéricos
-                </span>
+                <Input
+                  id="documentNumber"
+                  name="documentNumber"
+                  defaultValue={values?.documentNumber ?? ""}
+                  placeholder="Ej. 35894120"
+                  required
+                  aria-invalid={Boolean(fields?.documentNumber)}
+                  aria-describedby={
+                    fields?.documentNumber ? "documentNumber-error" : undefined
+                  }
+                />
+                <FieldError
+                  id="documentNumber-error"
+                  errors={fields?.documentNumber}
+                />
               </div>
-              <div className="relative">
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="phone">Teléfono (opcional)</Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  defaultValue={values?.phone ?? ""}
+                  placeholder="Ej. +54 9 387 555-1234"
+                  aria-invalid={Boolean(fields?.phone)}
+                  aria-describedby={fields?.phone ? "phone-error" : undefined}
+                />
+                <FieldError id="phone-error" errors={fields?.phone} />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="email">Email (opcional)</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  defaultValue={values?.email ?? ""}
+                  placeholder="profesional@ejemplo.com"
+                  aria-invalid={Boolean(fields?.email)}
+                  aria-describedby={fields?.email ? "email-error" : undefined}
+                />
+                <FieldError id="email-error" errors={fields?.email} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 2. Ejercicio Profesional */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <FileBadge2 className="size-5 text-primary" />
+                <CardTitle className="text-title-lg">
+                  Ejercicio profesional
+                </CardTitle>
+              </div>
+              <CardDescription>
+                Matrícula habilitante y títulos otorgados por colegios o
+                universidades.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2 sm:max-w-xs">
+                <Label htmlFor="licenseNumber">
+                  Matrícula profesional{" "}
+                  <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="licenseNumber"
                   name="licenseNumber"
-                  value={values.licenseNumber}
-                  onChange={handleChange}
-                  placeholder="Ej. 12345"
+                  defaultValue={values?.licenseNumber ?? ""}
+                  placeholder="Ej. 12345 (1 a 8 dígitos)"
                   required
                   maxLength={8}
-                  className={`rounded-xl bg-background font-mono font-medium pl-9 ${
-                    fieldErrors?.licenseNumber
-                      ? "border-destructive bg-destructive/5 ring-2 ring-destructive/20 focus-visible:border-destructive text-destructive font-bold"
-                      : "border-input"
-                  }`}
-                  aria-invalid={!!fieldErrors?.licenseNumber}
+                  aria-invalid={Boolean(fields?.licenseNumber)}
+                  aria-describedby={
+                    fields?.licenseNumber ? "licenseNumber-error" : undefined
+                  }
                 />
-                <IdCard
-                  className={`size-4 absolute left-3 top-1/2 -translate-y-1/2 ${
-                    fieldErrors?.licenseNumber
-                      ? "text-destructive"
-                      : "text-muted-foreground"
-                  }`}
+                <FieldError
+                  id="licenseNumber-error"
+                  errors={fields?.licenseNumber}
                 />
               </div>
-              {fieldErrors?.licenseNumber && (
-                <p className="text-xs font-semibold text-destructive flex items-center gap-1.5 mt-1 animate-in fade-in-50">
-                  <AlertCircle className="size-4 shrink-0" />
-                  {fieldErrors.licenseNumber[0]}
-                </p>
-              )}
-            </div>
 
-            {/* Selección de títulos */}
-            <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Título profesional <span className="text-destructive">*</span>
-                </Label>
-                <span className="text-xs text-muted-foreground">
-                  Puede seleccionar más de una opción
-                </span>
-              </div>
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <Label>
+                    Título profesional{" "}
+                    <span className="text-destructive">*</span>
+                  </Label>
+                  <span className="text-label-sm text-muted-foreground">
+                    Puede seleccionar más de uno
+                  </span>
+                </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {titles.map((title) => {
-                  const isSelected = selectedTitles.includes(title.id);
-                  return (
-                    <button
-                      type="button"
-                      key={title.id}
-                      onClick={() => toggleTitle(title.id)}
-                      className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer select-none ${
-                        isSelected
-                          ? "border-primary bg-primary-soft/40 text-primary-soft-foreground shadow-xs ring-2 ring-primary/20"
-                          : "border-border hover:border-border-strong bg-background text-foreground hover:bg-tray/50"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className={`size-5 rounded-lg flex items-center justify-center transition-colors ${
-                            isSelected
-                              ? "bg-primary text-white"
-                              : "border border-muted-foreground/30 bg-background"
-                          }`}
-                        >
-                          {isSelected && (
-                            <Check className="size-3.5 stroke-[2.5]" />
-                          )}
-                        </div>
-                        <span className="text-sm font-medium">
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                  {titles.map((title) => {
+                    const isChecked = values?.titleIds
+                      ? values.titleIds.includes(title.id)
+                      : false;
+                    return (
+                      <label
+                        key={title.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card hover:bg-tray cursor-pointer select-none transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary-soft/30"
+                      >
+                        <input
+                          type="checkbox"
+                          name="titleIds"
+                          value={title.id}
+                          defaultChecked={isChecked}
+                          className="size-4 rounded border-input text-primary focus:ring-primary accent-primary"
+                        />
+                        <span className="text-body-sm font-medium text-foreground">
                           {title.name}
                         </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <FieldError id="titleIds-error" errors={fields?.titleIds} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 3. Servicios que presta */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <BriefcaseMedical className="size-5 text-primary" />
+                <CardTitle className="text-title-lg">
+                  Servicios y prestaciones
+                </CardTitle>
+              </div>
+              <CardDescription>
+                Servicios del catálogo clínico que el profesional queda
+                habilitado para brindar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <Label>
+                Prestaciones habilitadas{" "}
+                <span className="text-destructive">*</span>
+              </Label>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {services.map((service) => {
+                  const isChecked = values?.serviceIds
+                    ? values.serviceIds.includes(service.id)
+                    : false;
+                  return (
+                    <label
+                      key={service.id}
+                      className="flex items-start gap-3 p-3.5 rounded-lg border border-border bg-card hover:bg-tray cursor-pointer select-none transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary-soft/30"
+                    >
+                      <input
+                        type="checkbox"
+                        name="serviceIds"
+                        value={service.id}
+                        defaultChecked={isChecked}
+                        className="size-4 mt-0.5 rounded border-input text-primary focus:ring-primary accent-primary"
+                      />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-body-sm font-medium text-foreground">
+                          {service.name}
+                        </span>
+                        <span className="text-label-sm text-muted-foreground flex items-center gap-1">
+                          <Clock className="size-3" />
+                          {service.durationMinutes} min por turno
+                        </span>
                       </div>
-                    </button>
+                    </label>
                   );
                 })}
               </div>
-              {fieldErrors?.titleIds && (
-                <p className="text-xs font-semibold text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="size-3.5" />
-                  {fieldErrors.titleIds[0]}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+              <FieldError id="serviceIds-error" errors={fields?.serviceIds} />
+            </CardContent>
+          </Card>
 
-        {/* 3. Servicios del Catálogo */}
-        <Card
-          className={`shadow-sm rounded-2xl bg-card overflow-hidden transition-all ${
-            serviceErrors
-              ? "border-destructive/60 ring-2 ring-destructive/15"
-              : "border-border"
-          }`}
-        >
-          <CardHeader className="bg-tray/40 border-b border-border/60 px-6 py-4 flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-success-soft text-success">
-                <BriefcaseMedical className="size-5" />
-              </div>
-              <div>
-                <CardTitle className="text-base font-semibold text-foreground">
-                  Prestaciones y Servicios Habilitados
-                </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  Seleccione al menos un servicio del catálogo que el
-                  profesional atenderá
-                </CardDescription>
-              </div>
-            </div>
-            {serviceErrors && (
-              <Badge
-                variant="destructive"
-                className="rounded-lg text-[11px] gap-1 px-2.5 py-1"
-              >
-                <AlertCircle className="size-3" />
-                Seleccione al menos uno
-              </Badge>
-            )}
-          </CardHeader>
-          <CardContent className="p-6 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {services.map((service) => {
-                const isSelected = selectedServices.includes(service.id);
-                return (
-                  <button
-                    type="button"
-                    key={service.id}
-                    onClick={() => toggleService(service.id)}
-                    className={`flex items-center justify-between p-4 rounded-xl border text-left transition-all cursor-pointer select-none ${
-                      isSelected
-                        ? "border-primary bg-primary-soft/40 text-primary-soft-foreground shadow-xs ring-2 ring-primary/20"
-                        : "border-border hover:border-border-strong bg-background text-foreground hover:bg-tray/50"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`size-5 rounded-lg mt-0.5 flex items-center justify-center shrink-0 transition-colors ${
-                          isSelected
-                            ? "bg-primary text-white"
-                            : "border border-muted-foreground/30 bg-background"
-                        }`}
-                      >
-                        {isSelected && (
-                          <Check className="size-3.5 stroke-[2.5]" />
-                        )}
-                      </div>
-                      <div className="space-y-0.5">
-                        <span className="text-sm font-semibold block">
-                          {service.name}
-                        </span>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Clock className="size-3.5" />
-                          <span>
-                            {service.durationMinutes} minutos por turno
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    {isSelected && (
-                      <Badge
-                        variant="default"
-                        className="rounded-lg bg-primary text-white text-[11px] h-5 px-2"
-                      >
-                        Habilitado
-                      </Badge>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            {fieldErrors?.serviceIds && (
-              <p className="text-xs font-semibold text-destructive flex items-center gap-1 mt-1">
-                <AlertCircle className="size-3.5" />
-                {fieldErrors.serviceIds[0]}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+          {/* 4. Observaciones */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-title-lg">
+                Observaciones internas
+              </CardTitle>
+              <CardDescription>
+                Notas administrativas opcionales sobre el profesional o su
+                perfil.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <textarea
+                id="notes"
+                name="notes"
+                rows={3}
+                defaultValue={values?.notes ?? ""}
+                placeholder="Aclaraciones sobre disponibilidad, convenios o perfil médico..."
+                className="w-full rounded-lg border border-input bg-card p-3 text-body-sm outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary"
+              />
+              <FieldError id="notes-error" errors={fields?.notes} />
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* 4. Observaciones adicionales */}
-        <Card className="shadow-sm rounded-2xl border-border bg-card overflow-hidden">
-          <CardContent className="p-6 space-y-1.5">
-            <Label
-              htmlFor="notes"
-              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-            >
-              Observaciones internas{" "}
-              <span className="text-muted-foreground font-normal lowercase">
-                (opcional)
-              </span>
-            </Label>
-            <textarea
-              id="notes"
-              name="notes"
-              rows={3}
-              value={values.notes}
-              onChange={handleChange}
-              placeholder="Notas administrativas o aclaraciones sobre la disponibilidad o perfil del profesional..."
-              className="w-full rounded-xl border border-input bg-background p-3 text-sm transition-colors outline-none focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-primary/20"
-            />
-          </CardContent>
-        </Card>
-
-        {/* Acciones del formulario */}
-        <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-2">
-          <Link href="/professionals" className="w-full sm:w-auto">
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              className="w-full sm:w-auto rounded-xl px-6"
-            >
-              Cancelar
-            </Button>
-          </Link>
-          <Button
-            type="submit"
-            size="lg"
-            disabled={isPending}
-            className="w-full sm:w-auto rounded-xl px-8 bg-primary hover:bg-primary-hover active:bg-primary-active text-white font-medium shadow-sm transition-all"
-          >
-            {isPending ? (
-              <>
-                <Loader2 className="size-4 animate-spin mr-2" />
-                Registrando...
-              </>
-            ) : (
-              <>
-                <UserCheck className="size-4 mr-2" />
-                Guardar profesional
-              </>
-            )}
+        {/* Acciones */}
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <Button asChild variant="outline">
+            <Link href="/professionals">Cancelar</Link>
           </Button>
+          <SubmitButton />
         </div>
       </form>
     </div>
