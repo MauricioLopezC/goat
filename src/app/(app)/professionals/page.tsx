@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 export default async function ProfessionalsPage() {
   // HU-02: MANAGER crea; RECEPTIONIST y PROFESSIONAL tienen solo lectura.
   const actor = await requirePageRole(...STAFF_ROLES);
-  const professionals = await listProfessionals();
+  const professionals = await listProfessionals(actor);
 
   const isManager = actor.role === "MANAGER";
 

@@ -173,7 +173,7 @@ Una ficha por operación implementada o acordada. Se agregan a medida que se tra
 **Historia de usuario:** [HU-02 — Registrar un profesional](hu/HU-02-registrar-profesional.md)
 **Roles:** `MANAGER`
 **Entrada:** `lastName`, `firstName`, `documentType` (`DocumentType`), `documentNumber`, `licenseNumber`, `titleIds` (`Int[]`, al menos uno), `serviceIds` (`Int[]`, al menos uno), `phone?`, `email?`, `photoUrl?`, `notes?`.
-**Precondiciones:** no existe otro `Professional` activo o inactivo con el mismo par (`documentType`, `documentNumber`). No existe otro `Professional` con la misma `licenseNumber`. Todos los `titleIds` y `serviceIds` corresponden a registros activos de `ProfessionalTitle` y `Service`.
+**Precondiciones:** el actor es `MANAGER` (lo verifican la acción y la DAL). No existe otro `Professional` activo o inactivo con el mismo par (`documentType`, `documentNumber`). No existe otro `Professional` con la misma `licenseNumber`. Todos los `titleIds` y `serviceIds` corresponden a registros activos de `ProfessionalTitle` y `Service`.
 **Efectos:** crea un `Professional` con `active: true`, sin franjas horarias. Asocia los `ProfessionalTitle` y `Service` indicados. Registra `createdById` con el id del usuario de la sesión. El profesional no aparece como opción al dar turnos hasta que se le carguen franjas ([HU-05](hu/HU-05-franjas-de-atencion.md)).
 **Errores:** `VALIDATION` (campo obligatorio vacío, matrícula no numérica o fuera de rango 1–8 dígitos, email con formato inválido, arrays vacíos), `FORBIDDEN` (el rol no es `MANAGER`), `NOT_FOUND` (algún `titleId` o `serviceId` no existe o no está activo), `DUPLICATE` (documento o matrícula ya registrados; incluye `fieldErrors`).
 **Revalida:** `/professionals` (listado de profesionales).
@@ -238,14 +238,36 @@ restricción de rol y decide qué datos del usuario salen a la interfaz.
 
 **Historia de usuario:** [HU-02 — Registrar un profesional](hu/HU-02-registrar-profesional.md) / [HU-04 — Buscar y listar profesionales](hu/HU-04-buscar-profesionales.md)
 **Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
-**Entrada:** ninguna.
-**Precondiciones:** ninguna.
+**Entrada:** el `actor`. No recibe parámetros de la interfaz.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES` (`MANAGER`, `RECEPTIONIST` o `PROFESSIONAL`).
 **Efectos:** ninguno. Es una lectura.
-**Errores:** ninguno propio. Sin sesión válida, la página redirige al login.
+**Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro. En `/professionals` no llega a dispararse: `requirePageRole` redirige antes. Queda como barrera por si la función se llama desde otro lado.
 **Revalida:** no aplica.
 **Devuelve:** `{ id, lastName, firstName, documentType, documentNumber, licenseNumber, phone, email, active, titles: { id, name }[], services: { id, name, durationMinutes }[] }[]`, ordenado por estado activo, apellido y nombre.
 
 No es una Server Action: es una lectura que el Server Component de `/professionals` llama directo a la DAL (ADR 0001).
+
+### `listActiveProfessionalTitles`
+
+**Historia de usuario:** [HU-02 — Registrar un profesional](hu/HU-02-registrar-profesional.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
+**Entrada:** el `actor`. No recibe parámetros de la interfaz.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`.
+**Efectos:** ninguno. Es una lectura del catálogo de títulos activos.
+**Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, name }[]`, ordenado alfabéticamente por nombre.
+
+### `listActiveServices`
+
+**Historia de usuario:** [HU-02 — Registrar un profesional](hu/HU-02-registrar-profesional.md) / [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
+**Entrada:** el `actor`. No recibe parámetros de la interfaz.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`.
+**Efectos:** ninguno. Es una lectura del catálogo de servicios activos.
+**Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, name, durationMinutes }[]`, ordenado alfabéticamente por nombre.
 
 
 ### Nota: `signIn` y `signOut` frente a `defineAction`

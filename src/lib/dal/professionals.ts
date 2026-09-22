@@ -2,7 +2,9 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
-import type { DocumentType } from "@/generated/prisma/enums";
+import { Role, type DocumentType } from "@/generated/prisma/enums";
+import { assertRole, type Actor } from "@/lib/dal/auth";
+import { STAFF_ROLES } from "@/lib/roles";
 
 // ─────────────────────── Tipos de entrada ────────────────────────────
 
@@ -34,8 +36,10 @@ export interface CreateProfessionalInput {
  */
 export async function createProfessional(
   input: CreateProfessionalInput,
-  actorId: number,
+  actor: Actor,
 ) {
+  assertRole(actor, Role.MANAGER);
+
   // ── 1. Verificar que no exista un profesional con el mismo documento ──
   const existingByDocument = await prisma.professional.findUnique({
     where: {
@@ -108,9 +112,13 @@ export async function createProfessional(
       photoUrl: input.photoUrl ?? null,
       notes: input.notes ?? null,
       active: true,
-      createdBy: { connect: { id: actorId } },
-      titles: { connect: input.titleIds.map((id) => ({ id })) },
-      services: { connect: input.serviceIds.map((id) => ({ id })) },
+      createdBy: { connect: { id: actor.id } },
+      titles: {
+        connect: Array.from(new Set(input.titleIds)).map((id) => ({ id })),
+      },
+      services: {
+        connect: Array.from(new Set(input.serviceIds)).map((id) => ({ id })),
+      },
     },
     select: {
       id: true,
@@ -130,7 +138,9 @@ export async function createProfessional(
  * Es una lectura: la consume un Server Component llamando directo a la DAL
  * (ADR 0001). Devuelve la ficha resumida con títulos y servicios asociados.
  */
-export async function listProfessionals() {
+export async function listProfessionals(actor: Actor) {
+  assertRole(actor, ...STAFF_ROLES);
+
   return prisma.professional.findMany({
     orderBy: [{ active: "desc" }, { lastName: "asc" }, { firstName: "asc" }],
     select: {
@@ -156,7 +166,9 @@ export async function listProfessionals() {
 /**
  * Devuelve los títulos profesionales activos para las opciones de formulario.
  */
-export async function listActiveProfessionalTitles() {
+export async function listActiveProfessionalTitles(actor: Actor) {
+  assertRole(actor, ...STAFF_ROLES);
+
   return prisma.professionalTitle.findMany({
     where: { active: true },
     select: { id: true, name: true },
@@ -167,7 +179,9 @@ export async function listActiveProfessionalTitles() {
 /**
  * Devuelve el catálogo de servicios activos para las opciones de formulario.
  */
-export async function listActiveServices() {
+export async function listActiveServices(actor: Actor) {
+  assertRole(actor, ...STAFF_ROLES);
+
   return prisma.service.findMany({
     where: { active: true },
     select: { id: true, name: true, durationMinutes: true },

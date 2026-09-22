@@ -13,12 +13,12 @@ export const metadata: Metadata = {
 
 export default async function NewProfessionalPage() {
   // Solo MANAGER puede acceder a registrar profesionales (HU-02)
-  await requirePageRole("MANAGER");
+  const actor = await requirePageRole("MANAGER");
 
   // Cargar catálogos activos desde la DAL (ADR 0001)
   const [titles, services] = await Promise.all([
-    listActiveProfessionalTitles(),
-    listActiveServices(),
+    listActiveProfessionalTitles(actor),
+    listActiveServices(actor),
   ]);
 
   return <ProfessionalForm titles={titles} services={services} />;

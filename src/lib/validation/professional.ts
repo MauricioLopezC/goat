@@ -38,36 +38,32 @@ export const createProfessionalSchema = z
       .array(z.number().int().positive())
       .min(1, "Debe seleccionar al menos un servicio"),
 
-    phone: z
-      .string()
-      .trim()
-      .regex(
-        /^[\d\s+\-()]{6,30}$/,
-        "El teléfono solo puede contener números, guiones o espacios",
-      )
-      .nullish()
-      .transform((v) => v || null),
+    phone: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? null : (v ?? null)),
+      z
+        .string()
+        .trim()
+        .regex(
+          /^[\d\s+\-()]{6,30}$/,
+          "El teléfono solo puede contener números, guiones o espacios",
+        )
+        .nullable(),
+    ),
 
-    email: z
-      .string()
-      .trim()
-      .email()
-      .nullish()
-      .transform((v) => v || null),
+    email: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? null : (v ?? null)),
+      z.string().trim().toLowerCase().email().nullable(),
+    ),
 
-    photoUrl: z
-      .string()
-      .trim()
-      .url()
-      .nullish()
-      .transform((v) => v || null),
+    photoUrl: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? null : (v ?? null)),
+      z.string().trim().url().nullable(),
+    ),
 
-    notes: z
-      .string()
-      .trim()
-      .max(500)
-      .nullish()
-      .transform((v) => v || null),
+    notes: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? null : (v ?? null)),
+      z.string().trim().max(500).nullable(),
+    ),
   })
   .superRefine((data, ctx) => {
     // Validación según tipo de documento

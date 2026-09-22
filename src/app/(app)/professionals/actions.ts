@@ -13,7 +13,7 @@ const create = defineAction({
   roles: ["MANAGER"],
   input: createProfessionalSchema,
   handler: async (input, actor) => {
-    const professional = await dal.createProfessional(input, actor.id);
+    const professional = await dal.createProfessional(input, actor);
     // Revalidar es responsabilidad de la acción, no de la DAL (ADR 0001).
     revalidatePath("/professionals");
     return professional;
