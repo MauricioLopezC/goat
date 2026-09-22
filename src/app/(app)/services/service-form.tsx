@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { AlertCircle, CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ interface ServiceFormProps {
   specialties: SpecialtyOption[];
   editingService?: EditingService | null;
   onCancel?: () => void;
+  onSuccess?: (created: { name: string; isEditing: boolean }) => void;
 }
 
 function SubmitButton({ isEditing }: { isEditing: boolean }) {
@@ -68,6 +69,7 @@ export function ServiceForm({
   specialties,
   editingService,
   onCancel,
+  onSuccess,
 }: ServiceFormProps) {
   const isEditing = Boolean(editingService);
 
@@ -79,6 +81,13 @@ export function ServiceForm({
   const created = state?.ok ? state.data : undefined;
   const failed = state?.ok === false ? state.error : undefined;
   const fields = failed?.fieldErrors;
+
+  // Si terminó con éxito y tenemos callback onSuccess, notificar al padre para cerrar el form
+  useEffect(() => {
+    if (created && onSuccess) {
+      onSuccess({ name: created.name, isEditing });
+    }
+  }, [created, onSuccess, isEditing]);
 
   // Valores enviados que fallaron para preservar lo escrito
   const values = state?.values;

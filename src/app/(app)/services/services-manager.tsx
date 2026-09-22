@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Edit2, Plus } from "lucide-react";
+import { CheckCircle2, Edit2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -56,8 +57,10 @@ export function ServicesManager({
     null,
   );
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const handleEdit = (service: ServiceListItem) => {
+    setFeedback(null);
     setEditingService({
       id: service.id,
       name: service.name,
@@ -76,8 +79,39 @@ export function ServicesManager({
     setIsFormVisible(false);
   };
 
+  const handleSuccess = (item: { name: string; isEditing: boolean }) => {
+    setEditingService(null);
+    setIsFormVisible(false);
+    setFeedback(
+      item.isEditing
+        ? `Se actualizaron correctamente los datos del servicio "${item.name}".`
+        : `Se creó exitosamente el servicio "${item.name}".`,
+    );
+  };
+
   return (
     <div className="flex flex-col gap-6">
+      {/* Banner de confirmación global */}
+      {feedback && (
+        <Alert
+          role="status"
+          className="border-success-soft-border bg-success-soft text-success-soft-foreground"
+        >
+          <CheckCircle2 className="size-5 text-success" />
+          <AlertDescription className="flex items-center justify-between gap-4">
+            <span>{feedback}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setFeedback(null)}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+            >
+              Cerrar
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Panel de formulario (exclusivo para MANAGER) */}
       {isManager && (
         <Card className="rounded-xl border-border bg-card">
@@ -95,6 +129,7 @@ export function ServicesManager({
             {!isFormVisible && (
               <Button
                 onClick={() => {
+                  setFeedback(null);
                   setEditingService(null);
                   setIsFormVisible(true);
                 }}
@@ -112,6 +147,7 @@ export function ServicesManager({
                 specialties={specialties}
                 editingService={editingService}
                 onCancel={handleCancelForm}
+                onSuccess={handleSuccess}
               />
             </CardContent>
           )}
