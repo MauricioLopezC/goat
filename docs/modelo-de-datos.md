@@ -11,12 +11,14 @@ erDiagram
     User |o--o| Professional : "cuenta de acceso"
     User ||--o{ Appointment : "crea"
     User ||--o{ AppointmentEvent : "registra"
+    User ||--o{ ProfessionalEvent : "registra"
 
     Professional }o--o{ ProfessionalTitle : "tiene"
     Professional }o--o{ Service : "presta"
     Professional ||--o{ AvailabilityWindow : "atiende en"
     Professional ||--o{ AvailabilityException : "se ausenta"
     Professional ||--o{ Appointment : "atiende"
+    Professional ||--o{ ProfessionalEvent : "registra cambios"
 
     Specialty |o--o{ Service : "agrupa"
     Service }o--o{ AvailabilityWindow : "habilitado en"
@@ -52,6 +54,16 @@ erDiagram
     ProfessionalTitle {
         int id PK
         string name UK
+    }
+
+    ProfessionalEvent {
+        int id PK
+        int professionalId FK
+        int userId FK
+        ProfessionalEventType type
+        string reason
+        json changes
+        timestamptz createdAt
     }
 
     Specialty {
@@ -155,7 +167,7 @@ erDiagram
 | Grupo | Entidades | Qué resuelve |
 |---|---|---|
 | Acceso | `User` | Cuenta, rol y credencial (HU-01). Se ingresa con email y contraseña; la sesión no se persiste ([ADR 0002](adr/0002-autenticacion-y-sesion.md)). |
-| Profesionales | `Professional`, `ProfessionalTitle` | Ficha del profesional y sus títulos (HU-02 a HU-04). |
+| Profesionales | `Professional`, `ProfessionalTitle`, `ProfessionalEvent` | Ficha, títulos e historial de cambios del profesional (HU-02 a HU-04). |
 | Catálogo | `Service`, `Specialty` | Qué se hace en un turno, cuánto dura y cuánto vale (HU-06). |
 | Agenda | `AvailabilityWindow`, `AvailabilityException`, `Holiday`, `Room` | Cuándo y dónde atiende cada profesional, y cuándo el centro no atiende (HU-05). |
 | Pacientes y cobertura | `Patient`, `Coverage`, `InsurancePlan`, `HealthInsurer` | Quién es el paciente y cómo se cubre (HU-07, HU-08). |
@@ -168,7 +180,8 @@ erDiagram
 - **Valor, cobertura y pago están en entidades distintas.** El valor de la prestación vive en `Service.price` y el coseguro en `Coverage.copayAmount`. `Appointment` no guarda importes. Lo que efectivamente paga el paciente se modela con `Payment`, que todavía no existe (ver más abajo).
 - **Las relaciones muchos a muchos** las resuelve Prisma con tablas implícitas: `_ProfessionalToProfessionalTitle`, `_ProfessionalToService` y `_AvailabilityWindowToService`. No tienen atributos propios, por eso no aparecen como entidades. Una `AvailabilityWindow` sin servicios asignados habilita todos los que presta el profesional.
 - **`Appointment` no tiene relación con la franja ni con el consultorio.** Que el turno caiga dentro de una `AvailabilityWindow` se verifica al crearlo, con la disponibilidad vigente; el turno guarda solo su `startsAt` y `endsAt`.
-- **Auditoría.** Para no llenar el diagrama de flechas, solo se dibujaron las relaciones de `User` con `Appointment` y `AppointmentEvent`. El resto de las referencias a `User` son campos de autoría: `createdById` en `Professional`, `Patient` y `AvailabilityException`; `updatedById` en `Professional` y `Patient`; y `deactivatedById` en `Professional`.
+- **Auditoría.** Se dibujan las relaciones de `User` con `Appointment`, `AppointmentEvent` y `ProfessionalEvent`. Las demás referencias a `User` son campos de autoría: `createdById` en `Professional`, `Patient` y `AvailabilityException`; `updatedById` en `Professional` y `Patient`; y `deactivatedById` en `Professional`.
+- **Trazabilidad del profesional.** El alta conserva `createdById` y `createdAt`; cada edición, baja y reactivación crea un `ProfessionalEvent` con autor, instante y motivo. La edición también registra los valores anteriores y nuevos.
 - **Trazabilidad del turno.** El alta se registra en `Appointment.createdById` y `createdAt`. Todo cambio posterior (`UPDATED`, `CANCELLED`, `COMPLETED`, `EXPIRED`) agrega un `AppointmentEvent` con quién, cuándo, tipo y motivo. Los eventos se borran en cascada con el turno, pero un turno cancelado no se borra (HU-10).
 - **Bajas lógicas.** Se usa `active` (más `deactivatedAt` en `Professional`) y nunca se borra el registro, para no perder la historia de los turnos.
 

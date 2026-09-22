@@ -152,8 +152,13 @@ export default async function ProfessionalsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-                  <Button variant="outline" size="sm" className="text-xs">
-                    Ver ficha
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    <Link href={`/professionals/${prof.id}`}>Ver ficha</Link>
                   </Button>
                 </div>
               </CardContent>
