@@ -31,13 +31,13 @@ Next.js (App Router) + TypeScript + Prisma 7 + PostgreSQL en Docker.
 
 Antes de dar por terminado un feature, arreglo o cambio de código, correr `npm run check` y dejarlo en verde. Un cambio con `check` en rojo no está terminado y no se entrega ni se commitea.
 
-`check` corre, en orden: `format:check` (Prettier), `lint` (ESLint), `typecheck` (`next typegen` + `tsc --noEmit`) y `db:validate` (`prisma validate`).
+`check` corre, en orden: `format:check` (Prettier), `lint` (ESLint), `typecheck` (`next typegen` + `tsc --noEmit`), `db:validate` (`prisma validate`) y `test` (runner de Node con tsx).
 
 - Si falla el formato: `npm run format` lo corrige solo; volver a correr `check`.
 - Si falla lint o tipos: arreglar la causa. No silenciar con `eslint-disable`, `@ts-ignore`, `@ts-expect-error` ni `any` para que pase; si de verdad no hay otra salida, decirlo explícitamente en el resumen.
 - `typecheck` necesita el cliente de Prisma generado: tras clonar o cambiar `schema.prisma`, correr `npm run db:generate` primero.
 - Si `check` pasa en local pero falla en el CI, sospechar de estado viejo: `tsc` es incremental y reutiliza `tsconfig.tsbuildinfo`, y los tipos de Next viven en `.next/`. Para reproducir el CI, borrar `.next/`, `tsconfig.tsbuildinfo` y `next-env.d.ts` y volver a correr `check`.
-- No hay tests automatizados todavía. Cuando se agregue un runner, sumarlo a `check` y actualizar esta sección.
+- `npm test` ejecuta las pruebas de disponibilidad de HU-09 y forma parte de `check`. `npm run test:appointments:db` verifica además la DAL, concurrencia y permisos en PostgreSQL local con datos temporales; requiere `.env` y la base migrada.
 - Al reportar el resultado, decir qué comandos se corrieron y cuál fue el resultado real; no afirmar que pasó sin haberlo corrido.
 
 ## Ramas y Pull Requests

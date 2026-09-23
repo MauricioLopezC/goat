@@ -15,6 +15,9 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Paciente | `Patient` | |
 | Profesional | `Professional` | No `Doctor`: incluye kinesiólogos. |
 | Turno | `Appointment` | |
+| Horario disponible | `AvailableSlot` | Bloque calculado desde una franja, con la duración del servicio, sin ausencias, feriados ni turnos superpuestos. No es una entidad persistida. |
+| Calendario del centro | `/calendar` | Consulta diaria de turnos para gerente y mesa de entradas. |
+| Agenda propia de turnos | `/agenda` | El profesional consulta exclusivamente sus turnos. Distinta de `/my-schedule`, que muestra sus franjas. |
 | Prestación | `Service` | Lo que se hace en el turno; determina duración y valor. |
 | Área / línea de atención | `Specialty` | Columna, Rodilla, Hombro, etc. No confundir con la prestación. |
 | Franja de atención | `AvailabilityWindow` | Horario en que un profesional atiende un día determinado. |

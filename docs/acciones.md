@@ -154,20 +154,49 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Devuelve:** forma de `data` cuando `ok: true`.
 ```
 
-### Ejemplo ilustrativo
-
-> No vinculante: muestra cómo se completa la plantilla. La especificación real se define con la historia de usuario correspondiente.
-
-#### `createAppointment`
+### `createAppointment`
 
 **Historia de usuario:** [HU-09 — Asignar un turno](hu/HU-09-asignar-turno.md)
-**Roles:** `RECEPTIONIST`, `PROFESSIONAL`
-**Entrada:** `patientId`, `professionalId`, `serviceId`, `startsAt`. La duración la fija la `Service`.
-**Precondiciones:** el `startsAt` más la duración de la `Service` cae dentro de una `AvailabilityWindow` del profesional. No hay otro turno activo del profesional en ese intervalo. Si el rol es `PROFESSIONAL`, `professionalId` es el suyo.
-**Efectos:** crea un `Appointment` en estado `SCHEDULED`. Registra quién lo creó y cuándo.
-**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `OUTSIDE_AVAILABILITY_WINDOW`, `APPOINTMENT_OVERLAP`.
-**Revalida:** la agenda del profesional.
-**Devuelve:** `{ id, startsAt, endsAt, status }`.
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `patientId`, `professionalId`, `serviceId` (enteros positivos), `date` (AAAA-MM-DD), `startTime` (HH:MM), `notes` (hasta 500 caracteres, opcional).
+**Precondiciones:** paciente, servicio y profesional activos; profesional asociado al servicio. Fecha desde hoy hasta dos meses inclusive y hora futura. El bloque calculado entra en una franja habilitada, sin feriados ni ausencias. No se superpone con turnos Programados o Completados del profesional ni del paciente.
+**Efectos:** transacción Serializable que relee todas las reglas y crea un `Appointment` Programado con autor y fecha. Restricciones de exclusión de PostgreSQL respaldan los dos solapamientos. Se reintenta ante conflictos de serialización; nunca se envía un aviso antes de confirmar la transacción.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `OUTSIDE_AVAILABILITY_WINDOW`, `APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`. Un conflicto refresca la grilla en el cliente.
+**Revalida:** `/calendar`, `/agenda`, `/appointments/new`, ficha del profesional.
+**Devuelve:** `{ id }` para consultar el resumen autorizado.
+
+### `getAppointmentOptions`
+
+**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md).
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** texto de búsqueda (hasta 80 caracteres), `patientId?`, `serviceId?`.
+**Precondiciones:** rol autorizado; IDs válidos.
+**Efectos:** ninguno. Busca hasta 30 pacientes activos por palabras del nombre, apellido o documento; recupera por separado el paciente elegido. Lista servicios activos y profesionales activos asociados al servicio con alguna franja habilitada.
+**Errores:** `FORBIDDEN`, `VALIDATION`.
+**Revalida:** no aplica.
+**Devuelve:** pacientes identificados por nombre y documento, paciente elegido, servicios (con duración), profesionales habilitados.
+
+### `listAvailableSlots`
+
+**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md).
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `professionalId`, `serviceId`, `patientId`, `date`.
+**Precondiciones:** entidades activas y relacionadas, fecha válida en el horizonte permitido.
+**Efectos:** ninguno. Calcula bloques según duración del servicio desde el inicio de cada franja; descarta pasado, feriados, ausencias y ambos solapamientos.
+**Errores:** `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ startTime, endTime }[]` en hora del centro.
+
+### `listAppointments` / `getAppointment`
+
+**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), consulta del turno creado.
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
+**Entrada:** fecha del calendario / ID del turno.
+**Precondiciones:** el profesional solo accede a registros cuyo `professional.userId` coincida con su usuario, verificado en la DAL.
+**Efectos:** ninguno.
+**Errores:** `FORBIDDEN`, `VALIDATION`, `NOT_FOUND`.
+**Revalida:** no aplica.
+**Devuelve:** resúmenes con paciente, servicio, profesional, horario, estado y autoría.
 
 ## Catálogo
 

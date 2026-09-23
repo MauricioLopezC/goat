@@ -1,13 +1,21 @@
 import { requirePageRole } from "@/lib/dal/auth";
-import { Placeholder } from "../placeholder";
+import { AppointmentCalendar } from "@/components/appointment-calendar";
+import { isCalendarDate, toLocalSlot } from "@/lib/schedule";
 
-export default async function AgendaPage() {
+export default async function AgendaPage({
+  searchParams,
+}: PageProps<"/agenda">) {
   const actor = await requirePageRole("PROFESSIONAL");
 
+  const { date } = await searchParams;
   return (
-    <Placeholder title={`Agenda de ${actor.lastName}`} story="HU-12">
-      Tu agenda del día. Un profesional ve solo la suya, nunca la de sus
-      colegas.
-    </Placeholder>
+    <AppointmentCalendar
+      actor={actor}
+      date={
+        typeof date === "string" && isCalendarDate(date)
+          ? date
+          : toLocalSlot(new Date()).date
+      }
+    />
   );
 }

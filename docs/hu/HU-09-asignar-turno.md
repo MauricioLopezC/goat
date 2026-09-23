@@ -30,7 +30,7 @@
 
 ## Confirmación
 
-- Se envía un aviso de turno registrado por email al paciente.
+- **PENDIENTE:** aviso de turno registrado por email al paciente. Se posterga por indicación de quien dirige el desarrollo (23/09/2026). La confirmación indica expresamente que no se envió correo.
 - Pantalla de confirmación con un resumen legible: paciente, servicio, profesional, día, hora y duración.
 - Mensaje de éxito y opción de volver al calendario o dar otro turno.
 
@@ -42,11 +42,30 @@
 
 ## Operaciones
 
-- `createAppointment` — ficha de ejemplo en [`acciones.md`](../acciones.md); se especifica en firme al implementar esta historia.
-- Disponibilidad: `listAvailableSlots(professionalId, serviceId, date)` en la DAL, lectura desde Server Component.
+- `createAppointment` — alta transaccional; ficha en [`acciones.md`](../acciones.md).
+- `getAppointmentOptions` — pacientes por nombre/documento, paciente elegido, servicios activos y profesionales habilitados.
+- `listAvailableSlots` — disponibilidad del profesional, servicio, fecha y paciente; lectura desde Server Component.
+- `listAppointments` — calendario del centro y agenda propia, con autorización en la DAL.
+- `getAppointment` — resumen de confirmación y consulta autorizada.
+
+## Criterios de aceptación verificables
+
+1. Mesa de entradas y gerente pueden asignar; el profesional solo consulta sus propios turnos.
+2. Se puede buscar y elegir un paciente activo o registrarlo y continuar desde el alta.
+3. El servicio determina la duración; solo se ofrecen profesionales activos que lo presten y tengan franjas habilitadas.
+4. Cada bloque entra completo en una franja que habilite el servicio. Se excluyen feriados y ausencias, parciales o completas.
+5. Se rechazan fechas y horas pasadas y fechas posteriores a dos meses, según HU-05. Las fechas y horas se interpretan en la zona del centro.
+6. No se ofrecen bloques ocupados ni superpuestos con otro turno del paciente. La base respalda ambas restricciones, incluso con solicitudes simultáneas.
+7. Si otro usuario ocupa el horario antes de confirmar, se informa el conflicto y se actualizan las opciones sin perder paciente, servicio, profesional y fecha.
+8. Al confirmar se crea un único turno Programado, con hora de fin calculada, observación opcional, usuario creador y fecha de creación.
+9. El turno se muestra al instante en el calendario general y en la agenda de su profesional.
+10. La confirmación muestra paciente, servicio, profesional, fecha, hora y duración, con enlaces al calendario y a otro turno.
+11. **PENDIENTE:** enviar el aviso por email al paciente. Postergado expresamente el 23/09/2026; no se considera cumplido por mostrar un mensaje de éxito en pantalla.
+
+La grilla parte del inicio de cada franja y avanza por la duración del servicio. Las vistas de calendario y agenda incluidas aquí permiten consultar el turno creado; el alcance completo de HU-11 y HU-12 se mantiene en sus historias.
 
 El "gana el primero" no se resuelve con una consulta previa más un `insert`: dos usuarios de mesa de entrada pueden reservar a la vez. La restricción va en la base de datos y la DAL traduce el error a `APPOINTMENT_OVERLAP` (ver [ADR 0001](../adr/0001-server-actions-y-capa-de-acceso-a-datos.md), "Concurrencia en turnos").
 
 ## A conversar
 
-- **Pendiente:** el aviso por email al paciente no tiene proveedor ni decisión de envío. Si no entra en el Inc. 1, hay que avisarlo explícitamente al cliente.
+- **PENDIENTE:** definir proveedor e implementar el aviso por email al paciente, postergado expresamente el 23/09/2026. Informar este pendiente en la revisión con el cliente.
