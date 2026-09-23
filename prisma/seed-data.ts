@@ -224,8 +224,8 @@ export type SeedProfessional = {
   services: string[];
   /// Email del usuario con el que ingresa, si tiene cuenta.
   userEmail: string | null;
-  /// Baja lógica (HU-03), si corresponde.
-  deactivation: { at: string; reason: string } | null;
+  /// Baja lógica (HU-03), si corresponde. `date` en AAAA-MM-DD.
+  deactivation: { date: string; reason: string } | null;
 };
 
 export const PROFESSIONALS: SeedProfessional[] = [
@@ -384,7 +384,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     titles: [TRAUMATOLOGIST],
     services: ["Consulta traumatológica general", "Consulta de columna"],
     userEmail: null,
-    deactivation: { at: "2026-06-30T12:00:00-03:00", reason: "Se jubiló." },
+    deactivation: { date: "2026-06-30", reason: "Se jubiló." },
   },
 ];
 

@@ -4,6 +4,7 @@ import "dotenv/config";
 import { hash } from "@node-rs/argon2";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { ProfessionalEventType } from "../src/generated/prisma/enums";
 import { createPatientSchema } from "../src/lib/validation/patients";
 import { createProfessionalSchema } from "../src/lib/validation/professional";
 import { createServiceSchema } from "../src/lib/validation/service";
@@ -136,15 +137,19 @@ async function seedProfessionals(
       notes: input.notes,
       userId: p.userEmail ? idOf(userIds, p.userEmail, "Usuario") : null,
       active: p.deactivation === null,
-      deactivatedAt: p.deactivation ? new Date(p.deactivation.at) : null,
+      // Igual que `deactivateProfessional`: la fecha de baja a las 12:00 UTC.
+      deactivatedAt: p.deactivation
+        ? new Date(`${p.deactivation.date}T12:00:00.000Z`)
+        : null,
       deactivationReason: p.deactivation?.reason ?? null,
       deactivatedById: p.deactivation ? managerId : null,
+      updatedById: p.deactivation ? managerId : null,
       createdById: managerId,
     };
     const titles = input.titleIds.map((id) => ({ id }));
     const services = input.serviceIds.map((id) => ({ id }));
 
-    await prisma.professional.upsert({
+    const { id: professionalId } = await prisma.professional.upsert({
       where: { licenseNumber: input.licenseNumber },
       create: {
         ...data,
@@ -152,7 +157,28 @@ async function seedProfessionals(
         services: { connect: services },
       },
       update: { ...data, titles: { set: titles }, services: { set: services } },
+      select: { id: true },
     });
+
+    // La baja deja traza en el historial (HU-03). Una sola vez: el historial
+    // es inmutable y el seed se puede correr muchas veces.
+    if (p.deactivation) {
+      const logged = await prisma.professionalEvent.count({
+        where: { professionalId, type: ProfessionalEventType.DEACTIVATED },
+      });
+      if (!logged) {
+        await prisma.professionalEvent.create({
+          data: {
+            professionalId,
+            type: ProfessionalEventType.DEACTIVATED,
+            reason: p.deactivation.reason,
+            changes: { deactivatedAt: p.deactivation.date },
+            userId: managerId,
+            createdAt: data.deactivatedAt ?? undefined,
+          },
+        });
+      }
+    }
   }
 }
 
