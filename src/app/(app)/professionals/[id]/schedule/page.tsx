@@ -14,7 +14,7 @@ import { getProfessionalSchedule } from "@/lib/dal/availability";
 import { ExceptionsSection } from "./exceptions-section";
 import { ScheduleEditor } from "./schedule-editor";
 
-export const metadata: Metadata = { title: "Agenda del profesional · Goat" };
+export const metadata: Metadata = { title: "Horarios de atención · Goat" };
 
 export default async function ProfessionalSchedulePage({
   params,
@@ -35,7 +35,7 @@ export default async function ProfessionalSchedulePage({
       return (
         <Alert className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border max-w-xl">
           <AlertDescription className="text-destructive-soft-foreground">
-            Solo podés consultar tu propia agenda.
+            Solo podés consultar tus propios horarios de atención.
           </AlertDescription>
         </Alert>
       );
@@ -50,7 +50,8 @@ export default async function ProfessionalSchedulePage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-headline-lg">
-            Agenda de {professional.lastName}, {professional.firstName}
+            Horarios de atención de {professional.lastName},{" "}
+            {professional.firstName}
           </h1>
           <p className="text-muted-foreground">
             Franjas de atención semanales y ausencias puntuales.

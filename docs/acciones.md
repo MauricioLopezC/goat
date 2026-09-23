@@ -430,6 +430,19 @@ No es una Server Action: es una lectura que el Server Component de `/services` l
 
 No es una Server Action: la página `/professionals/[id]/schedule` la llama directo a la DAL (ADR 0001).
 
+### `getOwnProfessionalId`
+
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Roles:** `PROFESSIONAL`
+**Entrada:** `actor`.
+**Precondiciones:** el usuario de la sesión está vinculado a un profesional (`Professional.userId`).
+**Efectos:** ninguno. Es una lectura.
+**Errores:** `FORBIDDEN` (rol no permitido), `NOT_FOUND` (el usuario no tiene profesional vinculado).
+**Revalida:** no aplica.
+**Devuelve:** el `id` del profesional.
+
+No es una Server Action: la página `/my-schedule` la llama directo a la DAL y redirige a `/professionals/[id]/schedule` (ADR 0001).
+
 ### `createAvailabilityWindow`
 
 **Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)

@@ -120,10 +120,10 @@ export default async function ProfessionalDetailPage({
       {professional.availabilityWindows && (
         <Card>
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-            <CardTitle>Agenda semanal</CardTitle>
+            <CardTitle>Horarios de atención</CardTitle>
             <Button asChild variant="outline" size="sm">
               <Link href={`/professionals/${professional.id}/schedule`}>
-                {manager ? "Editar agenda" : "Ver agenda y ausencias"}
+                {manager ? "Editar horarios" : "Ver horarios y ausencias"}
               </Link>
             </Button>
           </CardHeader>

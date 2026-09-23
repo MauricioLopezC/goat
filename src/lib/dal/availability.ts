@@ -515,6 +515,23 @@ export async function getProfessionalSchedule(
   };
 }
 
+/// Profesional vinculado al usuario de la sesión, para el acceso directo a sus
+/// horarios de atención (`/my-schedule`).
+export async function getOwnProfessionalId(actor: Actor) {
+  assertRole(actor, Role.PROFESSIONAL);
+
+  const professional = await prisma.professional.findUnique({
+    where: { userId: actor.id },
+    select: { id: true },
+  });
+  if (!professional)
+    throw new DomainError(
+      "NOT_FOUND",
+      "Tu usuario no está vinculado a ningún profesional.",
+    );
+  return professional.id;
+}
+
 // ─────────────────────────── Feriados ──────────────────────────────────
 
 export async function listHolidays(actor: Actor) {

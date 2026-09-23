@@ -32,6 +32,8 @@
 ## Confirmación
 
 - Vista semanal de las franjas cargadas, para revisar de un vistazo antes de salir.
+- La pantalla se llama *Horarios de atención*, para no confundirla con la agenda de turnos de [HU-12](HU-12-agenda-del-profesional.md).
+- El profesional llega a sus horarios desde *Mis horarios* en el menú, sin buscarse en el listado de profesionales.
 - Eliminar una franja, una excepción o un feriado pide confirmación.
 
 ## Permisos
@@ -43,6 +45,7 @@
 ## Operaciones
 
 - `getProfessionalSchedule` — lectura de franjas y excepciones de un profesional.
+- `getOwnProfessionalId` — profesional vinculado al usuario de la sesión, para el acceso directo *Mis horarios*.
 - `createAvailabilityWindow`, `updateAvailabilityWindow`, `deleteAvailabilityWindow` — franjas del patrón semanal.
 - `createAvailabilityException`, `deleteAvailabilityException` — excepciones de agenda del profesional.
 - `listHolidays`, `createHoliday`, `deleteHoliday` — feriados del centro.
