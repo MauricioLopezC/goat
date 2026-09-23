@@ -29,6 +29,7 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Medio de pago | `PaymentMethod` | |
 | Usuario | `User` | Cuenta con la que se ingresa al sistema. Lleva el `Role`. |
 | Título profesional | `ProfessionalTitle` | Traumatólogo, kinesiólogo. Un `Professional` puede tener más de uno. No confundir con `Specialty` (área) ni con `Service` (prestación). |
+| Horarios de atención | `schedule` | Franjas y excepciones de agenda de un profesional, juntas ([HU-05](hu/HU-05-franjas-de-atencion.md)). Es el nombre de la pantalla (`/professionals/[id]/schedule`, y `/my-schedule` para el propio profesional). No confundir con la agenda del profesional ([HU-12](hu/HU-12-agenda-del-profesional.md)), que son sus turnos. |
 | Excepción de agenda | `AvailabilityException` | Día u horario en que el profesional no atiende, contra su patrón de `AvailabilityWindow`. |
 | Consultorio / box | `Room` | En el Incremento 1 cada profesional tiene el suyo. |
 | Feriado | `Holiday` | Día en que el centro permanece cerrado. No genera disponibilidad para nadie. |

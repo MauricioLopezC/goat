@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,23 +10,11 @@ import { DomainError } from "@/lib/actions";
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
 import { getProfessional } from "@/lib/dal/professionals";
 
+import { WeeklySchedule } from "@/components/weekly-schedule";
+
 import { FutureAppointmentsSection } from "./future-appointment-cancel";
 
 export const metadata: Metadata = { title: "Ficha profesional · Goat" };
-
-const weekdays = {
-  MONDAY: "Lunes",
-  TUESDAY: "Martes",
-  WEDNESDAY: "Miércoles",
-  THURSDAY: "Jueves",
-  FRIDAY: "Viernes",
-  SATURDAY: "Sábado",
-  SUNDAY: "Domingo",
-};
-
-function formatMinute(minute: number) {
-  return `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
-}
 
 export default async function ProfessionalDetailPage({
   params,
@@ -40,6 +29,14 @@ export default async function ProfessionalDetailPage({
     professional = await getProfessional(professionalId, actor);
   } catch (error) {
     if (error instanceof DomainError && error.code === "NOT_FOUND") notFound();
+    if (error instanceof DomainError && error.code === "FORBIDDEN")
+      return (
+        <Alert className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border max-w-xl">
+          <AlertDescription className="text-destructive-soft-foreground">
+            {error.message}
+          </AlertDescription>
+        </Alert>
+      );
     throw error;
   }
 
@@ -65,9 +62,11 @@ export default async function ProfessionalDetailPage({
               </Link>
             </Button>
           )}
-          <Button asChild variant="outline">
-            <Link href="/professionals">Volver al listado</Link>
-          </Button>
+          {actor.role !== "PROFESSIONAL" && (
+            <Button asChild variant="outline">
+              <Link href="/professionals">Volver al listado</Link>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -129,31 +128,16 @@ export default async function ProfessionalDetailPage({
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Agenda semanal</CardTitle>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+          <CardTitle>Horarios de atención</CardTitle>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/professionals/${professional.id}/schedule`}>
+              {manager ? "Editar horarios" : "Ver horarios y ausencias"}
+            </Link>
+          </Button>
         </CardHeader>
         <CardContent>
-          {professional.availabilityWindows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Este profesional todavía no tiene franjas de atención cargadas.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {professional.availabilityWindows.map((window) => (
-                <li key={window.id} className="rounded-md border p-3 text-sm">
-                  <span className="font-medium">
-                    {weekdays[window.weekday]}
-                  </span>
-                  {": "}
-                  {formatMinute(window.startMinute)}–
-                  {formatMinute(window.endMinute)}
-                  {window.room && ` · ${window.room.name}`}
-                  {window.services.length > 0 &&
-                    ` · ${window.services.map((service) => service.name).join(", ")}`}
-                </li>
-              ))}
-            </ul>
-          )}
+          <WeeklySchedule windows={professional.availabilityWindows} />
         </CardContent>
       </Card>
 

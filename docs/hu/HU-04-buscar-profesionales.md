@@ -23,10 +23,16 @@
 
 ## Permisos
 
-- Los tres roles pueden consultar.
+- `MANAGER` y `RECEPTIONIST`: buscan en el listado y consultan cualquier ficha.
+- `PROFESSIONAL`: no ve el listado. Consulta solo su propia ficha, a la que llega desde *Mis horarios* ([HU-05](HU-05-franjas-de-atencion.md)). La ficha de otro profesional trae sus turnos con pacientes, que [HU-12](HU-12-agenda-del-profesional.md) le reserva a cada uno.
 
 ## Operaciones
 
 Historia de solo lectura: no lleva Server Action. Las consultas van en la DAL y se llaman desde Server Components ([ADR 0001](../adr/0001-server-actions-y-capa-de-acceso-a-datos.md)).
 
 - `listProfessionals(filters)`, `getProfessional(id)` en `src/lib/dal/professionals.ts`.
+
+## A conversar
+
+- ¿El profesional necesita consultar a sus colegas (por ejemplo, para derivar un paciente)?
+  - **Supuesto del equipo:** no. La historia decía que los tres roles consultan, pero la ficha expone los turnos y pacientes de otro profesional. Se restringe al propio profesional hasta confirmarlo con el cliente.

@@ -9,10 +9,17 @@ import { createPatientSchema } from "../src/lib/validation/patients";
 import { createProfessionalSchema } from "../src/lib/validation/professional";
 import { createServiceSchema } from "../src/lib/validation/service";
 import {
+  createAvailabilityWindowSchema,
+  createHolidaySchema,
+} from "../src/lib/validation/availability";
+import {
+  AVAILABILITY,
   HEALTH_INSURERS,
+  HOLIDAYS,
   MANAGER_EMAIL,
   PATIENTS,
   PROFESSIONALS,
+  ROOMS,
   SEED_USERS,
   SERVICES,
   SPECIALTIES,
@@ -20,8 +27,8 @@ import {
 } from "./seed-data";
 
 // Datos de prueba para lo que ya está implementado: usuarios (HU-01),
-// profesionales (HU-02), catálogo de servicios (HU-06) y pacientes (HU-07).
-// Los datos están en `seed-data.ts`.
+// profesionales (HU-02), agenda y feriados (HU-05), catálogo de servicios
+// (HU-06) y pacientes (HU-07). Los datos están en `seed-data.ts`.
 //
 // Existe, además, por un problema de arranque: solo un `MANAGER` crea
 // usuarios, y una base recién migrada no tiene ninguno.
@@ -30,7 +37,10 @@ import {
 // volver a correrlo los registros del seed vuelven a sus valores sembrados. Lo
 // que se cargó desde la UI no se toca.
 //
-// Franjas, feriados y turnos no se siembran hasta que existan HU-05 y HU-09.
+// Excepción: las franjas de un profesional se siembran solo si no tiene
+// ninguna, para no pisar la agenda que se armó desde la UI.
+//
+// Los turnos no se siembran hasta que exista HU-09.
 
 // Mismos parámetros que `src/lib/password.ts`, que no se puede importar acá
 // porque es `server-only`. Quedan escritos dentro del hash, así que aunque se
@@ -118,6 +128,8 @@ async function seedProfessionals(
   serviceIds: Ids,
 ) {
   const managerId = idOf(userIds, MANAGER_EMAIL, "Usuario");
+  // Clave: matrícula.
+  const ids: Ids = new Map();
 
   for (const p of PROFESSIONALS) {
     const input = createProfessionalSchema.parse({
@@ -159,6 +171,7 @@ async function seedProfessionals(
       update: { ...data, titles: { set: titles }, services: { set: services } },
       select: { id: true },
     });
+    ids.set(input.licenseNumber, professionalId);
 
     // La baja deja traza en el historial (HU-03). Una sola vez: el historial
     // es inmutable y el seed se puede correr muchas veces.
@@ -180,6 +193,76 @@ async function seedProfessionals(
       }
     }
   }
+
+  return ids;
+}
+
+async function seedSchedule(
+  prisma: PrismaClient,
+  professionalIds: Ids,
+  serviceIds: Ids,
+) {
+  const roomIds: Ids = new Map();
+  for (const room of ROOMS) {
+    const { id } = await prisma.room.upsert({
+      where: { name: room.name },
+      create: room,
+      update: room,
+      select: { id: true },
+    });
+    roomIds.set(room.name, id);
+  }
+
+  let windows = 0;
+  for (const [license, seedWindows] of Object.entries(AVAILABILITY)) {
+    const professionalId = idOf(professionalIds, license, "Profesional");
+    const offered = PROFESSIONALS.find((p) => p.licenseNumber === license);
+    const existing = await prisma.availabilityWindow.count({
+      where: { professionalId },
+    });
+    if (existing) continue;
+
+    for (const { room, services, ...window } of seedWindows) {
+      // Mismas reglas que la UI: formato de hora y fin posterior al inicio.
+      const input = createAvailabilityWindowSchema.parse({
+        ...window,
+        professionalId,
+        roomId: room ? idOf(roomIds, room, "Consultorio") : null,
+        serviceIds: services.map((s) => {
+          if (!offered?.services.includes(s)) {
+            throw new Error(
+              `seed-data.ts: el profesional ${license} no presta "${s}".`,
+            );
+          }
+          return idOf(serviceIds, s, "Servicio");
+        }),
+      });
+      // La restricción de la base rechaza franjas superpuestas.
+      await prisma.availabilityWindow.create({
+        data: {
+          professionalId,
+          weekday: input.weekday,
+          startMinute: input.startMinute,
+          endMinute: input.endMinute,
+          roomId: input.roomId,
+          services: { connect: input.serviceIds.map((id) => ({ id })) },
+        },
+      });
+      windows++;
+    }
+  }
+
+  for (const holiday of HOLIDAYS) {
+    const input = createHolidaySchema.parse(holiday);
+    const date = new Date(`${input.date}T00:00:00.000Z`);
+    await prisma.holiday.upsert({
+      where: { date },
+      create: { date, description: input.description },
+      update: { description: input.description },
+    });
+  }
+
+  return { rooms: roomIds.size, windows };
 }
 
 async function seedHealthInsurers(prisma: PrismaClient) {
@@ -306,8 +389,18 @@ async function main() {
       `✓ ${TITLES.length} títulos, ${SPECIALTIES.length} especialidades y ${SERVICES.length} servicios`,
     );
 
-    await seedProfessionals(prisma, userIds, titleIds, serviceIds);
+    const professionalIds = await seedProfessionals(
+      prisma,
+      userIds,
+      titleIds,
+      serviceIds,
+    );
     console.log(`✓ ${PROFESSIONALS.length} profesionales`);
+
+    const schedule = await seedSchedule(prisma, professionalIds, serviceIds);
+    console.log(
+      `✓ ${schedule.rooms} consultorios, ${schedule.windows} franjas nuevas y ${HOLIDAYS.length} feriados`,
+    );
 
     const plans = await seedHealthInsurers(prisma);
     console.log(
