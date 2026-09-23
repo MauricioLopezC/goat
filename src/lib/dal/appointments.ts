@@ -42,7 +42,7 @@ export async function cancelProfessionalAppointment(
       )
         throw new DomainError(
           "INVALID_STATUS_TRANSITION",
-          "Solo se puede cancelar un turno futuro programado.",
+          "Solo se puede cancelar un turno programado que aún no comenzó.",
         );
       await tx.appointment.update({
         where: { id: appointment.id },

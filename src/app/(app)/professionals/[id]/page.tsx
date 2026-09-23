@@ -164,7 +164,7 @@ export default async function ProfessionalDetailPage({
       <Card id="future-appointments">
         <CardHeader>
           <CardTitle>
-            Turnos futuros programados ({professional.appointments.length})
+            Turnos programados ({professional.appointments.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
@@ -183,9 +183,7 @@ export default async function ProfessionalDetailPage({
               );
             })
           ) : (
-            <p className="text-muted-foreground">
-              No hay turnos futuros programados.
-            </p>
+            <p className="text-muted-foreground">No hay turnos programados.</p>
           )}
         </CardContent>
       </Card>

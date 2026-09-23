@@ -271,7 +271,7 @@ export async function updateProfessional(
         if (appointments.length) {
           throw new DomainError(
             "FUTURE_APPOINTMENTS",
-            `No se pueden quitar servicios con turnos futuros programados: ${appointments.map((appointment) => `#${appointment.id} ${appointment.service.name} (${appointment.startsAt.toLocaleDateString("es-AR")})`).join(", ")}.`,
+            `No se pueden quitar servicios con turnos programados: ${appointments.map((appointment) => `#${appointment.id} ${appointment.service.name} (${appointment.startsAt.toLocaleDateString("es-AR")})`).join(", ")}.`,
           );
         }
       }
@@ -350,7 +350,7 @@ export async function deactivateProfessional(
       if (count)
         throw new DomainError(
           "FUTURE_APPOINTMENTS",
-          `El profesional tiene ${count} turno(s) futuro(s) programado(s). Cancelalos antes de darlo de baja.`,
+          `El profesional tiene ${count} turno(s) programado(s). Cancelalos antes de darlo de baja.`,
         );
       const date = new Date(`${input.deactivatedAt}T12:00:00.000Z`);
       if (
@@ -454,11 +454,11 @@ export async function listProfessionals(
   return prisma.professional.findMany({
     where: {
       active:
-        filters.status === "all"
-          ? undefined
+        filters.status === "active"
+          ? true
           : filters.status === "inactive"
             ? false
-            : true,
+            : undefined,
       services: filters.serviceId
         ? { some: { id: filters.serviceId } }
         : undefined,

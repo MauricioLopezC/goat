@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { documentNumberFormat } from "@/lib/validation/document-number";
 
 type Professional = {
   id: number;
@@ -91,6 +92,8 @@ export function ProfessionalEditor({
     null,
   );
   const [confirm, setConfirm] = useState(false);
+  const [documentType, setDocumentType] = useState(professional.documentType);
+  const documentFormat = documentNumberFormat(documentType);
   const currentTitles = new Set(professional.titles.map((title) => title.id));
   const currentServices = new Set(
     professional.services.map((service) => service.id),
@@ -117,6 +120,11 @@ export function ProfessionalEditor({
                   ["firstName", "Nombre", professional.firstName],
                   ["lastName", "Apellido", professional.lastName],
                   [
+                    "documentType",
+                    "Tipo de documento",
+                    professional.documentType,
+                  ],
+                  [
                     "documentNumber",
                     "Número de documento",
                     professional.documentNumber,
@@ -130,18 +138,91 @@ export function ProfessionalEditor({
               ).map(([name, label, value]) => (
                 <div key={name} className="flex flex-col gap-2">
                   <Label htmlFor={name}>{label}</Label>
-                  <Input
-                    id={name}
-                    name={name}
-                    defaultValue={value}
-                    required={[
-                      "firstName",
-                      "lastName",
-                      "documentNumber",
-                      "licenseNumber",
-                    ].includes(name)}
-                    aria-invalid={Boolean(fieldErrors?.[name])}
-                  />
+                  {name === "documentType" ? (
+                    <Select
+                      name={name}
+                      value={documentType}
+                      onValueChange={setDocumentType}
+                    >
+                      <SelectTrigger
+                        id={name}
+                        aria-invalid={Boolean(fieldErrors?.[name])}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {["DNI", "LC", "LE", "CI", "PASSPORT"].map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id={name}
+                      name={name}
+                      type={
+                        name === "email"
+                          ? "email"
+                          : name === "photoUrl"
+                            ? "url"
+                            : name === "phone"
+                              ? "tel"
+                              : "text"
+                      }
+                      defaultValue={value}
+                      required={[
+                        "firstName",
+                        "lastName",
+                        "documentNumber",
+                        "licenseNumber",
+                      ].includes(name)}
+                      pattern={
+                        name === "documentNumber"
+                          ? documentFormat.pattern
+                          : name === "licenseNumber"
+                            ? "[0-9]{1,8}"
+                            : undefined
+                      }
+                      maxLength={
+                        name === "documentNumber"
+                          ? documentFormat.maxLength
+                          : name === "licenseNumber"
+                            ? 8
+                            : name === "firstName" || name === "lastName"
+                              ? 100
+                              : name === "phone"
+                                ? 30
+                                : name === "notes"
+                                  ? 500
+                                  : undefined
+                      }
+                      inputMode={
+                        name === "documentNumber"
+                          ? documentFormat.inputMode
+                          : name === "licenseNumber"
+                            ? "numeric"
+                            : undefined
+                      }
+                      aria-invalid={Boolean(fieldErrors?.[name])}
+                      aria-describedby={
+                        name === "documentNumber"
+                          ? "documentNumber-format"
+                          : undefined
+                      }
+                    />
+                  )}
+                  {name === "documentNumber" && (
+                    <p
+                      id="documentNumber-format"
+                      className="text-sm text-muted-foreground"
+                    >
+                      Formato: {documentFormat.hint}.
+                    </p>
+                  )}
                   {fieldErrors?.[name]?.[0] && (
                     <p className="text-destructive text-sm">
                       {fieldErrors[name][0]}
@@ -149,26 +230,6 @@ export function ProfessionalEditor({
                   )}
                 </div>
               ))}
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="documentType">Tipo de documento</Label>
-                <Select
-                  name="documentType"
-                  defaultValue={professional.documentType}
-                >
-                  <SelectTrigger id="documentType">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {["DNI", "LC", "LE", "CI", "PASSPORT"].map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
             <fieldset className="flex flex-col gap-2">
               <legend className="font-medium">Títulos profesionales</legend>
@@ -239,7 +300,7 @@ export function ProfessionalEditor({
           <CardTitle>{active ? "Dar de baja" : "Reactivar"}</CardTitle>
           <CardDescription>
             {active
-              ? `Esta acción dejará a ${professional.firstName} ${professional.lastName} fuera de los turnos nuevos. Debés cancelar antes sus turnos futuros.`
+              ? `Esta acción dejará a ${professional.firstName} ${professional.lastName} fuera de los turnos nuevos. Debés cancelar antes sus turnos programados.`
               : "La reactivación permite volver a asignar turnos cuando tenga disponibilidad."}
           </CardDescription>
         </CardHeader>
@@ -281,7 +342,9 @@ export function ProfessionalEditor({
                   Confirmar baja
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href="#future-appointments">Ver turnos futuros</Link>
+                  <Link href="#future-appointments">
+                    Ver turnos programados
+                  </Link>
                 </Button>
               </div>
             </form>

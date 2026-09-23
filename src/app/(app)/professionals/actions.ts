@@ -36,6 +36,7 @@ export type SubmittedProfessionalValues = {
   licenseNumber: string;
   phone: string;
   email: string;
+  photoUrl: string;
   notes: string;
   titleIds: number[];
   serviceIds: number[];
@@ -57,6 +58,7 @@ function submitted(formData: FormData): SubmittedProfessionalValues {
     licenseNumber: read("licenseNumber"),
     phone: read("phone"),
     email: read("email"),
+    photoUrl: read("photoUrl"),
     notes: read("notes"),
     titleIds: formData.getAll("titleIds").map(Number),
     serviceIds: formData.getAll("serviceIds").map(Number),
@@ -78,6 +80,7 @@ export async function createProfessional(
     serviceIds: formData.getAll("serviceIds").map(Number),
     phone: formData.get("phone") || null,
     email: formData.get("email") || null,
+    photoUrl: formData.get("photoUrl") || null,
     notes: formData.get("notes") || null,
   };
 

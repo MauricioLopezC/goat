@@ -12,10 +12,10 @@
 
 ## Validaciones
 
-- Al modificar matrícula o documento siguen aplicando las reglas de unicidad.
-- No se puede quitar un servicio si el profesional tiene turnos futuros programados para ese servicio: el sistema avisa y los lista.
-- No se puede dar de baja un profesional con turnos futuros en estado Programado: el sistema avisa cuántos son y ofrece ir a cancelarlos.
-- Desde la ficha, el gerente puede cancelar esos turnos futuros indicando motivo y quién lo solicitó, con confirmación explícita. El calendario completo y sus filtros se implementan en [HU-10](HU-10-cancelar-turno.md) y [HU-11](HU-11-calendario-del-centro.md).
+- Al modificar matrícula o documento siguen aplicando las reglas de formato de [HU-02](HU-02-registrar-profesional.md) y de unicidad.
+- No se puede quitar un servicio si el profesional tiene turnos programados para ese servicio que todavía no comenzaron: el sistema avisa y los lista.
+- No se puede dar de baja un profesional con turnos en estado Programado que todavía no comenzaron: el sistema avisa cuántos son y ofrece ir a cancelarlos.
+- Desde la ficha, el gerente puede cancelar esos turnos programados indicando motivo y quién lo solicitó, con confirmación explícita. El calendario completo y sus filtros se implementan en [HU-10](HU-10-cancelar-turno.md) y [HU-11](HU-11-calendario-del-centro.md).
 
 ## Comportamiento
 

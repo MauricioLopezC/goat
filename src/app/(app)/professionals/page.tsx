@@ -45,9 +45,9 @@ export default async function ProfessionalsPage({
     : undefined;
   const statusValue = single(params.status);
   const status =
-    statusValue === "inactive" || statusValue === "all"
+    statusValue === "active" || statusValue === "inactive"
       ? statusValue
-      : "active";
+      : "all";
   const tooShort = query.length === 1;
   const [professionals, services] = await Promise.all([
     tooShort
