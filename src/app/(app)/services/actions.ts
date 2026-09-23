@@ -174,4 +174,3 @@ export async function activateServiceAction(
 
   return activate(raw);
 }
-

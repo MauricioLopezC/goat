@@ -272,4 +272,3 @@ export async function activateService(id: number, actor: Actor) {
     },
   });
 }
-
