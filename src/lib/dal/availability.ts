@@ -42,9 +42,9 @@ const SERIALIZABLE = {
 
 const FORBIDDEN_MESSAGE = "No tenés permiso para realizar esta operación.";
 
-/// Un `PROFESSIONAL` consulta solo su propia agenda (HU-05). Los demás roles
-/// del centro ven la de cualquiera.
-export function canViewSchedule(
+/// Un `PROFESSIONAL` consulta solo su propia ficha y sus horarios de atención
+/// (HU-04, HU-05). Los demás roles del centro ven los de cualquiera.
+export function canViewProfessional(
   actor: Actor,
   professionalUserId: number | null,
 ): boolean {
@@ -489,7 +489,7 @@ export async function getProfessionalSchedule(
   });
   if (!professional)
     throw new DomainError("NOT_FOUND", "El profesional no existe.");
-  if (!canViewSchedule(actor, professional.userId))
+  if (!canViewProfessional(actor, professional.userId))
     throw new DomainError("FORBIDDEN", FORBIDDEN_MESSAGE);
 
   const rooms = await prisma.room.findMany({

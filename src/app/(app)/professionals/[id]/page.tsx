@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +29,14 @@ export default async function ProfessionalDetailPage({
     professional = await getProfessional(professionalId, actor);
   } catch (error) {
     if (error instanceof DomainError && error.code === "NOT_FOUND") notFound();
+    if (error instanceof DomainError && error.code === "FORBIDDEN")
+      return (
+        <Alert className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border max-w-xl">
+          <AlertDescription className="text-destructive-soft-foreground">
+            {error.message}
+          </AlertDescription>
+        </Alert>
+      );
     throw error;
   }
 
@@ -53,9 +62,11 @@ export default async function ProfessionalDetailPage({
               </Link>
             </Button>
           )}
-          <Button asChild variant="outline">
-            <Link href="/professionals">Volver al listado</Link>
-          </Button>
+          {actor.role !== "PROFESSIONAL" && (
+            <Button asChild variant="outline">
+              <Link href="/professionals">Volver al listado</Link>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -116,22 +127,19 @@ export default async function ProfessionalDetailPage({
         </CardContent>
       </Card>
 
-      {/* `null`: un profesional que consulta la ficha de otro (HU-05). */}
-      {professional.availabilityWindows && (
-        <Card>
-          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-            <CardTitle>Horarios de atención</CardTitle>
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/professionals/${professional.id}/schedule`}>
-                {manager ? "Editar horarios" : "Ver horarios y ausencias"}
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <WeeklySchedule windows={professional.availabilityWindows} />
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+          <CardTitle>Horarios de atención</CardTitle>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/professionals/${professional.id}/schedule`}>
+              {manager ? "Editar horarios" : "Ver horarios y ausencias"}
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <WeeklySchedule windows={professional.availabilityWindows} />
+        </CardContent>
+      </Card>
 
       <FutureAppointmentsSection
         appointments={professional.appointments}

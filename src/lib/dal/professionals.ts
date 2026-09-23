@@ -10,7 +10,7 @@ import {
 } from "@/generated/prisma/enums";
 import { Prisma } from "@/generated/prisma/client";
 import { assertRole, type Actor } from "@/lib/dal/auth";
-import { canViewSchedule } from "@/lib/dal/availability";
+import { canViewProfessional } from "@/lib/dal/availability";
 import { STAFF_ROLES } from "@/lib/roles";
 import { getTodayDateString } from "@/lib/utils";
 
@@ -180,13 +180,14 @@ export async function getProfessional(id: number, actor: Actor) {
   });
   if (!professional)
     throw new DomainError("NOT_FOUND", "El profesional no existe.");
-  // HU-05: un profesional consulta solo sus propias franjas.
-  return {
-    ...professional,
-    availabilityWindows: canViewSchedule(actor, professional.userId)
-      ? professional.availabilityWindows
-      : null,
-  };
+  // La ficha trae los turnos (con pacientes) y el historial de cambios: un
+  // profesional consulta solo la suya (HU-04, HU-12).
+  if (!canViewProfessional(actor, professional.userId))
+    throw new DomainError(
+      "FORBIDDEN",
+      "Solo podés consultar tu propia ficha de profesional.",
+    );
+  return professional;
 }
 
 export async function updateProfessional(
@@ -454,7 +455,8 @@ export async function listProfessionals(
   filters: ProfessionalFilters,
   actor: Actor,
 ) {
-  assertRole(actor, ...STAFF_ROLES);
+  // HU-04: el listado es para gerencia y mesa de entradas.
+  assertRole(actor, Role.MANAGER, Role.RECEPTIONIST);
 
   const query = filters.query?.trim();
   if (query && query.length < 2) return [];

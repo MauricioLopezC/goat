@@ -187,13 +187,13 @@ Una ficha por operación implementada o acordada. Se agregan a medida que se tra
 ### `getProfessional`
 
 **Historia de usuario:** [HU-03](hu/HU-03-modificar-baja-profesional.md) / [HU-04 — Buscar y consultar profesionales](hu/HU-04-buscar-profesionales.md).
-**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`.
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL` (solo la propia).
 **Entrada:** `id`.
-**Precondiciones:** profesional existente.
+**Precondiciones:** profesional existente. Si el actor es `PROFESSIONAL`, el profesional es el suyo (`Professional.userId`).
 **Efectos:** ninguno.
-**Errores:** `FORBIDDEN`, `NOT_FOUND`.
+**Errores:** `FORBIDDEN` (rol no permitido, o un `PROFESSIONAL` que consulta la ficha de otro), `NOT_FOUND`.
 **Revalida:** no aplica.
-**Devuelve:** ficha completa, títulos, servicios, eventos de auditoría con autor, turnos programados que todavía no comenzaron y franjas de atención semanales con consultorio y servicios asociados. Las franjas vienen en `null` cuando el actor es un `PROFESSIONAL` que consulta la ficha de otro ([HU-05](hu/HU-05-franjas-de-atencion.md): cada profesional consulta solo la propia).
+**Devuelve:** ficha completa, títulos, servicios, eventos de auditoría con autor, turnos programados que todavía no comenzaron y franjas de atención semanales con consultorio y servicios asociados.
 
 ### `updateProfessional`
 
@@ -297,11 +297,11 @@ restricción de rol y decide qué datos del usuario salen a la interfaz.
 ### `listProfessionals`
 
 **Historia de usuario:** [HU-02 — Registrar un profesional](hu/HU-02-registrar-profesional.md) / [HU-04 — Buscar y listar profesionales](hu/HU-04-buscar-profesionales.md)
-**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
+**Roles:** `MANAGER`, `RECEPTIONIST`
 **Entrada:** `filters` (`query`, `serviceId`, `status`) y `actor`. La búsqueda parcial aplica a apellido, nombre, documento y matrícula. Con menos de 2 caracteres no consulta la base.
-**Precondiciones:** el actor pertenece a `STAFF_ROLES` (`MANAGER`, `RECEPTIONIST` o `PROFESSIONAL`).
+**Precondiciones:** el actor es `MANAGER` o `RECEPTIONIST`. Un `PROFESSIONAL` no ve el listado ([HU-04](hu/HU-04-buscar-profesionales.md)).
 **Efectos:** ninguno. Es una lectura.
-**Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro. En `/professionals` no llega a dispararse: `requirePageRole` redirige antes. Queda como barrera por si la función se llama desde otro lado.
+**Errores:** `FORBIDDEN` si el actor no es `MANAGER` ni `RECEPTIONIST`. En `/professionals` no llega a dispararse: `requirePageRole` redirige antes. Queda como barrera por si la función se llama desde otro lado.
 **Revalida:** no aplica.
 **Devuelve:** `{ id, lastName, firstName, documentType, documentNumber, licenseNumber, phone, email, active, titles: { id, name }[], services: { id, name, durationMinutes }[] }[]`, con todos los estados por defecto y ordenado por apellido y nombre.
 

@@ -36,12 +36,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
                 Mis horarios
               </Link>
             )}
-            <Link
-              href="/professionals"
-              className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Profesionales
-            </Link>
+            {(actor.role === "RECEPTIONIST" || actor.role === "MANAGER") && (
+              <Link
+                href="/professionals"
+                className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Profesionales
+              </Link>
+            )}
             <Link
               href="/services"
               className="text-title-md text-muted-foreground hover:text-foreground transition-colors"

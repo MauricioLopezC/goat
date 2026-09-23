@@ -9,7 +9,7 @@ import {
   UserX,
 } from "lucide-react";
 
-import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
+import { requirePageRole } from "@/lib/dal/auth";
 import { listActiveServices, listProfessionals } from "@/lib/dal/professionals";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,9 @@ export default async function ProfessionalsPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const actor = await requirePageRole(...STAFF_ROLES);
+  // HU-04: un profesional no ve el listado; llega a su ficha desde "Mis
+  // horarios".
+  const actor = await requirePageRole("MANAGER", "RECEPTIONIST");
   const params = await searchParams;
   const query = single(params.q).trim();
   const serviceValue = single(params.serviceId);
