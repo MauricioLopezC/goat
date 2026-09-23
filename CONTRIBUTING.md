@@ -39,8 +39,11 @@ Además siembra:
 - **Profesionales:** 9, con títulos y servicios. Uno con pasaporte y uno dado de baja.
 - **Obras sociales:** 9 con 22 planes. Una obra social y un plan están inactivos.
 - **Pacientes:** 35, particulares y con obra social. Incluye menores con tutor, uno de 16 años sin tutor, adultos mayores con LE, LC o CI, un extranjero con pasaporte y uno con género "Otro".
+- **Consultorios:** 7, entre consultorios, gimnasio y box de kinesiología.
+- **Franjas de atención:** para los 8 profesionales activos. Ferrari tiene dos franjas el mismo día y una restringida a algunos servicios. Solo se siembran si el profesional no tiene ninguna, para no pisar lo cargado desde la UI.
+- **Feriados:** los nacionales, de octubre de 2026 a marzo de 2027.
 
-Franjas, feriados y turnos todavía no se siembran: se agregan con HU-05 y HU-09.
+Excepciones de agenda y turnos todavía no se siembran: los turnos se agregan con HU-09.
 
 Las convenciones de código, arquitectura y dominio están en [`AGENTS.md`](AGENTS.md).
 
