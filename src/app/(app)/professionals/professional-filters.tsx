@@ -44,7 +44,13 @@ export function ProfessionalFilters({
 }: ProfessionalFiltersProps) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
+  const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
   const [isPending, startTransition] = useTransition();
+
+  if (initialQuery !== prevInitialQuery) {
+    setPrevInitialQuery(initialQuery);
+    setQuery(initialQuery);
+  }
 
   useEffect(() => {
     if (query === initialQuery) return;
@@ -158,7 +164,9 @@ export function ProfessionalFilters({
             </Select>
           </div>
           <Button asChild variant="outline">
-            <Link href="/professionals">Limpiar</Link>
+            <Link href="/professionals" onClick={() => setQuery("")}>
+              Limpiar
+            </Link>
           </Button>
         </form>
       </CardContent>

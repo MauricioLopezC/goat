@@ -9,7 +9,7 @@ import { DomainError } from "@/lib/actions";
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
 import { getProfessional } from "@/lib/dal/professionals";
 
-import { FutureAppointmentCancel } from "./future-appointment-cancel";
+import { FutureAppointmentsSection } from "./future-appointment-cancel";
 
 export const metadata: Metadata = { title: "Ficha profesional · Goat" };
 
@@ -157,32 +157,12 @@ export default async function ProfessionalDetailPage({
         </CardContent>
       </Card>
 
-      <Card id="future-appointments">
-        <CardHeader>
-          <CardTitle>
-            Turnos programados ({professional.appointments.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          {professional.appointments.length ? (
-            professional.appointments.map((appointment) => {
-              const description = `#${appointment.id} · ${appointment.startsAt.toLocaleString("es-AR")} · ${appointment.service.name} · ${appointment.patient.lastName}, ${appointment.patient.firstName} · ${professional.lastName}, ${professional.firstName}`;
-              return manager ? (
-                <FutureAppointmentCancel
-                  key={appointment.id}
-                  appointmentId={appointment.id}
-                  professionalId={professional.id}
-                  description={description}
-                />
-              ) : (
-                <p key={appointment.id}>{description}</p>
-              );
-            })
-          ) : (
-            <p className="text-muted-foreground">No hay turnos programados.</p>
-          )}
-        </CardContent>
-      </Card>
+      <FutureAppointmentsSection
+        appointments={professional.appointments}
+        professionalId={professional.id}
+        professionalName={`${professional.lastName}, ${professional.firstName}`}
+        canCancel={manager}
+      />
 
       <Card>
         <CardHeader>

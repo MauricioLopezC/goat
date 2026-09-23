@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { documentNumberFormat } from "@/lib/validation/document-number";
+import { getTodayDateString } from "@/lib/utils";
 
 type Professional = {
   id: number;
@@ -57,6 +58,15 @@ function Submit({
   return (
     <Button type="submit" variant={variant} disabled={pending}>
       {pending ? "Guardando…" : children}
+    </Button>
+  );
+}
+
+function DeactivateSubmit({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="destructive" disabled={disabled || pending}>
+      {pending ? "Dando de baja…" : "Confirmar baja"}
     </Button>
   );
 }
@@ -310,7 +320,7 @@ export function ProfessionalEditor({
                   id="deactivatedAt"
                   name="deactivatedAt"
                   type="date"
-                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  defaultValue={getTodayDateString()}
                   required
                 />
               </div>
@@ -334,9 +344,7 @@ export function ProfessionalEditor({
               </label>
               <Feedback state={deactivateState} />
               <div className="flex gap-3">
-                <Button type="submit" variant="destructive" disabled={!confirm}>
-                  Confirmar baja
-                </Button>
+                <DeactivateSubmit disabled={!confirm} />
                 <Button asChild variant="outline">
                   <Link href="#future-appointments">
                     Ver turnos programados

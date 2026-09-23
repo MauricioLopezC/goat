@@ -11,6 +11,7 @@ import {
 import { Prisma } from "@/generated/prisma/client";
 import { assertRole, type Actor } from "@/lib/dal/auth";
 import { STAFF_ROLES } from "@/lib/roles";
+import { getTodayDateString } from "@/lib/utils";
 
 // ─────────────────────── Tipos de entrada ────────────────────────────
 
@@ -348,13 +349,17 @@ export async function deactivateProfessional(
           "FUTURE_APPOINTMENTS",
           `El profesional tiene ${count} turno(s) programado(s). Cancelalos antes de darlo de baja.`,
         );
+      const todayInArgentina = getTodayDateString();
       const date = new Date(`${input.deactivatedAt}T12:00:00.000Z`);
       if (
         Number.isNaN(date.getTime()) ||
         date.toISOString().slice(0, 10) !== input.deactivatedAt ||
-        input.deactivatedAt > new Date().toISOString().slice(0, 10)
+        input.deactivatedAt > todayInArgentina
       )
-        throw new DomainError("VALIDATION", "La fecha de baja no es válida.");
+        throw new DomainError(
+          "VALIDATION",
+          "La fecha de baja no es válida o no puede ser futura.",
+        );
       const updated = await tx.professional.update({
         where: { id: input.id },
         data: {

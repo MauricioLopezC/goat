@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DomainError } from "@/lib/actions";
 import { requirePageRole } from "@/lib/dal/auth";
 import {
@@ -13,7 +12,7 @@ import {
 } from "@/lib/dal/professionals";
 
 import { ProfessionalEditor } from "../professional-editor";
-import { FutureAppointmentCancel } from "../future-appointment-cancel";
+import { FutureAppointmentsSection } from "../future-appointment-cancel";
 
 export const metadata: Metadata = { title: "Modificar profesional · Goat" };
 
@@ -74,27 +73,12 @@ export default async function EditProfessionalPage({
         services={services}
       />
 
-      <Card id="future-appointments">
-        <CardHeader>
-          <CardTitle>
-            Turnos programados ({professional.appointments.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          {professional.appointments.length ? (
-            professional.appointments.map((appointment) => (
-              <FutureAppointmentCancel
-                key={appointment.id}
-                appointmentId={appointment.id}
-                professionalId={professional.id}
-                description={`#${appointment.id} · ${appointment.startsAt.toLocaleString("es-AR")} · ${appointment.service.name} · ${appointment.patient.lastName}, ${appointment.patient.firstName} · ${professional.lastName}, ${professional.firstName}`}
-              />
-            ))
-          ) : (
-            <p className="text-muted-foreground">No hay turnos programados.</p>
-          )}
-        </CardContent>
-      </Card>
+      <FutureAppointmentsSection
+        appointments={professional.appointments}
+        professionalId={professional.id}
+        professionalName={`${professional.lastName}, ${professional.firstName}`}
+        canCancel={true}
+      />
     </div>
   );
 }
