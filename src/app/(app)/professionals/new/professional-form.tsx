@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import {
@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { documentNumberFormat } from "@/lib/validation/document-number";
 import { createProfessional, type CreateProfessionalState } from "../actions";
 
 interface TitleOption {
@@ -92,6 +93,10 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
 
   // Valores restaurados ante fallo de validación
   const values = state?.values;
+  const [documentType, setDocumentType] = useState(
+    values?.documentType ?? "DNI",
+  );
+  const documentFormat = documentNumberFormat(documentType);
 
   // Remontar los campos en cada intento para que defaultValue se aplique
   const attempt = state ? (created ? "ok" : "error") : "inicial";
@@ -146,10 +151,10 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
                 </Link>
               </Button>
               <Button asChild variant="secondary" size="sm">
-                <a href="/professionals/new">
+                <Link href="/professionals/new">
                   <PlusCircle className="size-4 mr-1.5" />
                   Registrar otro
-                </a>
+                </Link>
               </Button>
             </div>
           </AlertDescription>
@@ -194,6 +199,7 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
                     defaultValue={values?.firstName ?? ""}
                     placeholder="Ej. Martín"
                     required
+                    maxLength={100}
                     aria-invalid={Boolean(fields?.firstName)}
                     aria-describedby={
                       fields?.firstName ? "firstName-error" : undefined
@@ -212,6 +218,7 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
                     defaultValue={values?.lastName ?? ""}
                     placeholder="Ej. González"
                     required
+                    maxLength={100}
                     aria-invalid={Boolean(fields?.lastName)}
                     aria-describedby={
                       fields?.lastName ? "lastName-error" : undefined
@@ -227,7 +234,8 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
                   </Label>
                   <Select
                     name="documentType"
-                    defaultValue={values?.documentType ?? "DNI"}
+                    value={documentType}
+                    onValueChange={setDocumentType}
                   >
                     <SelectTrigger id="documentType" className="w-full">
                       <SelectValue />
@@ -257,13 +265,22 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
                     defaultValue={values?.documentNumber ?? ""}
                     placeholder="Ej. 35894120"
                     required
+                    pattern={documentFormat.pattern}
+                    maxLength={documentFormat.maxLength}
+                    inputMode={documentFormat.inputMode}
                     aria-invalid={Boolean(fields?.documentNumber)}
                     aria-describedby={
                       fields?.documentNumber
-                        ? "documentNumber-error"
-                        : undefined
+                        ? "documentNumber-format documentNumber-error"
+                        : "documentNumber-format"
                     }
                   />
+                  <p
+                    id="documentNumber-format"
+                    className="text-sm text-muted-foreground"
+                  >
+                    Formato: {documentFormat.hint}.
+                  </p>
                   <FieldError
                     id="documentNumber-error"
                     errors={fields?.documentNumber}
@@ -278,6 +295,7 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
                     type="tel"
                     defaultValue={values?.phone ?? ""}
                     placeholder="Ej. +54 9 387 555-1234"
+                    maxLength={30}
                     aria-invalid={Boolean(fields?.phone)}
                     aria-describedby={fields?.phone ? "phone-error" : undefined}
                   />
@@ -327,6 +345,8 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
                     placeholder="Ej. 12345 (1 a 8 dígitos)"
                     required
                     maxLength={8}
+                    inputMode="numeric"
+                    pattern="[0-9]{1,8}"
                     aria-invalid={Boolean(fields?.licenseNumber)}
                     aria-describedby={
                       fields?.licenseNumber ? "licenseNumber-error" : undefined
@@ -449,6 +469,7 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
                   name="notes"
                   rows={3}
                   defaultValue={values?.notes ?? ""}
+                  maxLength={500}
                   placeholder="Aclaraciones sobre disponibilidad, convenios o perfil médico..."
                   className="w-full rounded-lg border border-input bg-card p-3 text-body-sm outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary"
                 />

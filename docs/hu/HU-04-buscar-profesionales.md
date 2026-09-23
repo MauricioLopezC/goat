@@ -17,8 +17,9 @@
 
 - Búsqueda por apellido, nombre, documento o matrícula, con coincidencia parcial.
 - Filtros por servicio y por estado (activo, inactivo, todos).
-- Por defecto muestra solo activos, ordenados por apellido.
+- Por defecto muestra todos los estados, ordenados por apellido. Al limpiar los filtros vuelve a mostrar todos.
 - Sin resultados: mensaje claro y opción de limpiar filtros.
+- El listado ofrece **Ver ficha** para consultar los datos y las franjas semanales; la edición se inicia con una acción separada, disponible para el gerente.
 
 ## Permisos
 

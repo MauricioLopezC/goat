@@ -1,11 +1,13 @@
 import { z } from "@/lib/validation/zod";
+import {
+  documentNumberFormats,
+  documentTypes,
+} from "@/lib/validation/document-number";
 
 /**
  * Tipos de documento válidos. Deben coincidir con el enum `DocumentType`
  * de Prisma (prisma/schema.prisma).
  */
-const documentTypes = ["DNI", "LC", "LE", "CI", "PASSPORT"] as const;
-
 /**
  * Schema de validación para crear un profesional (HU-02).
  *
@@ -45,7 +47,7 @@ export const createProfessionalSchema = z
         .trim()
         .regex(
           /^[\d\s+\-()]{6,30}$/,
-          "El teléfono solo puede contener números, guiones o espacios",
+          "El teléfono debe tener entre 6 y 30 caracteres: números, espacios, +, guiones o paréntesis",
         )
         .nullable(),
     ),
@@ -55,43 +57,36 @@ export const createProfessionalSchema = z
       z.string().trim().toLowerCase().email().nullable(),
     ),
 
-    photoUrl: z.preprocess(
-      (v) => (typeof v === "string" && v.trim() === "" ? null : (v ?? null)),
-      z.string().trim().url().nullable(),
-    ),
-
     notes: z.preprocess(
       (v) => (typeof v === "string" && v.trim() === "" ? null : (v ?? null)),
       z.string().trim().max(500).nullable(),
     ),
   })
   .superRefine((data, ctx) => {
-    // Validación según tipo de documento
-    if (data.documentType === "DNI") {
-      if (!/^\d{7,8}$/.test(data.documentNumber)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["documentNumber"],
-          message: "El DNI debe tener 7 u 8 dígitos numéricos",
-        });
-      }
-    } else if (["LC", "LE", "CI"].includes(data.documentType)) {
-      if (!/^\d{6,8}$/.test(data.documentNumber)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["documentNumber"],
-          message: "El documento debe ser numérico (6 a 8 dígitos)",
-        });
-      }
-    } else if (data.documentType === "PASSPORT") {
-      if (!/^[A-Za-z0-9]{3,20}$/.test(data.documentNumber)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["documentNumber"],
-          message: "El pasaporte debe ser alfanumérico (3 a 20 caracteres)",
-        });
-      }
+    const format = documentNumberFormats[data.documentType];
+    if (!new RegExp(`^(?:${format.pattern})$`).test(data.documentNumber)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["documentNumber"],
+        message: format.error,
+      });
     }
   });
 
 export type CreateProfessionalInput = z.infer<typeof createProfessionalSchema>;
+
+export const updateProfessionalSchema = createProfessionalSchema.safeExtend({
+  id: z.number().int().positive(),
+  reason: z.string().trim().min(1, "El motivo es obligatorio").max(500),
+});
+
+export const deactivateProfessionalSchema = z.object({
+  id: z.number().int().positive(),
+  reason: z.string().trim().min(1, "El motivo es obligatorio").max(500),
+  deactivatedAt: z.iso.date(),
+});
+
+export const reactivateProfessionalSchema = z.object({
+  id: z.number().int().positive(),
+  reason: z.string().trim().min(1, "El motivo es obligatorio").max(500),
+});

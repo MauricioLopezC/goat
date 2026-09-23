@@ -13,6 +13,7 @@
 
 - No se permiten dos profesionales con el mismo número de documento.
 - No se permiten dos profesionales con la misma matrícula.
+- El DNI debe tener 8 dígitos numéricos; el pasaporte, entre 8 y 20 letras o números sin espacios. LC, LE y CI admiten entre 6 y 8 dígitos numéricos.
 - La matrícula es numérica, de 1 a 8 dígitos; si no valida, se marca el campo.
 - Debe seleccionarse al menos un servicio del catálogo ([HU-06](HU-06-catalogo-de-servicios.md)).
 - Campo obligatorio vacío: se marca el campo y no se guarda nada.
