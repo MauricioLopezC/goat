@@ -115,6 +115,8 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `DUPLICATE_PATIENT` | Ya existe un paciente con ese tipo y número de documento. Incluye metadatos en `meta` (id, nombre, etc.) para que la UI pueda ofrecer abrir el paciente existente. |
 | `INVALID_CREDENTIALS` | El ingreso falló. Cubre email inexistente, contraseña incorrecta y usuario inactivo: los tres devuelven lo mismo, a propósito (HU-01). |
 | `EMAIL_TAKEN` | Ya existe un usuario con ese email. |
+| `FUTURE_APPOINTMENTS` | Turnos programados que todavía no comenzaron impiden quitar un servicio o dar de baja al profesional. El mensaje enumera los turnos afectados al quitar servicios y da el total en la baja. En la agenda (HU-05), modificar o eliminar una franja o cargar una excepción o un feriado que los deje fuera de horario: los turnos afectados van en `meta.appointments`. |
+| `AVAILABILITY_WINDOW_OVERLAP` | La franja se superpone con otra del mismo profesional el mismo día. |
 | `UNMET_DEPENDENCY` | La operación no puede completarse porque existen registros dependientes (por ejemplo, dar de baja un servicio con turnos futuros programados). |
 
 Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
@@ -124,7 +126,7 @@ Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
 Los schemas importan `z` de `@/lib/validation/zod`, nunca de `"zod"` (una regla de ESLint lo impide). Ese módulo configura los mensajes por defecto en español y en un tono neutro apto para mostrar (`Este campo es obligatorio`, `Debe tener al menos 3 caracteres`, `Correo electrónico inválido`).
 
 - Los mensajes genéricos cubren campo vacío, largo, rango, opción inválida y formatos comunes. Un `regex` devuelve solo `Formato inválido`.
-- Cuando el campo necesita un mensaje propio, se pasa en el schema: `z.string().regex(/^\d{7,8}$/, "El DNI debe tener 7 u 8 dígitos")`.
+- Cuando el campo necesita un mensaje propio, se pasa en el schema: `z.string().regex(/^\d{8}$/, "El DNI debe tener 8 dígitos")`.
 - `fieldErrors` de `ActionError` sale de `z.flattenError(error).fieldErrors`, ya en español.
 
 ## Reglas que toda ficha debe reflejar
@@ -178,9 +180,64 @@ Una ficha por operación implementada o acordada. Se agregan a medida que se tra
 **Entrada:** `lastName`, `firstName`, `documentType` (`DocumentType`), `documentNumber`, `licenseNumber`, `titleIds` (`Int[]`, al menos uno), `serviceIds` (`Int[]`, al menos uno), `phone?`, `email?`, `photoUrl?`, `notes?`.
 **Precondiciones:** el actor es `MANAGER` (lo verifican la acción y la DAL). No existe otro `Professional` activo o inactivo con el mismo par (`documentType`, `documentNumber`). No existe otro `Professional` con la misma `licenseNumber`. Todos los `titleIds` y `serviceIds` corresponden a registros activos de `ProfessionalTitle` y `Service`.
 **Efectos:** crea un `Professional` con `active: true`, sin franjas horarias. Asocia los `ProfessionalTitle` y `Service` indicados. Registra `createdById` con el id del usuario de la sesión. El profesional no aparece como opción al dar turnos hasta que se le carguen franjas ([HU-05](hu/HU-05-franjas-de-atencion.md)).
-**Errores:** `VALIDATION` (campo obligatorio vacío, matrícula no numérica o fuera de rango 1–8 dígitos, email con formato inválido, arrays vacíos), `FORBIDDEN` (el rol no es `MANAGER`), `NOT_FOUND` (algún `titleId` o `serviceId` no existe o no está activo), `DUPLICATE` (documento o matrícula ya registrados; incluye `fieldErrors`).
+**Errores:** `VALIDATION` (campo obligatorio vacío, número de documento inválido para su tipo, matrícula no numérica o fuera de rango 1–8 dígitos, email con formato inválido, arrays vacíos), `FORBIDDEN` (el rol no es `MANAGER`), `NOT_FOUND` (algún `titleId` o `serviceId` no existe o no está activo), `DUPLICATE` (documento o matrícula ya registrados; incluye `fieldErrors`).
 **Revalida:** `/professionals` (listado de profesionales).
 **Devuelve:** `{ id, firstName, lastName }`.
+
+### `getProfessional`
+
+**Historia de usuario:** [HU-03](hu/HU-03-modificar-baja-profesional.md) / [HU-04 — Buscar y consultar profesionales](hu/HU-04-buscar-profesionales.md).
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL` (solo la propia).
+**Entrada:** `id`.
+**Precondiciones:** profesional existente. Si el actor es `PROFESSIONAL`, el profesional es el suyo (`Professional.userId`).
+**Efectos:** ninguno.
+**Errores:** `FORBIDDEN` (rol no permitido, o un `PROFESSIONAL` que consulta la ficha de otro), `NOT_FOUND`.
+**Revalida:** no aplica.
+**Devuelve:** ficha completa, títulos, servicios, eventos de auditoría con autor, turnos programados que todavía no comenzaron y franjas de atención semanales con consultorio y servicios asociados.
+
+### `updateProfessional`
+
+**Historia de usuario:** [HU-03](hu/HU-03-modificar-baja-profesional.md).
+**Roles:** `MANAGER`.
+**Entrada:** `id`, todos los campos editables de `createProfessional` y `reason` obligatorio.
+**Precondiciones:** profesional existente; documento y matrícula únicos; títulos y servicios activos; ningún servicio retirado tiene turnos `SCHEDULED` que todavía no comenzaron.
+**Efectos:** actualiza ficha y asociaciones; registra autor, fecha y motivo en `ProfessionalEvent` dentro de la misma transacción.
+**Errores:** `VALIDATION` (mismas reglas de formato que el alta), `FORBIDDEN`, `NOT_FOUND`, `DUPLICATE`, `FUTURE_APPOINTMENTS` (lista turnos afectados).
+**Revalida:** `/professionals`, `/professionals/[id]` y `/professionals/[id]/edit`.
+**Devuelve:** `{ id, firstName, lastName }`.
+
+### `deactivateProfessional`
+
+**Historia de usuario:** [HU-03](hu/HU-03-modificar-baja-profesional.md).
+**Roles:** `MANAGER`.
+**Entrada:** `id`, `reason` obligatorio y `deactivatedAt` (fecha de baja).
+**Precondiciones:** profesional activo y sin turnos `SCHEDULED` que todavía no comenzaron.
+**Efectos:** baja lógica y evento de auditoría en una transacción; conserva turnos y agenda histórica.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION`, `FUTURE_APPOINTMENTS` (indica cantidad).
+**Revalida:** `/professionals`, `/professionals/[id]` y `/professionals/[id]/edit`.
+**Devuelve:** `{ id, active: false }`.
+
+### `reactivateProfessional`
+
+**Historia de usuario:** [HU-03](hu/HU-03-modificar-baja-profesional.md).
+**Roles:** `MANAGER`.
+**Entrada:** `id`, `reason` obligatorio.
+**Precondiciones:** profesional inactivo.
+**Efectos:** activa al profesional, limpia la baja vigente y registra evento sin borrar el historial.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION`.
+**Revalida:** `/professionals`, `/professionals/[id]` y `/professionals/[id]/edit`.
+**Devuelve:** `{ id, active: true }`.
+
+### `cancelProfessionalAppointment`
+
+**Historia de usuario:** [HU-03](hu/HU-03-modificar-baja-profesional.md), salida para resolver turnos programados antes de la baja. Aplica las reglas de [HU-10](hu/HU-10-cancelar-turno.md) en la ficha del profesional.
+**Roles:** `MANAGER`.
+**Entrada:** `appointmentId`, `professionalId`, `reason` y `requestedBy` obligatorios.
+**Precondiciones:** el turno pertenece al profesional de la ficha, está `SCHEDULED` y todavía no comenzó.
+**Efectos:** pasa a `CANCELLED` y crea `AppointmentEvent` con autor, fecha, motivo y solicitante, en una transacción.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION`.
+**Revalida:** `/professionals/[id]` y `/professionals/[id]/edit`.
+**Devuelve:** `{ id }`.
 
 ### `signIn`
 
@@ -240,13 +297,13 @@ restricción de rol y decide qué datos del usuario salen a la interfaz.
 ### `listProfessionals`
 
 **Historia de usuario:** [HU-02 — Registrar un profesional](hu/HU-02-registrar-profesional.md) / [HU-04 — Buscar y listar profesionales](hu/HU-04-buscar-profesionales.md)
-**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
-**Entrada:** el `actor`. No recibe parámetros de la interfaz.
-**Precondiciones:** el actor pertenece a `STAFF_ROLES` (`MANAGER`, `RECEPTIONIST` o `PROFESSIONAL`).
+**Roles:** `MANAGER`, `RECEPTIONIST`
+**Entrada:** `filters` (`query`, `serviceId`, `status`) y `actor`. La búsqueda parcial aplica a apellido, nombre, documento y matrícula. Con menos de 2 caracteres no consulta la base.
+**Precondiciones:** el actor es `MANAGER` o `RECEPTIONIST`. Un `PROFESSIONAL` no ve el listado ([HU-04](hu/HU-04-buscar-profesionales.md)).
 **Efectos:** ninguno. Es una lectura.
-**Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro. En `/professionals` no llega a dispararse: `requirePageRole` redirige antes. Queda como barrera por si la función se llama desde otro lado.
+**Errores:** `FORBIDDEN` si el actor no es `MANAGER` ni `RECEPTIONIST`. En `/professionals` no llega a dispararse: `requirePageRole` redirige antes. Queda como barrera por si la función se llama desde otro lado.
 **Revalida:** no aplica.
-**Devuelve:** `{ id, lastName, firstName, documentType, documentNumber, licenseNumber, phone, email, active, titles: { id, name }[], services: { id, name, durationMinutes }[] }[]`, ordenado por estado activo, apellido y nombre.
+**Devuelve:** `{ id, lastName, firstName, documentType, documentNumber, licenseNumber, phone, email, active, titles: { id, name }[], services: { id, name, durationMinutes }[] }[]`, con todos los estados por defecto y ordenado por apellido y nombre.
 
 No es una Server Action: es una lectura que el Server Component de `/professionals` llama directo a la DAL (ADR 0001).
 
@@ -360,6 +417,122 @@ No es una Server Action: es una lectura que el Server Component de `/services` l
 **Revalida:** no aplica.
 **Devuelve:** `{ id, name, plans: { id, name }[] }[]` de obras sociales y planes activos, ordenados alfabéticamente.
 
+### `getProfessionalSchedule`
+
+**Historia de usuario:** [HU-05 — Definir los días y horarios de atención](hu/HU-05-franjas-de-atencion.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
+**Entrada:** `professionalId` y `actor`.
+**Precondiciones:** el profesional existe. Si el actor es `PROFESSIONAL`, el profesional es el suyo (`Professional.userId`).
+**Efectos:** ninguno. Es una lectura.
+**Errores:** `FORBIDDEN` (rol no permitido, o un `PROFESSIONAL` que consulta la agenda de otro), `NOT_FOUND`.
+**Revalida:** no aplica.
+**Devuelve:** `{ professional: { id, firstName, lastName, active }, windows: { id, weekday, startMinute, endMinute, room: { id, name } | null, services: { id, name }[] }[], exceptions: { id, date, startMinute, endMinute, reason, createdBy: { firstName, lastName } }[], services: { id, name }[], rooms: { id, name }[] }`. Las franjas van ordenadas por día y hora. Las excepciones son solo las de hoy en adelante, ordenadas por fecha. `services` son los que presta el profesional, y `rooms` los consultorios activos, para el formulario.
+
+No es una Server Action: la página `/professionals/[id]/schedule` la llama directo a la DAL (ADR 0001).
+
+### `getOwnProfessionalId`
+
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Roles:** `PROFESSIONAL`
+**Entrada:** `actor`.
+**Precondiciones:** el usuario de la sesión está vinculado a un profesional (`Professional.userId`).
+**Efectos:** ninguno. Es una lectura.
+**Errores:** `FORBIDDEN` (rol no permitido), `NOT_FOUND` (el usuario no tiene profesional vinculado).
+**Revalida:** no aplica.
+**Devuelve:** el `id` del profesional.
+
+No es una Server Action: la página `/my-schedule` la llama directo a la DAL y redirige a `/professionals/[id]/schedule` (ADR 0001).
+
+### `createAvailabilityWindow`
+
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Roles:** `MANAGER`
+**Entrada:** `professionalId`, `weekday` (`Weekday`), `startTime` y `endTime` (`HH:MM`, se guardan como minutos desde la medianoche), `roomId?`, `serviceIds` (`Int[]`, puede ir vacío).
+**Precondiciones:** el profesional existe y está activo. `endTime` es posterior a `startTime`. No hay otra franja del mismo profesional ese día que se superponga. Cada `serviceId` es un servicio que presta el profesional. El `roomId`, si viene, es un `Room` activo.
+**Efectos:** crea la `AvailabilityWindow` con sus servicios habilitados. Sin servicios, la franja admite todos los del profesional. La restricción `AvailabilityWindow_no_overlap` de la base respalda el control de superposición.
+**Errores:** `VALIDATION` (hora con formato inválido, fin anterior o igual al inicio, profesional inactivo), `FORBIDDEN`, `NOT_FOUND` (profesional, consultorio o servicio inexistente o no habilitado), `AVAILABILITY_WINDOW_OVERLAP`.
+**Revalida:** `/professionals/[id]`, `/professionals/[id]/schedule` y `/calendar`.
+**Devuelve:** `{ id }`.
+
+### `updateAvailabilityWindow`
+
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`, `professionalId` y los mismos campos que `createAvailabilityWindow`.
+**Precondiciones:** las mismas que el alta, y además la franja pertenece a ese profesional. Ningún turno `SCHEDULED` que todavía no comenzó queda fuera de horario por el cambio: un turno que entraba en alguna franja del profesional (con su servicio habilitado) tiene que seguir entrando. Esto cubre acortar la franja, cambiarla de día y quitarle servicios.
+**Efectos:** actualiza la franja y reemplaza sus servicios habilitados.
+**Errores:** los del alta y `FUTURE_APPOINTMENTS`, con la lista de turnos afectados en `meta.appointments` (`{ id, startsAt, patientName, serviceName }[]`).
+**Revalida:** `/professionals/[id]`, `/professionals/[id]/schedule` y `/calendar`.
+**Devuelve:** `{ id }`.
+
+### `deleteAvailabilityWindow`
+
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`, `professionalId`.
+**Precondiciones:** la franja existe y pertenece a ese profesional. Quitarla no deja fuera de horario ningún turno `SCHEDULED` que todavía no comenzó (mismo criterio que la modificación). Se puede eliminar aunque el profesional esté inactivo.
+**Efectos:** borra la franja. Es el patrón vigente, no un dato histórico: los turnos pasados conservan su horario en `Appointment`.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `FUTURE_APPOINTMENTS` (con `meta.appointments`).
+**Revalida:** `/professionals/[id]`, `/professionals/[id]/schedule` y `/calendar`.
+**Devuelve:** `{ id }`.
+
+### `createAvailabilityException`
+
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Roles:** `MANAGER`
+**Entrada:** `professionalId`, `date` (`AAAA-MM-DD`), `allDay` (booleano), `startTime` y `endTime` (`HH:MM`, obligatorios si no es el día entero) y `reason`.
+**Precondiciones:** el profesional existe. La fecha es hoy o futura, en hora de Argentina. Si no es el día entero, `endTime` es posterior a `startTime`. No hay turnos `SCHEDULED` que todavía no comenzaron del profesional que se superpongan con la excepción.
+**Efectos:** crea la `AvailabilityException` con su autor (`createdById`). Ese día u horario deja de ofrecer disponibilidad.
+**Errores:** `VALIDATION` (fecha inválida o pasada, horario incompleto o invertido, motivo vacío), `FORBIDDEN`, `NOT_FOUND`, `FUTURE_APPOINTMENTS` (con `meta.appointments`).
+**Revalida:** `/professionals/[id]/schedule` y `/calendar`.
+**Devuelve:** `{ id }`.
+
+### `deleteAvailabilityException`
+
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`, `professionalId`.
+**Precondiciones:** la excepción existe y pertenece a ese profesional.
+**Efectos:** borra la excepción: el día u horario vuelve a ofrecer la disponibilidad de las franjas.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`.
+**Revalida:** `/professionals/[id]/schedule` y `/calendar`.
+**Devuelve:** `{ id }`.
+
+### `listHolidays`
+
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
+**Entrada:** el `actor`.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`.
+**Efectos:** ninguno. Es una lectura.
+**Errores:** `FORBIDDEN`.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, date, description }[]` de hoy en adelante, ordenado por fecha.
+
+No es una Server Action: la página `/holidays` la llama directo a la DAL (ADR 0001).
+
+### `createHoliday`
+
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Roles:** `MANAGER`
+**Entrada:** `date` (`AAAA-MM-DD`), `description`.
+**Precondiciones:** la fecha es hoy o futura, en hora de Argentina, y no hay otro `Holiday` ese día. Ningún profesional tiene turnos `SCHEDULED` que todavía no comenzaron ese día.
+**Efectos:** crea el `Holiday`. Ese día el centro no ofrece disponibilidad para nadie.
+**Errores:** `VALIDATION` (fecha inválida o pasada, descripción vacía), `FORBIDDEN`, `DUPLICATE` (ya hay un feriado ese día; incluye `fieldErrors`), `FUTURE_APPOINTMENTS` (con `meta.appointments`).
+**Revalida:** `/holidays` y `/calendar`.
+**Devuelve:** `{ id, date, description }`.
+
+### `deleteHoliday`
+
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`.
+**Precondiciones:** el feriado existe.
+**Efectos:** lo borra: el día vuelve a ofrecer disponibilidad según las franjas.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`.
+**Revalida:** `/holidays` y `/calendar`.
+**Devuelve:** `{ id }`.
+
 ### `searchPatients`
 
 **Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md)
@@ -396,6 +569,7 @@ No es una Server Action: es una lectura que el Server Component de `/patients/[i
 **Errores:** `VALIDATION` (campos obligatorios vacíos, formatos inválidos, menor de 16 años sin tutor), `FORBIDDEN` (profesionales u otros roles sin permiso), `NOT_FOUND` (paciente no encontrado), `DUPLICATE_PATIENT` (documento ya registrado en otro paciente).
 **Revalida:** `/patients` y `/patients/[id]`.
 **Devuelve:** `{ id, firstName, lastName, documentType, documentNumber }`.
+
 
 ### Nota: `signIn` y `signOut` frente a `defineAction`
 

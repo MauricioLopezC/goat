@@ -80,6 +80,12 @@ enum AppointmentEventType {
   EXPIRED
 }
 
+enum ProfessionalEventType {
+  UPDATED
+  DEACTIVATED
+  REACTIVATED
+}
+
 // ────────────────────────────── Acceso ───────────────────────────────
 
 /// Cuenta con la que se ingresa al sistema (HU-01). El ingreso es por email y
@@ -112,6 +118,7 @@ model User {
   createdExceptions        AvailabilityException[] @relation("AvailabilityExceptionCreatedBy")
   createdAppointments      Appointment[]           @relation("AppointmentCreatedBy")
   appointmentEvents        AppointmentEvent[]
+  professionalEvents       ProfessionalEvent[]
 
   @@index([lastName, firstName])
 }
@@ -184,10 +191,26 @@ model Professional {
   availabilityWindows AvailabilityWindow[]
   exceptions          AvailabilityException[]
   appointments        Appointment[]
+  events              ProfessionalEvent[]
 
   @@unique([documentType, documentNumber])
   @@index([lastName, firstName])
   @@index([active])
+}
+
+/// Historial inmutable de cambios posteriores al alta de un profesional.
+model ProfessionalEvent {
+  id             Int                   @id @default(autoincrement())
+  professionalId Int
+  professional   Professional          @relation(fields: [professionalId], references: [id])
+  type           ProfessionalEventType
+  reason         String
+  changes        Json?
+  userId         Int
+  user           User                  @relation(fields: [userId], references: [id])
+  createdAt      DateTime              @default(now())
+
+  @@index([professionalId, createdAt])
 }
 
 // ─────────────────────── Catálogo de servicios ───────────────────────

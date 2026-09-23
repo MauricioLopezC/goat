@@ -10,20 +10,37 @@ cp .env.example .env    # y ajustar los valores si hace falta
 npm run db:up
 npm run db:generate     # el cliente de Prisma no se commitea
 npm run db:migrate
-npm run db:seed         # usuarios para poder entrar
+npm run db:seed         # usuarios y datos de prueba
 npm run dev
 ```
 
-El seed (`prisma/seed.ts`) crea un usuario por rol con la contraseña
-`goat1234` (cambiable con `SEED_PASSWORD`). Existe porque solo un `MANAGER`
-crea usuarios y una base recién migrada no tiene ninguno. Es idempotente y se
-niega a correr con `NODE_ENV=production`. `prisma migrate reset` lo corre solo.
+El seed (`prisma/seed.ts`, con los datos en `prisma/seed-data.ts`) carga datos
+de prueba realistas de un centro en Salta para lo que ya está implementado.
+También resuelve el arranque: solo un `MANAGER` crea usuarios y una base recién
+migrada no tiene ninguno. Es idempotente (al volver a correrlo, lo sembrado
+vuelve a sus valores; lo cargado desde la UI no se toca) y se niega a correr con
+`NODE_ENV=production`. `prisma migrate reset` lo corre solo.
 
-| Email | Rol |
-| --- | --- |
-| `gerente@goat.local` | `MANAGER` |
-| `mesa@goat.local` | `RECEPTIONIST` |
-| `profesional@goat.local` | `PROFESSIONAL` |
+Todos los usuarios tienen la contraseña `goat1234` (cambiable con `SEED_PASSWORD`):
+
+| Email | Rol | Para qué |
+| --- | --- | --- |
+| `gerente@goat.local` | `MANAGER` | |
+| `mesa@goat.local` | `RECEPTIONIST` | |
+| `mesa2@goat.local` | `RECEPTIONIST` | |
+| `profesional@goat.local` | `PROFESSIONAL` | Julia Ferrari, con ficha de profesional |
+| `rarias@goat.local` | `PROFESSIONAL` | Ricardo Arias, con ficha de profesional |
+| `lzerpa@goat.local` | `PROFESSIONAL` | Lucía Zerpa, con ficha de profesional |
+| `exmesa@goat.local` | `RECEPTIONIST` | Inactivo: el login lo rechaza |
+
+Además siembra:
+
+- **Catálogo:** 4 títulos, 10 especialidades y 13 servicios (de 30 y 60 min, con y sin orden médica). Hay un título, una especialidad y un servicio inactivos.
+- **Profesionales:** 9, con títulos y servicios. Uno con pasaporte y uno dado de baja.
+- **Obras sociales:** 9 con 22 planes. Una obra social y un plan están inactivos.
+- **Pacientes:** 35, particulares y con obra social. Incluye menores con tutor, uno de 16 años sin tutor, adultos mayores con LE, LC o CI, un extranjero con pasaporte y uno con género "Otro".
+
+Franjas, feriados y turnos todavía no se siembran: se agregan con HU-05 y HU-09.
 
 Las convenciones de código, arquitectura y dominio están en [`AGENTS.md`](AGENTS.md).
 

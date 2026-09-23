@@ -34,17 +34,33 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
                 Nuevo paciente
               </Link>
             )}
-            <Link
-              href="/professionals"
-              className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Profesionales
-            </Link>
+            {actor.role === "PROFESSIONAL" && (
+              <Link
+                href="/my-schedule"
+                className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Mis horarios
+              </Link>
+            )}
+            {(actor.role === "RECEPTIONIST" || actor.role === "MANAGER") && (
+              <Link
+                href="/professionals"
+                className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Profesionales
+              </Link>
+            )}
             <Link
               href="/services"
               className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
             >
               Servicios
+            </Link>
+            <Link
+              href="/holidays"
+              className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Feriados
             </Link>
             {actor.role === "MANAGER" && (
               <Link
