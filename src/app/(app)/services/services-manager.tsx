@@ -147,6 +147,7 @@ export function ServicesManager({
           {isFormVisible && (
             <CardContent>
               <ServiceForm
+                key={editingService ? `edit-${editingService.id}` : "create"}
                 specialties={specialties}
                 editingService={editingService}
                 onCancel={handleCancelForm}

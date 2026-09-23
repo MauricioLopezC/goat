@@ -19,6 +19,10 @@ const BY_ROLE: Array<{ prefix: string; roles: Role[] }> = [
     prefix: "/professionals",
     roles: [Role.MANAGER, Role.RECEPTIONIST, Role.PROFESSIONAL],
   },
+  {
+    prefix: "/services",
+    roles: [Role.MANAGER, Role.RECEPTIONIST, Role.PROFESSIONAL],
+  },
   { prefix: "/users", roles: [Role.MANAGER] },
   { prefix: "/agenda", roles: [Role.PROFESSIONAL] },
   { prefix: "/calendar", roles: [Role.RECEPTIONIST, Role.MANAGER] },
