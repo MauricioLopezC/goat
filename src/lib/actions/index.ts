@@ -18,7 +18,8 @@ export type ErrorCode =
   | "PATIENT_APPOINTMENT_OVERLAP"
   | "OUTSIDE_AVAILABILITY_WINDOW"
   | "INVALID_STATUS_TRANSITION"
-  | "REASON_REQUIRED";
+  | "REASON_REQUIRED"
+  | "DUPLICATE_PATIENT";
 
 export type ActionError = {
   code: ErrorCode;
@@ -27,6 +28,8 @@ export type ActionError = {
   message: string;
   /// Solo para `VALIDATION` y `DUPLICATE`.
   fieldErrors?: Record<string, string[]>;
+  /// Metadatos adicionales para errores específicos (ej. ID de recurso existente).
+  meta?: Record<string, unknown>;
 };
 
 export type ActionResult<T> =
@@ -38,16 +41,19 @@ export type ActionResult<T> =
 export class DomainError extends Error {
   readonly code: ErrorCode;
   readonly fieldErrors?: Record<string, string[]>;
+  readonly meta?: Record<string, unknown>;
 
   constructor(
     code: ErrorCode,
     message: string,
     fieldErrors?: Record<string, string[]>,
+    meta?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "DomainError";
     this.code = code;
     this.fieldErrors = fieldErrors;
+    this.meta = meta;
   }
 }
 
@@ -97,6 +103,7 @@ export function defineAction<Input, Output>(config: {
           code: error.code,
           message: error.message,
           fieldErrors: error.fieldErrors,
+          meta: error.meta,
         });
       }
       throw error;

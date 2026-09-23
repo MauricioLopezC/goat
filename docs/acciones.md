@@ -89,6 +89,7 @@ type ActionError = {
   code: ErrorCode
   message: string                          // en español, apto para mostrar
   fieldErrors?: Record<string, string[]>   // solo para VALIDATION
+  meta?: Record<string, unknown>           // metadatos del error (ej. recurso duplicado)
 }
 ```
 
@@ -111,6 +112,7 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `INVALID_STATUS_TRANSITION` | El cambio de `AppointmentStatus` no está permitido (ver `glossary.md`). |
 | `REASON_REQUIRED` | Falta el motivo en una operación trazable (por ejemplo, cancelar). |
 | `DUPLICATE` | El recurso que se intenta crear ya existe (por ejemplo, matrícula o documento duplicado). Incluye `fieldErrors` con los campos afectados. |
+| `DUPLICATE_PATIENT` | Ya existe un paciente con ese tipo y número de documento. Incluye metadatos en `meta` (id, nombre, etc.) para que la UI pueda ofrecer abrir el paciente existente. |
 | `INVALID_CREDENTIALS` | El ingreso falló. Cubre email inexistente, contraseña incorrecta y usuario inactivo: los tres devuelven lo mismo, a propósito (HU-01). |
 | `EMAIL_TAKEN` | Ya existe un usuario con ese email. |
 
@@ -267,8 +269,27 @@ No es una Server Action: es una lectura que el Server Component de `/professiona
 **Efectos:** ninguno. Es una lectura del catálogo de servicios activos.
 **Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
 **Revalida:** no aplica.
-**Devuelve:** `{ id, name, durationMinutes }[]`, ordenado alfabéticamente por nombre.
+### `createPatient`
 
+**Historia de usuario:** [HU-07 — Registrar un paciente nuevo](hu/HU-07-registrar-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`
+**Entrada:** `lastName`, `firstName`, `gender`, `documentType`, `documentNumber`, `birthDate`, `phone`, `email`, `coverageType`, `insurancePlanId` (si `coverageType` es `HEALTH_INSURANCE`), `memberNumber` (si `coverageType` es `HEALTH_INSURANCE`), `guardianName` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**), `guardianPhone` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**).
+**Precondiciones:** no existe otro paciente con la misma combinación de `documentType` y `documentNumber`. Si `coverageType` es `HEALTH_INSURANCE`, el `insurancePlanId` existe y está activo. Si la edad calculada a partir de `birthDate` es menor de 16 años, `guardianName` y `guardianPhone` deben estar presentes y no vacíos; esta regla se valida en el schema Zod (`createPatientSchema`) y no se puede omitir invocando la acción directamente.
+**Efectos:** crea un `Patient` con `active: true` y `createdById`. Si `coverageType` es `HEALTH_INSURANCE`, crea además su `Coverage` asociada.
+**Errores:** `VALIDATION` (campo obligatorio vacío, formato inválido, tutor ausente para menor de 16 años), `FORBIDDEN`, `DUPLICATE_PATIENT`.
+**Revalida:** `/patients`.
+**Devuelve:** `{ id, firstName, lastName, documentType, documentNumber }`.
+
+### `listHealthInsurers`
+
+**Historia de usuario:** [HU-07 — Registrar un paciente nuevo](hu/HU-07-registrar-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`
+**Entrada:** ninguna (recibe el `actor` para verificación de permisos).
+**Precondiciones:** ninguna.
+**Efectos:** ninguno. Es una lectura para poblar los selectores de cobertura y plan.
+**Errores:** `FORBIDDEN` si el actor no pertenece a los roles habilitados.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, name, plans: { id, name }[] }[]` de obras sociales y planes activos, ordenados alfabéticamente.
 
 ### Nota: `signIn` y `signOut` frente a `defineAction`
 
