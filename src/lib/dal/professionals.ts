@@ -24,7 +24,6 @@ export interface CreateProfessionalInput {
   serviceIds: number[];
   phone?: string | null;
   email?: string | null;
-  photoUrl?: string | null;
   notes?: string | null;
 }
 
@@ -115,7 +114,6 @@ export async function createProfessional(
       licenseNumber: input.licenseNumber,
       phone: input.phone ?? null,
       email: input.email ?? null,
-      photoUrl: input.photoUrl ?? null,
       notes: input.notes ?? null,
       active: true,
       createdBy: { connect: { id: actor.id } },
@@ -284,7 +282,6 @@ export async function updateProfessional(
         licenseNumber: current.licenseNumber,
         phone: current.phone,
         email: current.email,
-        photoUrl: current.photoUrl,
         notes: current.notes,
         titleIds: current.titles.map((title) => title.id),
         serviceIds: current.services.map((service) => service.id),
@@ -299,7 +296,6 @@ export async function updateProfessional(
           licenseNumber: input.licenseNumber,
           phone: input.phone ?? null,
           email: input.email ?? null,
-          photoUrl: input.photoUrl ?? null,
           notes: input.notes ?? null,
           titles: { set: input.titleIds.map((id) => ({ id })) },
           services: { set: input.serviceIds.map((id) => ({ id })) },

@@ -39,7 +39,6 @@ type Professional = {
   licenseNumber: string;
   phone: string | null;
   email: string | null;
-  photoUrl: string | null;
   notes: string | null;
   active: boolean;
   deactivatedAt: string | null;
@@ -132,7 +131,6 @@ export function ProfessionalEditor({
                   ["licenseNumber", "Matrícula", professional.licenseNumber],
                   ["phone", "Teléfono", professional.phone ?? ""],
                   ["email", "Email", professional.email ?? ""],
-                  ["photoUrl", "URL de foto", professional.photoUrl ?? ""],
                   ["notes", "Observaciones", professional.notes ?? ""],
                 ] as const
               ).map(([name, label, value]) => (
@@ -167,11 +165,9 @@ export function ProfessionalEditor({
                       type={
                         name === "email"
                           ? "email"
-                          : name === "photoUrl"
-                            ? "url"
-                            : name === "phone"
-                              ? "tel"
-                              : "text"
+                          : name === "phone"
+                            ? "tel"
+                            : "text"
                       }
                       defaultValue={value}
                       required={[

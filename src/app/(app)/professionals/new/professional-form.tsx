@@ -315,22 +315,6 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
                   />
                   <FieldError id="email-error" errors={fields?.email} />
                 </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="photoUrl">URL de foto (opcional)</Label>
-                  <Input
-                    id="photoUrl"
-                    name="photoUrl"
-                    type="url"
-                    defaultValue={values?.photoUrl ?? ""}
-                    placeholder="https://ejemplo.com/foto.jpg"
-                    aria-invalid={Boolean(fields?.photoUrl)}
-                    aria-describedby={
-                      fields?.photoUrl ? "photoUrl-error" : undefined
-                    }
-                  />
-                  <FieldError id="photoUrl-error" errors={fields?.photoUrl} />
-                </div>
               </CardContent>
             </Card>
 

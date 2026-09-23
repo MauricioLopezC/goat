@@ -64,7 +64,6 @@ export default async function EditProfessionalPage({
           licenseNumber: professional.licenseNumber,
           phone: professional.phone,
           email: professional.email,
-          photoUrl: professional.photoUrl,
           notes: professional.notes,
           active: professional.active,
           deactivatedAt: professional.deactivatedAt?.toISOString() ?? null,

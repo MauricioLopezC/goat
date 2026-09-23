@@ -104,10 +104,6 @@ export default async function ProfessionalDetailPage({
             {professional.email || "No informado"}
           </p>
           <p>
-            <span className="font-medium">Foto (URL):</span>{" "}
-            {professional.photoUrl || "No informada"}
-          </p>
-          <p>
             <span className="font-medium">Títulos:</span>{" "}
             {professional.titles.map((title) => title.name).join(", ") ||
               "No informados"}
