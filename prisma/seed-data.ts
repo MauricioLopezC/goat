@@ -7,7 +7,12 @@
 // Los emails de personas usan el dominio reservado `example.com`, para no
 // apuntar a casillas reales.
 
-import { DocumentType, Gender, Role } from "../src/generated/prisma/enums";
+import {
+  DocumentType,
+  Gender,
+  Role,
+  Weekday,
+} from "../src/generated/prisma/enums";
 
 // ───────────────────────────── Usuarios ──────────────────────────────
 
@@ -386,6 +391,107 @@ export const PROFESSIONALS: SeedProfessional[] = [
     userEmail: null,
     deactivation: { date: "2026-06-30", reason: "Se jubiló." },
   },
+];
+
+// ──────────────────────────── Agenda (HU-05) ──────────────────────────
+
+/// Consultorios. En el Inc. 1 cada profesional atiende en el suyo.
+export const ROOMS = [
+  { name: "Consultorio 1" },
+  { name: "Consultorio 2" },
+  { name: "Consultorio 3" },
+  { name: "Consultorio 4" },
+  { name: "Consultorio 5" },
+  { name: "Gimnasio de kinesiología" },
+  { name: "Box de kinesiología" },
+];
+
+export type SeedWindow = {
+  weekday: Weekday;
+  /// `HH:MM`, como en el formulario.
+  startTime: string;
+  endTime: string;
+  room: string | null;
+  /// Servicios habilitados. Vacío: todos los del profesional.
+  services: string[];
+};
+
+const { MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY } = Weekday;
+
+function weekly(
+  weekdays: Weekday[],
+  startTime: string,
+  endTime: string,
+  room: string,
+  services: string[] = [],
+): SeedWindow[] {
+  return weekdays.map((weekday) => ({
+    weekday,
+    startTime,
+    endTime,
+    room,
+    services,
+  }));
+}
+
+/// Franjas por matrícula del profesional. Lamas (inactivo) no tiene.
+export const AVAILABILITY: Record<string, SeedWindow[]> = {
+  // Ferrari: dos franjas el mismo día (lunes) y una restringida a rodilla.
+  "4521": [
+    ...weekly([MONDAY, WEDNESDAY], "09:00", "13:00", "Consultorio 1"),
+    ...weekly([MONDAY], "16:00", "20:00", "Consultorio 1"),
+    ...weekly([THURSDAY], "16:00", "19:00", "Consultorio 1", [
+      "Consulta de rodilla",
+      "Infiltración articular",
+    ]),
+  ],
+  // Arias opera los viernes: no atiende en consultorio.
+  "2873": weekly([TUESDAY, THURSDAY], "08:00", "12:00", "Consultorio 2"),
+  "5610": weekly(
+    [MONDAY, WEDNESDAY, FRIDAY],
+    "14:00",
+    "18:00",
+    "Consultorio 3",
+  ),
+  "6344": [
+    ...weekly([TUESDAY], "17:00", "21:00", "Consultorio 4"),
+    ...weekly([SATURDAY], "09:00", "12:00", "Consultorio 4"),
+  ],
+  "3312": weekly([MONDAY, THURSDAY], "09:00", "13:00", "Consultorio 5"),
+  "8120": weekly(
+    [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY],
+    "08:00",
+    "12:00",
+    "Gimnasio de kinesiología",
+  ),
+  "7985": weekly(
+    [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY],
+    "15:00",
+    "19:00",
+    "Gimnasio de kinesiología",
+  ),
+  "9054": weekly([TUESDAY, THURSDAY], "10:00", "14:00", "Box de kinesiología"),
+};
+
+/// Feriados nacionales desde el alta del seed hasta el primer trimestre de
+/// 2027, con los trasladables ya movidos (Ley 27.399). Datos de prueba: el
+/// calendario oficial lo fija cada año un decreto.
+export const HOLIDAYS = [
+  {
+    date: "2026-10-12",
+    description: "Día del Respeto a la Diversidad Cultural",
+  },
+  { date: "2026-11-23", description: "Día de la Soberanía Nacional" },
+  { date: "2026-12-08", description: "Inmaculada Concepción de María" },
+  { date: "2026-12-25", description: "Navidad" },
+  { date: "2027-01-01", description: "Año Nuevo" },
+  { date: "2027-02-08", description: "Carnaval" },
+  { date: "2027-02-09", description: "Carnaval" },
+  {
+    date: "2027-03-24",
+    description: "Día Nacional de la Memoria por la Verdad y la Justicia",
+  },
+  { date: "2027-03-26", description: "Viernes Santo" },
 ];
 
 // ────────────────────── Obras sociales y planes ──────────────────────
