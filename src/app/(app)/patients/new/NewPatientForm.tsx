@@ -188,6 +188,33 @@ export function NewPatientForm({
         if (birth < minDate) {
           clientErrors.birthDate =
             "La fecha de nacimiento no puede ser anterior a 120 años";
+        } else {
+          // Calcular edad
+          let age = today.getFullYear() - birth.getFullYear();
+          const m = today.getMonth() - birth.getMonth();
+          if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+            age--;
+          }
+          // Validar tutor si menor de 16 años
+          if (age < 16) {
+            if (!guardianName.trim()) {
+              clientErrors.guardianName =
+                "El nombre del responsable es obligatorio para menores de 16 años";
+            } else if (guardianName.trim().length > 120) {
+              clientErrors.guardianName =
+                "El nombre del responsable debe tener como máximo 120 caracteres";
+            } else if (!nameRegex.test(guardianName.trim())) {
+              clientErrors.guardianName =
+                "Solo se permiten letras, espacios, tildes y apóstrofes";
+            }
+            if (!guardianPhone.trim()) {
+              clientErrors.guardianPhone =
+                "El teléfono del responsable es obligatorio para menores de 16 años";
+            } else if (!phoneRegex.test(guardianPhone.trim())) {
+              clientErrors.guardianPhone =
+                "El teléfono del responsable debe contener únicamente números y puede comenzar con el signo + (entre 7 y 15 dígitos)";
+            }
+          }
         }
       }
     }
