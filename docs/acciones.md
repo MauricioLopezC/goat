@@ -360,6 +360,43 @@ No es una Server Action: es una lectura que el Server Component de `/services` l
 **Revalida:** no aplica.
 **Devuelve:** `{ id, name, plans: { id, name }[] }[]` de obras sociales y planes activos, ordenados alfabéticamente.
 
+### `searchPatients`
+
+**Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`
+**Entrada:** `query` (cadena de búsqueda) y el `actor`.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`. Si `query.trim().length < 3`, la operación no ejecuta la consulta a la base y retorna un listado vacío `[]`.
+**Efectos:** ninguno. Es una lectura de pacientes activos (`active: true`) con coincidencia parcial insensible a mayúsculas en `lastName` o `firstName`, o coincidencia en `documentNumber`. Incluye la afiliación (`coverage`) con su plan y obra social.
+**Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
+**Revalida:** no aplica.
+**Devuelve:** `Patient[]` con `coverage` incluida, ordenados alfabéticamente por apellido y nombre.
+
+No es una Server Action: es una lectura que el Server Component de `/patients` llama directo a la DAL (ADR 0001).
+
+### `getPatient`
+
+**Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`
+**Entrada:** `id` (identificador numérico del paciente) y el `actor`.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`.
+**Efectos:** ninguno. Es una lectura completa de la ficha del paciente, incluyendo su cobertura (`coverage`, plan y obra social) y la información de auditoría de creación y última actualización (`createdBy` y `updatedBy`).
+**Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro; `NOT_FOUND` si el paciente no existe.
+**Revalida:** no aplica.
+**Devuelve:** los datos completos del paciente para renderizar su ficha.
+
+No es una Server Action: es una lectura que el Server Component de `/patients/[id]` llama directo a la DAL (ADR 0001).
+
+### `updatePatient`
+
+**Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`
+**Entrada:** `id`, `lastName`, `firstName`, `gender`, `documentType`, `documentNumber`, `birthDate`, `phone`, `email`, `coverageType`, `insurancePlanId` (si `coverageType` es `HEALTH_INSURANCE`), `memberNumber` (si `coverageType` es `HEALTH_INSURANCE`), `guardianName` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**), `guardianPhone` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**).
+**Precondiciones:** el actor es `RECEPTIONIST` o `MANAGER`. El paciente existe. No existe otro paciente distinto con la misma combinación de `documentType` y `documentNumber`. Si `coverageType` es `HEALTH_INSURANCE`, el `insurancePlanId` existe y está activo. Si la edad calculada a partir de `birthDate` es menor de 16 años, `guardianName` y `guardianPhone` son obligatorios (validados por Zod tanto en cliente como en servidor).
+**Efectos:** actualiza los datos del `Patient`, registrando `updatedById` con el id del actor y actualizando `updatedAt`. Si `coverageType` es `HEALTH_INSURANCE`, actualiza o crea su `Coverage`. Si la cobertura pasa a `PRIVATE`, remueve la `Coverage` asociada.
+**Errores:** `VALIDATION` (campos obligatorios vacíos, formatos inválidos, menor de 16 años sin tutor), `FORBIDDEN` (profesionales u otros roles sin permiso), `NOT_FOUND` (paciente no encontrado), `DUPLICATE_PATIENT` (documento ya registrado en otro paciente).
+**Revalida:** `/patients` y `/patients/[id]`.
+**Devuelve:** `{ id, firstName, lastName, documentType, documentNumber }`.
+
 ### Nota: `signIn` y `signOut` frente a `defineAction`
 
 `defineAction` exige declarar roles, y estas dos operaciones no tienen ninguno que exigir: una corre sin sesión por definición y la otra acepta cualquiera. Ambas siguen igual el resto del flujo del [ADR 0001](adr/0001-server-actions-y-capa-de-acceso-a-datos.md) —validar con Zod, delegar en la DAL, devolver `ActionResult` ante el error— y siguen siendo endpoints POST públicos.
