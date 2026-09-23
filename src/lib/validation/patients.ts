@@ -160,7 +160,7 @@ export const createPatientSchema = z
             age--;
           }
           if (age < 16) {
-            if (!data.guardianName) {
+            if (!data.guardianName?.trim()) {
               ctx.addIssue({
                 code: "custom",
                 message:
@@ -168,7 +168,7 @@ export const createPatientSchema = z
                 path: ["guardianName"],
               });
             }
-            if (!data.guardianPhone) {
+            if (!data.guardianPhone?.trim()) {
               ctx.addIssue({
                 code: "custom",
                 message:

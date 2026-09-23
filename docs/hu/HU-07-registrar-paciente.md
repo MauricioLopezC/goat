@@ -7,13 +7,14 @@
 ## Datos
 
 - **Obligatorios:** apellido, nombre, género (lista precargada: masculino, femenino, otro), tipo de documento, número de documento, fecha de nacimiento, teléfono, email de contacto, cobertura (particular u obra social), estado (activo o inactivo).
-- **Opcionales en este incremento:** obra social, plan, número de afiliado; nombre y teléfono del responsable o tutor.
+- **Opcionales en este incremento:** obra social, plan, número de afiliado; nombre y teléfono del responsable o tutor _(excepto para pacientes menores de 16 años: en ese caso el nombre del responsable o tutor y su teléfono de contacto son **obligatorios**)_.
 - **Fuera del Inc. 1**, van a la ficha completa del Inc. 2: domicilio, contacto de emergencia, coseguro, datos ampliados de cobertura.
 
 ## Validaciones
 
 - No se permite otro paciente con el mismo tipo y número de documento: el sistema avisa del duplicado, muestra el paciente existente y ofrece abrirlo en lugar de crear uno nuevo.
-- Fecha de nacimiento no puede ser futura.
+- Fecha de nacimiento no puede ser futura ni anterior a 120 años.
+- Si el paciente es menor de 16 años, el nombre del responsable o tutor y su teléfono de contacto son **obligatorios**. Esta regla se valida tanto en el cliente (feedback inmediato) como en el servidor (protege llamadas directas a la acción).
 - Teléfono con formato válido.
 - Email con formato válido.
 - Si se elige cobertura por obra social, entonces obra social, plan y número de afiliado pasan a ser obligatorios.
@@ -44,4 +45,5 @@
 
 - El cliente ya anticipó que si el Inc. 1 es solo el alta mínima, en el Inc. 2 va a pedir la ficha completa.
 - Pacientes menores de edad: ¿hace falta registrar responsable o tutor desde el Inc. 1? En traumatología infantil puede aparecer temprano.
-  - **Cliente:** el nombre del responsable o tutor y su teléfono de contacto son campos opcionales para estos casos.
+  - **Cliente:** el nombre del responsable o tutor y su teléfono de contacto son campos opcionales para el caso general.
+  - **Decisión acordada:** si el paciente tiene menos de 16 años, ambos campos pasan a ser obligatorios. El sistema lo determina automáticamente a partir de la fecha de nacimiento y lo comunica visualmente en el formulario. La validación opera también en el servidor para proteger invocaciones directas a la acción.

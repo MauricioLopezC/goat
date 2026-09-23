@@ -168,6 +168,31 @@ export function NewPatientForm({
     }
   }
 
+  // Calcular si el paciente es menor de 16 años (para feedback visual y validación)
+  let isMinor = false;
+  if (birthDate) {
+    const birthForAge = new Date(`${birthDate}T00:00:00`);
+    if (!isNaN(birthForAge.getTime())) {
+      const nowForAge = new Date();
+      const todayForAge = new Date(
+        nowForAge.getFullYear(),
+        nowForAge.getMonth(),
+        nowForAge.getDate(),
+      );
+      if (birthForAge <= todayForAge) {
+        let computedAge = todayForAge.getFullYear() - birthForAge.getFullYear();
+        const mForAge = todayForAge.getMonth() - birthForAge.getMonth();
+        if (
+          mForAge < 0 ||
+          (mForAge === 0 && todayForAge.getDate() < birthForAge.getDate())
+        ) {
+          computedAge--;
+        }
+        isMinor = computedAge < 16;
+      }
+    }
+  }
+
   if (!birthDate) {
     clientErrors.birthDate = "La fecha de nacimiento es obligatoria";
   } else {
@@ -188,32 +213,24 @@ export function NewPatientForm({
         if (birth < minDate) {
           clientErrors.birthDate =
             "La fecha de nacimiento no puede ser anterior a 120 años";
-        } else {
-          // Calcular edad
-          let age = today.getFullYear() - birth.getFullYear();
-          const m = today.getMonth() - birth.getMonth();
-          if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-            age--;
-          }
+        } else if (isMinor) {
           // Validar tutor si menor de 16 años
-          if (age < 16) {
-            if (!guardianName.trim()) {
-              clientErrors.guardianName =
-                "El nombre del responsable es obligatorio para menores de 16 años";
-            } else if (guardianName.trim().length > 120) {
-              clientErrors.guardianName =
-                "El nombre del responsable debe tener como máximo 120 caracteres";
-            } else if (!nameRegex.test(guardianName.trim())) {
-              clientErrors.guardianName =
-                "Solo se permiten letras, espacios, tildes y apóstrofes";
-            }
-            if (!guardianPhone.trim()) {
-              clientErrors.guardianPhone =
-                "El teléfono del responsable es obligatorio para menores de 16 años";
-            } else if (!phoneRegex.test(guardianPhone.trim())) {
-              clientErrors.guardianPhone =
-                "El teléfono del responsable debe contener únicamente números y puede comenzar con el signo + (entre 7 y 15 dígitos)";
-            }
+          if (!guardianName.trim()) {
+            clientErrors.guardianName =
+              "El nombre del responsable es obligatorio para menores de 16 años";
+          } else if (guardianName.trim().length > 120) {
+            clientErrors.guardianName =
+              "El nombre del responsable debe tener como máximo 120 caracteres";
+          } else if (!nameRegex.test(guardianName.trim())) {
+            clientErrors.guardianName =
+              "Solo se permiten letras, espacios, tildes y apóstrofes";
+          }
+          if (!guardianPhone.trim()) {
+            clientErrors.guardianPhone =
+              "El teléfono del responsable es obligatorio para menores de 16 años";
+          } else if (!phoneRegex.test(guardianPhone.trim())) {
+            clientErrors.guardianPhone =
+              "El teléfono del responsable debe contener únicamente números y puede comenzar con el signo + (entre 7 y 15 dígitos)";
           }
         }
       }
@@ -988,21 +1005,26 @@ export function NewPatientForm({
 
             <Separator />
 
-            {/* SECCIÓN 4: Responsable o tutor (opcional para menores) */}
+            {/* SECCIÓN 4: Responsable o tutor */}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-label-sm font-semibold uppercase text-muted-foreground tracking-wider">
-                  Responsable o tutor (opcional)
+                  {isMinor
+                    ? "Responsable o tutor (obligatorio para menores de 16 años)"
+                    : "Responsable o tutor (opcional)"}
                 </h3>
-                <span className="text-body-sm text-muted-foreground">
-                  Para menores de edad o pacientes a cargo
-                </span>
+                {!isMinor && (
+                  <span className="text-body-sm text-muted-foreground">
+                    Para menores de edad o pacientes a cargo
+                  </span>
+                )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Nombre del tutor */}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="guardianName">
-                    Nombre del responsable o tutor
+                    Nombre del responsable o tutor{" "}
+                    {isMinor && <span className="text-destructive">*</span>}
                   </Label>
                   <Input
                     id="guardianName"
@@ -1033,7 +1055,8 @@ export function NewPatientForm({
                 {/* Teléfono del tutor */}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="guardianPhone">
-                    Teléfono del responsable
+                    Teléfono del responsable{" "}
+                    {isMinor && <span className="text-destructive">*</span>}
                   </Label>
                   <Input
                     id="guardianPhone"
