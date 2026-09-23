@@ -40,6 +40,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             >
               Servicios
             </Link>
+            <Link
+              href="/holidays"
+              className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Feriados
+            </Link>
             {actor.role === "MANAGER" && (
               <Link
                 href="/users"

@@ -9,23 +9,11 @@ import { DomainError } from "@/lib/actions";
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
 import { getProfessional } from "@/lib/dal/professionals";
 
+import { WeeklySchedule } from "@/components/weekly-schedule";
+
 import { FutureAppointmentsSection } from "./future-appointment-cancel";
 
 export const metadata: Metadata = { title: "Ficha profesional · Goat" };
-
-const weekdays = {
-  MONDAY: "Lunes",
-  TUESDAY: "Martes",
-  WEDNESDAY: "Miércoles",
-  THURSDAY: "Jueves",
-  FRIDAY: "Viernes",
-  SATURDAY: "Sábado",
-  SUNDAY: "Domingo",
-};
-
-function formatMinute(minute: number) {
-  return `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
-}
 
 export default async function ProfessionalDetailPage({
   params,
@@ -128,34 +116,22 @@ export default async function ProfessionalDetailPage({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Agenda semanal</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {professional.availabilityWindows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Este profesional todavía no tiene franjas de atención cargadas.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {professional.availabilityWindows.map((window) => (
-                <li key={window.id} className="rounded-md border p-3 text-sm">
-                  <span className="font-medium">
-                    {weekdays[window.weekday]}
-                  </span>
-                  {": "}
-                  {formatMinute(window.startMinute)}–
-                  {formatMinute(window.endMinute)}
-                  {window.room && ` · ${window.room.name}`}
-                  {window.services.length > 0 &&
-                    ` · ${window.services.map((service) => service.name).join(", ")}`}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {/* `null`: un profesional que consulta la ficha de otro (HU-05). */}
+      {professional.availabilityWindows && (
+        <Card>
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+            <CardTitle>Agenda semanal</CardTitle>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/professionals/${professional.id}/schedule`}>
+                {manager ? "Editar agenda" : "Ver agenda y ausencias"}
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <WeeklySchedule windows={professional.availabilityWindows} />
+          </CardContent>
+        </Card>
+      )}
 
       <FutureAppointmentsSection
         appointments={professional.appointments}

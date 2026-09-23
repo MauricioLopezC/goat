@@ -10,6 +10,7 @@ import {
 } from "@/generated/prisma/enums";
 import { Prisma } from "@/generated/prisma/client";
 import { assertRole, type Actor } from "@/lib/dal/auth";
+import { canViewSchedule } from "@/lib/dal/availability";
 import { STAFF_ROLES } from "@/lib/roles";
 import { getTodayDateString } from "@/lib/utils";
 
@@ -179,7 +180,13 @@ export async function getProfessional(id: number, actor: Actor) {
   });
   if (!professional)
     throw new DomainError("NOT_FOUND", "El profesional no existe.");
-  return professional;
+  // HU-05: un profesional consulta solo sus propias franjas.
+  return {
+    ...professional,
+    availabilityWindows: canViewSchedule(actor, professional.userId)
+      ? professional.availabilityWindows
+      : null,
+  };
 }
 
 export async function updateProfessional(
