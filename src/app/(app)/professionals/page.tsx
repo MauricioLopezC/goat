@@ -10,20 +10,51 @@ import {
 } from "lucide-react";
 
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
-import { listProfessionals } from "@/lib/dal/professionals";
+import { listActiveServices, listProfessionals } from "@/lib/dal/professionals";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ProfessionalFilters } from "./professional-filters";
 
 export const metadata: Metadata = {
   title: "Profesionales · Goat",
   description: "Gestión y listado de profesionales del centro.",
 };
 
-export default async function ProfessionalsPage() {
-  // HU-02: MANAGER crea; RECEPTIONIST y PROFESSIONAL tienen solo lectura.
+type SearchParams = Promise<{
+  q?: string | string[];
+  serviceId?: string | string[];
+  status?: string | string[];
+}>;
+
+function single(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : "";
+}
+
+export default async function ProfessionalsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const actor = await requirePageRole(...STAFF_ROLES);
-  const professionals = await listProfessionals(actor);
+  const params = await searchParams;
+  const query = single(params.q).trim();
+  const serviceValue = single(params.serviceId);
+  const serviceId = /^[1-9]\d*$/.test(serviceValue)
+    ? Number(serviceValue)
+    : undefined;
+  const statusValue = single(params.status);
+  const status =
+    statusValue === "active" || statusValue === "inactive"
+      ? statusValue
+      : "all";
+  const tooShort = query.length === 1;
+  const [professionals, services] = await Promise.all([
+    tooShort
+      ? Promise.resolve([])
+      : listProfessionals({ query, serviceId, status }, actor),
+    listActiveServices(actor),
+  ]);
 
   const isManager = actor.role === "MANAGER";
 
@@ -49,7 +80,18 @@ export default async function ProfessionalsPage() {
         )}
       </div>
 
-      {professionals.length === 0 ? (
+      <ProfessionalFilters
+        query={query}
+        serviceId={serviceValue || "all"}
+        status={status}
+        services={services}
+      />
+
+      {tooShort ? (
+        <p className="text-sm text-muted-foreground">
+          Ingresá al menos 2 caracteres para buscar. No se realizó la consulta.
+        </p>
+      ) : professionals.length === 0 ? (
         <Card className="rounded-xl border-dashed border-2 border-border p-12 text-center bg-card">
           <CardContent className="flex flex-col items-center justify-center gap-4 p-0">
             <div className="size-12 rounded-lg bg-primary-soft text-primary-soft-foreground flex items-center justify-center">
@@ -57,21 +99,15 @@ export default async function ProfessionalsPage() {
             </div>
             <div className="space-y-1">
               <h3 className="text-base font-semibold text-foreground">
-                No hay profesionales registrados
+                No se encontraron profesionales
               </h3>
               <p className="text-sm text-muted-foreground max-w-md">
-                Comience registrando al primer profesional del centro con su
-                matrícula y prestaciones habilitadas.
+                Probá con otros criterios o limpiá los filtros.
               </p>
             </div>
-            {isManager && (
-              <Button asChild>
-                <Link href="/professionals/new">
-                  <Plus className="size-4 mr-1.5" />
-                  Registrar profesional
-                </Link>
-              </Button>
-            )}
+            <Button asChild variant="outline">
+              <Link href="/professionals">Limpiar filtros</Link>
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -94,8 +130,8 @@ export default async function ProfessionalsPage() {
                       </Badge>
                     ) : (
                       <Badge
-                        variant="outline"
-                        className="text-muted-foreground rounded-lg text-xs font-medium gap-1"
+                        variant="destructive"
+                        className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border rounded-lg text-xs font-medium gap-1"
                       >
                         <UserX className="size-3" />
                         Inactivo
@@ -152,9 +188,21 @@ export default async function ProfessionalsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-                  <Button variant="outline" size="sm" className="text-xs">
-                    Ver ficha
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    <Link href={`/professionals/${prof.id}`}>Ver ficha</Link>
                   </Button>
+                  {isManager && (
+                    <Button asChild size="sm" className="text-xs">
+                      <Link href={`/professionals/${prof.id}/edit`}>
+                        Modificar
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
