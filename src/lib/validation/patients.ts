@@ -152,6 +152,31 @@ export const createPatientSchema = z
             message: "La fecha de nacimiento no puede ser anterior a 120 años",
             path: ["birthDate"],
           });
+        } else {
+          // Validar tutor obligatorio si el paciente es menor de 16 años
+          let age = today.getFullYear() - birth.getFullYear();
+          const m = today.getMonth() - birth.getMonth();
+          if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+            age--;
+          }
+          if (age < 16) {
+            if (!data.guardianName) {
+              ctx.addIssue({
+                code: "custom",
+                message:
+                  "El nombre del responsable es obligatorio para menores de 16 años",
+                path: ["guardianName"],
+              });
+            }
+            if (!data.guardianPhone) {
+              ctx.addIssue({
+                code: "custom",
+                message:
+                  "El teléfono del responsable es obligatorio para menores de 16 años",
+                path: ["guardianPhone"],
+              });
+            }
+          }
         }
       }
     }
