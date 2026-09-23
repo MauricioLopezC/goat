@@ -21,7 +21,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ServiceForm, type EditingService } from "./service-form";
-import { DeactivateServiceButton } from "./deactivate-button";
+import {
+  DeactivateServiceButton,
+  ActivateServiceButton,
+} from "./deactivate-button";
 
 interface SpecialtyOption {
   id: number;
@@ -254,8 +257,13 @@ export function ServicesManager({
                           <Edit2 className="size-3.5 mr-1" />
                           Editar
                         </Button>
-                        {service.active && (
+                        {service.active ? (
                           <DeactivateServiceButton
+                            serviceId={service.id}
+                            serviceName={service.name}
+                          />
+                        ) : (
+                          <ActivateServiceButton
                             serviceId={service.id}
                             serviceName={service.name}
                           />

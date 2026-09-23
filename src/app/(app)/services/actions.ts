@@ -6,6 +6,7 @@ import {
   createServiceSchema,
   updateServiceSchema,
   deactivateServiceSchema,
+  activateServiceSchema,
 } from "@/lib/validation/service";
 import { defineAction, type ActionResult } from "@/lib/actions";
 
@@ -38,6 +39,17 @@ const deactivate = defineAction({
   input: deactivateServiceSchema,
   handler: async (input, actor) => {
     const result = await dal.deactivateService(input.id, actor);
+    revalidatePath("/services");
+    revalidatePath("/professionals");
+    return result;
+  },
+});
+
+const activate = defineAction({
+  roles: ["MANAGER"],
+  input: activateServiceSchema,
+  handler: async (input, actor) => {
+    const result = await dal.activateService(input.id, actor);
     revalidatePath("/services");
     revalidatePath("/professionals");
     return result;
@@ -148,3 +160,18 @@ export async function deactivateServiceAction(
 
   return deactivate(raw);
 }
+
+/**
+ * Server Action: reactivación de un servicio previamente dado de baja.
+ */
+export async function activateServiceAction(
+  _previous: ActionResult<{ id: number; name: string; active: boolean }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: number; name: string; active: boolean }>> {
+  const raw = {
+    id: formData.get("id"),
+  };
+
+  return activate(raw);
+}
+

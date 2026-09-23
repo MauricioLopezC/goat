@@ -71,3 +71,13 @@ export const deactivateServiceSchema = z.object({
     .int()
     .positive("El identificador del servicio es inválido"),
 });
+
+/**
+ * Validador para reactivar un servicio previamente dado de baja.
+ */
+export const activateServiceSchema = z.object({
+  id: z.coerce
+    .number()
+    .int()
+    .positive("El identificador del servicio es inválido"),
+});

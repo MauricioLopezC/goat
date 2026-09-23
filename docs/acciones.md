@@ -327,6 +327,17 @@ No es una Server Action: es una lectura que el Server Component de `/services` l
 **Revalida:** `/services` y `/professionals`.
 **Devuelve:** `{ id, name, active: false }`.
 
+### `activateService`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`.
+**Precondiciones:** el actor es `MANAGER`. El servicio existe.
+**Efectos:** reactiva un servicio previamente dado de baja (`active: true`), volviendo a habilitarlo para nuevos turnos y asignación a profesionales.
+**Errores:** `FORBIDDEN` (actor no es `MANAGER`), `NOT_FOUND` (servicio inexistente).
+**Revalida:** `/services` y `/professionals`.
+**Devuelve:** `{ id, name, active: true }`.
+
 
 
 ### Nota: `signIn` y `signOut` frente a `defineAction`

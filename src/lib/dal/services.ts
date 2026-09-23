@@ -242,3 +242,34 @@ export async function deactivateService(id: number, actor: Actor) {
     },
   });
 }
+
+/**
+ * Reactiva un servicio previamente dado de baja (HU-06).
+ */
+export async function activateService(id: number, actor: Actor) {
+  assertRole(actor, Role.MANAGER);
+
+  const service = await prisma.service.findUnique({
+    where: { id },
+    select: { id: true, name: true, active: true },
+  });
+
+  if (!service) {
+    throw new DomainError("NOT_FOUND", "El servicio seleccionado no existe.");
+  }
+
+  if (service.active) {
+    return { id: service.id, name: service.name, active: true };
+  }
+
+  return prisma.service.update({
+    where: { id },
+    data: { active: true },
+    select: {
+      id: true,
+      name: true,
+      active: true,
+    },
+  });
+}
+
