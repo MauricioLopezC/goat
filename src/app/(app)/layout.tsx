@@ -34,6 +34,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             >
               Profesionales
             </Link>
+            <Link
+              href="/services"
+              className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Servicios
+            </Link>
             {actor.role === "MANAGER" && (
               <Link
                 href="/users"

@@ -115,6 +115,7 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `DUPLICATE_PATIENT` | Ya existe un paciente con ese tipo y número de documento. Incluye metadatos en `meta` (id, nombre, etc.) para que la UI pueda ofrecer abrir el paciente existente. |
 | `INVALID_CREDENTIALS` | El ingreso falló. Cubre email inexistente, contraseña incorrecta y usuario inactivo: los tres devuelven lo mismo, a propósito (HU-01). |
 | `EMAIL_TAKEN` | Ya existe un usuario con ese email. |
+| `UNMET_DEPENDENCY` | La operación no puede completarse porque existen registros dependientes (por ejemplo, dar de baja un servicio con turnos futuros programados). |
 
 Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
 
@@ -269,6 +270,74 @@ No es una Server Action: es una lectura que el Server Component de `/professiona
 **Efectos:** ninguno. Es una lectura del catálogo de servicios activos.
 **Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
 **Revalida:** no aplica.
+### `listServices`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
+**Entrada:** el `actor`. No recibe parámetros de la interfaz.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`.
+**Efectos:** ninguno. Es una lectura de todos los servicios (activos e inactivos) del centro.
+**Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, name, description, durationMinutes, requiresReferral, active, specialty: { id, name } | null }[]`, ordenado por estado activo primero y nombre alfabético.
+
+No es una Server Action: es una lectura que el Server Component de `/services` llama directo a la DAL (ADR 0001).
+
+### `listActiveSpecialties`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
+**Entrada:** el `actor`. No recibe parámetros de la interfaz.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`.
+**Efectos:** ninguno. Es una lectura de las áreas/especialidades activas para el formulario.
+**Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, name }[]`, ordenado alfabéticamente por nombre.
+
+### `createService`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`
+**Entrada:** `name`, `durationMinutes` (por defecto 30 en Inc. 1), `requiresReferral` (booleano), `description?`, `specialtyId?`.
+**Precondiciones:** el actor es `MANAGER`. No existe otro `Service` con el mismo `name`. Si se envía `specialtyId`, debe corresponder a una `Specialty` activa.
+**Efectos:** crea un `Service` con `active: true`.
+**Errores:** `VALIDATION` (nombre vacío o duración inválida), `FORBIDDEN` (actor no es `MANAGER`), `DUPLICATE` (ya existe un servicio con ese nombre; incluye `fieldErrors`), `NOT_FOUND` (la especialidad indicada no existe o no está activa).
+**Revalida:** `/services` y `/professionals`.
+**Devuelve:** `{ id, name, durationMinutes, requiresReferral }`.
+
+### `updateService`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`, `name`, `durationMinutes`, `requiresReferral`, `description?`, `specialtyId?`.
+**Precondiciones:** el actor es `MANAGER`. El servicio existe. No existe otro servicio con ese `name` (distinto id). Si se envía `specialtyId`, debe existir.
+**Efectos:** actualiza los datos del `Service`.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `DUPLICATE`.
+**Revalida:** `/services` y `/professionals`.
+**Devuelve:** `{ id, name, durationMinutes, requiresReferral }`.
+
+### `deactivateService`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`.
+**Precondiciones:** el actor es `MANAGER`. El servicio existe y está activo. No existen turnos futuros (`Appointment`) en estado `SCHEDULED` con fecha `startsAt >= now()` para este servicio.
+**Efectos:** realiza la baja lógica del servicio (`active: false`). No elimina el registro para preservar el historial.
+**Errores:** `FORBIDDEN` (actor no es `MANAGER`), `NOT_FOUND` (servicio inexistente), `UNMET_DEPENDENCY` (existen turnos futuros programados).
+**Revalida:** `/services` y `/professionals`.
+**Devuelve:** `{ id, name, active: false }`.
+
+### `activateService`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`.
+**Precondiciones:** el actor es `MANAGER`. El servicio existe.
+**Efectos:** reactiva un servicio previamente dado de baja (`active: true`), volviendo a habilitarlo para nuevos turnos y asignación a profesionales.
+**Errores:** `FORBIDDEN` (actor no es `MANAGER`), `NOT_FOUND` (servicio inexistente).
+**Revalida:** `/services` y `/professionals`.
+**Devuelve:** `{ id, name, active: true }`.
+
 ### `createPatient`
 
 **Historia de usuario:** [HU-07 — Registrar un paciente nuevo](hu/HU-07-registrar-paciente.md)

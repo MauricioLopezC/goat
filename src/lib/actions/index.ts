@@ -19,6 +19,7 @@ export type ErrorCode =
   | "OUTSIDE_AVAILABILITY_WINDOW"
   | "INVALID_STATUS_TRANSITION"
   | "REASON_REQUIRED"
+  | "UNMET_DEPENDENCY"
   | "DUPLICATE_PATIENT";
 
 export type ActionError = {
