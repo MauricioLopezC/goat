@@ -199,7 +199,7 @@ Una ficha por operación implementada o acordada. Se agregan a medida que se tra
 **Precondiciones:** profesional existente; documento y matrícula únicos; títulos y servicios activos; ningún servicio retirado tiene turnos futuros `SCHEDULED`.
 **Efectos:** actualiza ficha y asociaciones; registra autor, fecha y motivo en `ProfessionalEvent` dentro de la misma transacción.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `DUPLICATE`, `FUTURE_APPOINTMENTS` (lista turnos afectados).
-**Revalida:** `/professionals` y `/professionals/[id]`.
+**Revalida:** `/professionals`, `/professionals/[id]` y `/professionals/[id]/edit`.
 **Devuelve:** `{ id, firstName, lastName }`.
 
 ### `deactivateProfessional`
@@ -210,7 +210,7 @@ Una ficha por operación implementada o acordada. Se agregan a medida que se tra
 **Precondiciones:** profesional activo y sin turnos futuros `SCHEDULED`.
 **Efectos:** baja lógica y evento de auditoría en una transacción; conserva turnos y agenda histórica.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION`, `FUTURE_APPOINTMENTS` (indica cantidad).
-**Revalida:** `/professionals` y `/professionals/[id]`.
+**Revalida:** `/professionals`, `/professionals/[id]` y `/professionals/[id]/edit`.
 **Devuelve:** `{ id, active: false }`.
 
 ### `reactivateProfessional`
@@ -221,7 +221,7 @@ Una ficha por operación implementada o acordada. Se agregan a medida que se tra
 **Precondiciones:** profesional inactivo.
 **Efectos:** activa al profesional, limpia la baja vigente y registra evento sin borrar el historial.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION`.
-**Revalida:** `/professionals` y `/professionals/[id]`.
+**Revalida:** `/professionals`, `/professionals/[id]` y `/professionals/[id]/edit`.
 **Devuelve:** `{ id, active: true }`.
 
 ### `cancelProfessionalAppointment`
@@ -232,7 +232,7 @@ Una ficha por operación implementada o acordada. Se agregan a medida que se tra
 **Precondiciones:** el turno pertenece al profesional de la ficha, está `SCHEDULED` y comienza en el futuro.
 **Efectos:** pasa a `CANCELLED` y crea `AppointmentEvent` con autor, fecha, motivo y solicitante, en una transacción.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION`.
-**Revalida:** `/professionals/[id]`.
+**Revalida:** `/professionals/[id]` y `/professionals/[id]/edit`.
 **Devuelve:** `{ id }`.
 
 ### `signIn`

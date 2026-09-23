@@ -194,10 +194,15 @@ export default async function ProfessionalsPage({
                     size="sm"
                     className="text-xs"
                   >
-                    <Link href={`/professionals/${prof.id}`}>
-                      {isManager ? "Modificar" : "Ver ficha"}
-                    </Link>
+                    <Link href={`/professionals/${prof.id}`}>Ver ficha</Link>
                   </Button>
+                  {isManager && (
+                    <Button asChild size="sm" className="text-xs">
+                      <Link href={`/professionals/${prof.id}/edit`}>
+                        Modificar
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

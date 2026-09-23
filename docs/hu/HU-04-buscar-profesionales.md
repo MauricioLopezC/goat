@@ -19,6 +19,7 @@
 - Filtros por servicio y por estado (activo, inactivo, todos).
 - Por defecto muestra solo activos, ordenados por apellido.
 - Sin resultados: mensaje claro y opción de limpiar filtros.
+- El listado ofrece **Ver ficha** para consultar los datos y las franjas semanales; la edición se inicia con una acción separada, disponible para el gerente.
 
 ## Permisos
 

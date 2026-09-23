@@ -20,6 +20,7 @@
 ## Comportamiento
 
 - La baja es lógica: el profesional pasa a inactivo y deja de aparecer al dar turnos nuevos.
+- Desde el listado, la acción **Modificar** abre una pantalla separada de la ficha de consulta. Allí el gerente puede editar los datos, dar de baja o reactivar al profesional.
 - Sus turnos pasados y su agenda histórica siguen siendo consultables.
 - Un profesional inactivo puede reactivarse.
 - Queda registrado quién modificó o dio de baja, cuándo y con qué motivo.

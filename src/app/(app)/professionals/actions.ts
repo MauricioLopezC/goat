@@ -97,6 +97,7 @@ const update = defineAction({
     const result = await dal.updateProfessional(input, actor);
     revalidatePath("/professionals");
     revalidatePath(`/professionals/${input.id}`);
+    revalidatePath(`/professionals/${input.id}/edit`);
     return result;
   },
 });
@@ -108,6 +109,7 @@ const deactivate = defineAction({
     const result = await dal.deactivateProfessional(input, actor);
     revalidatePath("/professionals");
     revalidatePath(`/professionals/${input.id}`);
+    revalidatePath(`/professionals/${input.id}/edit`);
     return result;
   },
 });
@@ -119,6 +121,7 @@ const reactivate = defineAction({
     const result = await dal.reactivateProfessional(input, actor);
     revalidatePath("/professionals");
     revalidatePath(`/professionals/${input.id}`);
+    revalidatePath(`/professionals/${input.id}/edit`);
     return result;
   },
 });
@@ -187,6 +190,7 @@ const cancel = defineAction({
   handler: async (input, actor) => {
     const result = await cancelAppointmentInDal(input, actor);
     revalidatePath(`/professionals/${input.professionalId}`);
+    revalidatePath(`/professionals/${input.professionalId}/edit`);
     return result;
   },
 });

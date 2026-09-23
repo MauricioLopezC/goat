@@ -7,14 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DomainError } from "@/lib/actions";
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
-import {
-  getProfessional,
-  listActiveProfessionalTitles,
-  listActiveServices,
-} from "@/lib/dal/professionals";
+import { getProfessional } from "@/lib/dal/professionals";
 
 import { FutureAppointmentCancel } from "./future-appointment-cancel";
-import { ProfessionalEditor } from "./professional-editor";
 
 export const metadata: Metadata = { title: "Ficha profesional · Goat" };
 
@@ -49,12 +44,6 @@ export default async function ProfessionalDetailPage({
   }
 
   const manager = actor.role === "MANAGER";
-  const [titles, services] = manager
-    ? await Promise.all([
-        listActiveProfessionalTitles(actor),
-        listActiveServices(actor),
-      ])
-    : [[], []];
 
   return (
     <div className="flex max-w-5xl flex-col gap-6">
@@ -68,9 +57,18 @@ export default async function ProfessionalDetailPage({
             {professional.documentNumber}
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/professionals">Volver al listado</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {manager && (
+            <Button asChild>
+              <Link href={`/professionals/${professional.id}/edit`}>
+                Modificar
+              </Link>
+            </Button>
+          )}
+          <Button asChild variant="outline">
+            <Link href="/professionals">Volver al listado</Link>
+          </Button>
+        </div>
       </div>
 
       <Badge
@@ -162,29 +160,6 @@ export default async function ProfessionalDetailPage({
           )}
         </CardContent>
       </Card>
-
-      {manager && (
-        <ProfessionalEditor
-          professional={{
-            id: professional.id,
-            firstName: professional.firstName,
-            lastName: professional.lastName,
-            documentType: professional.documentType,
-            documentNumber: professional.documentNumber,
-            licenseNumber: professional.licenseNumber,
-            phone: professional.phone,
-            email: professional.email,
-            photoUrl: professional.photoUrl,
-            notes: professional.notes,
-            active: professional.active,
-            deactivatedAt: professional.deactivatedAt?.toISOString() ?? null,
-            titles: professional.titles,
-            services: professional.services,
-          }}
-          titles={titles}
-          services={services}
-        />
-      )}
 
       <Card id="future-appointments">
         <CardHeader>
