@@ -89,6 +89,7 @@ type ActionError = {
   code: ErrorCode
   message: string                          // en español, apto para mostrar
   fieldErrors?: Record<string, string[]>   // solo para VALIDATION
+  meta?: Record<string, unknown>           // metadatos del error (ej. recurso duplicado)
 }
 ```
 
@@ -111,9 +112,11 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `INVALID_STATUS_TRANSITION` | El cambio de `AppointmentStatus` no está permitido (ver `glossary.md`). |
 | `REASON_REQUIRED` | Falta el motivo en una operación trazable (por ejemplo, cancelar). |
 | `DUPLICATE` | El recurso que se intenta crear ya existe (por ejemplo, matrícula o documento duplicado). Incluye `fieldErrors` con los campos afectados. |
+| `DUPLICATE_PATIENT` | Ya existe un paciente con ese tipo y número de documento. Incluye metadatos en `meta` (id, nombre, etc.) para que la UI pueda ofrecer abrir el paciente existente. |
 | `INVALID_CREDENTIALS` | El ingreso falló. Cubre email inexistente, contraseña incorrecta y usuario inactivo: los tres devuelven lo mismo, a propósito (HU-01). |
 | `EMAIL_TAKEN` | Ya existe un usuario con ese email. |
 | `FUTURE_APPOINTMENTS` | Turnos programados que todavía no comenzaron impiden quitar un servicio o dar de baja al profesional. El mensaje enumera los turnos afectados al quitar servicios y da el total en la baja. |
+| `UNMET_DEPENDENCY` | La operación no puede completarse porque existen registros dependientes (por ejemplo, dar de baja un servicio con turnos futuros programados). |
 
 Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
 
@@ -122,7 +125,7 @@ Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
 Los schemas importan `z` de `@/lib/validation/zod`, nunca de `"zod"` (una regla de ESLint lo impide). Ese módulo configura los mensajes por defecto en español y en un tono neutro apto para mostrar (`Este campo es obligatorio`, `Debe tener al menos 3 caracteres`, `Correo electrónico inválido`).
 
 - Los mensajes genéricos cubren campo vacío, largo, rango, opción inválida y formatos comunes. Un `regex` devuelve solo `Formato inválido`.
-- Cuando el campo necesita un mensaje propio, se pasa en el schema: `z.string().regex(/^\d{7,8}$/, "El DNI debe tener 7 u 8 dígitos")`.
+- Cuando el campo necesita un mensaje propio, se pasa en el schema: `z.string().regex(/^\d{8}$/, "El DNI debe tener 8 dígitos")`.
 - `fieldErrors` de `ActionError` sale de `z.flattenError(error).fieldErrors`, ya en español.
 
 ## Reglas que toda ficha debe reflejar
@@ -323,8 +326,95 @@ No es una Server Action: es una lectura que el Server Component de `/professiona
 **Efectos:** ninguno. Es una lectura del catálogo de servicios activos.
 **Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
 **Revalida:** no aplica.
-**Devuelve:** `{ id, name, durationMinutes }[]`, ordenado alfabéticamente por nombre.
+### `listServices`
 
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
+**Entrada:** el `actor`. No recibe parámetros de la interfaz.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`.
+**Efectos:** ninguno. Es una lectura de todos los servicios (activos e inactivos) del centro.
+**Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, name, description, durationMinutes, requiresReferral, active, specialty: { id, name } | null }[]`, ordenado por estado activo primero y nombre alfabético.
+
+No es una Server Action: es una lectura que el Server Component de `/services` llama directo a la DAL (ADR 0001).
+
+### `listActiveSpecialties`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
+**Entrada:** el `actor`. No recibe parámetros de la interfaz.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`.
+**Efectos:** ninguno. Es una lectura de las áreas/especialidades activas para el formulario.
+**Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, name }[]`, ordenado alfabéticamente por nombre.
+
+### `createService`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`
+**Entrada:** `name`, `durationMinutes` (por defecto 30 en Inc. 1), `requiresReferral` (booleano), `description?`, `specialtyId?`.
+**Precondiciones:** el actor es `MANAGER`. No existe otro `Service` con el mismo `name`. Si se envía `specialtyId`, debe corresponder a una `Specialty` activa.
+**Efectos:** crea un `Service` con `active: true`.
+**Errores:** `VALIDATION` (nombre vacío o duración inválida), `FORBIDDEN` (actor no es `MANAGER`), `DUPLICATE` (ya existe un servicio con ese nombre; incluye `fieldErrors`), `NOT_FOUND` (la especialidad indicada no existe o no está activa).
+**Revalida:** `/services` y `/professionals`.
+**Devuelve:** `{ id, name, durationMinutes, requiresReferral }`.
+
+### `updateService`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`, `name`, `durationMinutes`, `requiresReferral`, `description?`, `specialtyId?`.
+**Precondiciones:** el actor es `MANAGER`. El servicio existe. No existe otro servicio con ese `name` (distinto id). Si se envía `specialtyId`, debe existir.
+**Efectos:** actualiza los datos del `Service`.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `DUPLICATE`.
+**Revalida:** `/services` y `/professionals`.
+**Devuelve:** `{ id, name, durationMinutes, requiresReferral }`.
+
+### `deactivateService`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`.
+**Precondiciones:** el actor es `MANAGER`. El servicio existe y está activo. No existen turnos futuros (`Appointment`) en estado `SCHEDULED` con fecha `startsAt >= now()` para este servicio.
+**Efectos:** realiza la baja lógica del servicio (`active: false`). No elimina el registro para preservar el historial.
+**Errores:** `FORBIDDEN` (actor no es `MANAGER`), `NOT_FOUND` (servicio inexistente), `UNMET_DEPENDENCY` (existen turnos futuros programados).
+**Revalida:** `/services` y `/professionals`.
+**Devuelve:** `{ id, name, active: false }`.
+
+### `activateService`
+
+**Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`.
+**Precondiciones:** el actor es `MANAGER`. El servicio existe.
+**Efectos:** reactiva un servicio previamente dado de baja (`active: true`), volviendo a habilitarlo para nuevos turnos y asignación a profesionales.
+**Errores:** `FORBIDDEN` (actor no es `MANAGER`), `NOT_FOUND` (servicio inexistente).
+**Revalida:** `/services` y `/professionals`.
+**Devuelve:** `{ id, name, active: true }`.
+
+### `createPatient`
+
+**Historia de usuario:** [HU-07 — Registrar un paciente nuevo](hu/HU-07-registrar-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`
+**Entrada:** `lastName`, `firstName`, `gender`, `documentType`, `documentNumber`, `birthDate`, `phone`, `email`, `coverageType`, `insurancePlanId` (si `coverageType` es `HEALTH_INSURANCE`), `memberNumber` (si `coverageType` es `HEALTH_INSURANCE`), `guardianName` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**), `guardianPhone` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**).
+**Precondiciones:** no existe otro paciente con la misma combinación de `documentType` y `documentNumber`. Si `coverageType` es `HEALTH_INSURANCE`, el `insurancePlanId` existe y está activo. Si la edad calculada a partir de `birthDate` es menor de 16 años, `guardianName` y `guardianPhone` deben estar presentes y no vacíos; esta regla se valida en el schema Zod (`createPatientSchema`) y no se puede omitir invocando la acción directamente.
+**Efectos:** crea un `Patient` con `active: true` y `createdById`. Si `coverageType` es `HEALTH_INSURANCE`, crea además su `Coverage` asociada.
+**Errores:** `VALIDATION` (campo obligatorio vacío, formato inválido, tutor ausente para menor de 16 años), `FORBIDDEN`, `DUPLICATE_PATIENT`.
+**Revalida:** `/patients`.
+**Devuelve:** `{ id, firstName, lastName, documentType, documentNumber }`.
+
+### `listHealthInsurers`
+
+**Historia de usuario:** [HU-07 — Registrar un paciente nuevo](hu/HU-07-registrar-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`
+**Entrada:** ninguna (recibe el `actor` para verificación de permisos).
+**Precondiciones:** ninguna.
+**Efectos:** ninguno. Es una lectura para poblar los selectores de cobertura y plan.
+**Errores:** `FORBIDDEN` si el actor no pertenece a los roles habilitados.
+**Revalida:** no aplica.
+**Devuelve:** `{ id, name, plans: { id, name }[] }[]` de obras sociales y planes activos, ordenados alfabéticamente.
 
 ### Nota: `signIn` y `signOut` frente a `defineAction`
 
