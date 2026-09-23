@@ -4,70 +4,281 @@ import "dotenv/config";
 import { hash } from "@node-rs/argon2";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { Role } from "../src/generated/prisma/enums";
+import { ProfessionalEventType } from "../src/generated/prisma/enums";
+import { createPatientSchema } from "../src/lib/validation/patients";
+import { createProfessionalSchema } from "../src/lib/validation/professional";
+import { createServiceSchema } from "../src/lib/validation/service";
+import {
+  HEALTH_INSURERS,
+  MANAGER_EMAIL,
+  PATIENTS,
+  PROFESSIONALS,
+  SEED_USERS,
+  SERVICES,
+  SPECIALTIES,
+  TITLES,
+} from "./seed-data";
 
-// Datos mínimos para poder entrar al sistema (HU-01) y probar profesionales (HU-02).
+// Datos de prueba para lo que ya está implementado: usuarios (HU-01),
+// profesionales (HU-02), catálogo de servicios (HU-06) y pacientes (HU-07).
+// Los datos están en `seed-data.ts`.
 //
-// Existe por un problema de arranque: solo un `MANAGER` crea usuarios, y una
-// base recién migrada no tiene ninguno. El seed crea ese primer gerente.
+// Existe, además, por un problema de arranque: solo un `MANAGER` crea
+// usuarios, y una base recién migrada no tiene ninguno.
 //
-// Los otros dos usuarios son comodidad de desarrollo, para probar que cada rol
-// aterriza en su pantalla mientras `createUser` no tenga interfaz. En un centro
-// real los daría de alta el gerente.
+// Es idempotente: cada registro se hace `upsert` por su clave natural, y al
+// volver a correrlo los registros del seed vuelven a sus valores sembrados. Lo
+// que se cargó desde la UI no se toca.
 //
-// Es idempotente: se puede correr las veces que haga falta.
+// Franjas, feriados y turnos no se siembran hasta que existan HU-05 y HU-09.
 
 // Mismos parámetros que `src/lib/password.ts`, que no se puede importar acá
 // porque es `server-only`. Quedan escritos dentro del hash, así que aunque se
 // desincronizaran, `verify` los lee del hash y las contraseñas siguen andando.
 const ARGON2 = { memoryCost: 19456, timeCost: 2, parallelism: 1 } as const;
 
-const USERS = [
-  {
-    email: "gerente@goat.local",
-    firstName: "Laura",
-    lastName: "Gómez",
-    role: Role.MANAGER,
-  },
-  {
-    email: "mesa@goat.local",
-    firstName: "Marcos",
-    lastName: "Díaz",
-    role: Role.RECEPTIONIST,
-  },
-  {
-    email: "profesional@goat.local",
-    firstName: "Julia",
-    lastName: "Ferrari",
-    role: Role.PROFESSIONAL,
-  },
-];
+type Ids = Map<string, number>;
 
-const TITLES = [
-  { name: "Médico Traumatólogo" },
-  { name: "Licenciado en Kinesiología y Fisiatría" },
-  { name: "Médico Cirujano Ortopédico" },
-];
+function idOf(ids: Ids, key: string, kind: string): number {
+  const id = ids.get(key);
+  if (id === undefined) {
+    throw new Error(`seed-data.ts: ${kind} "${key}" no existe en el seed.`);
+  }
+  return id;
+}
 
-const SPECIALTIES = [
-  { name: "Columna" },
-  { name: "Rodilla" },
-  { name: "Hombro y codo" },
-  { name: "Mano y muñeca" },
-  { name: "Cadera" },
-  { name: "Tobillo y pie" },
-  { name: "Traumatología infantil" },
-  { name: "Traumatología deportiva" },
-  { name: "Kinesiología y rehabilitación" },
-];
+async function seedUsers(prisma: PrismaClient, password: string) {
+  const passwordHash = await hash(password, ARGON2);
+  const ids: Ids = new Map();
 
-const SERVICES = [
-  { name: "Consulta traumatológica general", durationMinutes: 30 },
-  { name: "Control post-quirúrgico", durationMinutes: 30 },
-  { name: "Sesión de kinesiología motora", durationMinutes: 30 },
-  { name: "Rehabilitación deportiva", durationMinutes: 30 },
-  { name: "Curación y retiro de puntos", durationMinutes: 30 },
-];
+  for (const user of SEED_USERS) {
+    // `update` deja la contraseña en un valor conocido si alguien la cambió
+    // probando, que es justamente para lo que sirve este seed.
+    const { id } = await prisma.user.upsert({
+      where: { email: user.email },
+      create: { ...user, passwordHash },
+      update: { ...user, passwordHash },
+      select: { id: true },
+    });
+    ids.set(user.email, id);
+    const note = user.active ? "" : "  (inactivo)";
+    console.log(`  ${user.role.padEnd(12)}  ${user.email}${note}`);
+  }
+
+  return ids;
+}
+
+async function seedCatalog(prisma: PrismaClient) {
+  const titleIds: Ids = new Map();
+  for (const t of TITLES) {
+    const { id } = await prisma.professionalTitle.upsert({
+      where: { name: t.name },
+      create: t,
+      update: t,
+      select: { id: true },
+    });
+    titleIds.set(t.name, id);
+  }
+
+  const specialtyIds: Ids = new Map();
+  for (const s of SPECIALTIES) {
+    const { id } = await prisma.specialty.upsert({
+      where: { name: s.name },
+      create: s,
+      update: s,
+      select: { id: true },
+    });
+    specialtyIds.set(s.name, id);
+  }
+
+  const serviceIds: Ids = new Map();
+  for (const { specialty, active, ...fields } of SERVICES) {
+    const specialtyId = specialty
+      ? idOf(specialtyIds, specialty, "Especialidad")
+      : null;
+    const input = createServiceSchema.parse({ ...fields, specialtyId });
+    const data = { ...input, active };
+
+    const { id } = await prisma.service.upsert({
+      where: { name: input.name },
+      create: data,
+      update: data,
+      select: { id: true },
+    });
+    serviceIds.set(input.name, id);
+  }
+
+  return { titleIds, serviceIds };
+}
+
+async function seedProfessionals(
+  prisma: PrismaClient,
+  userIds: Ids,
+  titleIds: Ids,
+  serviceIds: Ids,
+) {
+  const managerId = idOf(userIds, MANAGER_EMAIL, "Usuario");
+
+  for (const p of PROFESSIONALS) {
+    const input = createProfessionalSchema.parse({
+      ...p,
+      titleIds: p.titles.map((t) => idOf(titleIds, t, "Título")),
+      serviceIds: p.services.map((s) => idOf(serviceIds, s, "Servicio")),
+    });
+
+    const data = {
+      lastName: input.lastName,
+      firstName: input.firstName,
+      documentType: input.documentType,
+      documentNumber: input.documentNumber,
+      licenseNumber: input.licenseNumber,
+      phone: input.phone,
+      email: input.email,
+      notes: input.notes,
+      userId: p.userEmail ? idOf(userIds, p.userEmail, "Usuario") : null,
+      active: p.deactivation === null,
+      // Igual que `deactivateProfessional`: la fecha de baja a las 12:00 UTC.
+      deactivatedAt: p.deactivation
+        ? new Date(`${p.deactivation.date}T12:00:00.000Z`)
+        : null,
+      deactivationReason: p.deactivation?.reason ?? null,
+      deactivatedById: p.deactivation ? managerId : null,
+      updatedById: p.deactivation ? managerId : null,
+      createdById: managerId,
+    };
+    const titles = input.titleIds.map((id) => ({ id }));
+    const services = input.serviceIds.map((id) => ({ id }));
+
+    const { id: professionalId } = await prisma.professional.upsert({
+      where: { licenseNumber: input.licenseNumber },
+      create: {
+        ...data,
+        titles: { connect: titles },
+        services: { connect: services },
+      },
+      update: { ...data, titles: { set: titles }, services: { set: services } },
+      select: { id: true },
+    });
+
+    // La baja deja traza en el historial (HU-03). Una sola vez: el historial
+    // es inmutable y el seed se puede correr muchas veces.
+    if (p.deactivation) {
+      const logged = await prisma.professionalEvent.count({
+        where: { professionalId, type: ProfessionalEventType.DEACTIVATED },
+      });
+      if (!logged) {
+        await prisma.professionalEvent.create({
+          data: {
+            professionalId,
+            type: ProfessionalEventType.DEACTIVATED,
+            reason: p.deactivation.reason,
+            changes: { deactivatedAt: p.deactivation.date },
+            userId: managerId,
+            createdAt: data.deactivatedAt ?? undefined,
+          },
+        });
+      }
+    }
+  }
+}
+
+async function seedHealthInsurers(prisma: PrismaClient) {
+  // Clave "Obra social|Plan".
+  const plans = new Map<string, { id: number; healthInsurerId: number }>();
+
+  for (const { plans: insurerPlans, ...insurer } of HEALTH_INSURERS) {
+    const { id: healthInsurerId } = await prisma.healthInsurer.upsert({
+      where: { name: insurer.name },
+      create: insurer,
+      update: insurer,
+      select: { id: true },
+    });
+
+    for (const plan of insurerPlans) {
+      const { id } = await prisma.insurancePlan.upsert({
+        where: { healthInsurerId_name: { healthInsurerId, name: plan.name } },
+        create: { ...plan, healthInsurerId },
+        update: plan,
+        select: { id: true },
+      });
+      plans.set(`${insurer.name}|${plan.name}`, { id, healthInsurerId });
+    }
+  }
+
+  return plans;
+}
+
+async function seedPatients(
+  prisma: PrismaClient,
+  userIds: Ids,
+  plans: Awaited<ReturnType<typeof seedHealthInsurers>>,
+) {
+  for (const p of PATIENTS) {
+    const key = p.coverage && `${p.coverage.insurer}|${p.coverage.plan}`;
+    const plan = key ? plans.get(key) : undefined;
+    if (key && !plan) {
+      throw new Error(`seed-data.ts: Plan "${key}" no existe en el seed.`);
+    }
+    const insurancePlanId = plan?.id;
+
+    // Mismo schema que el alta desde la UI: si un dato del seed deja de ser
+    // válido (ej. un menor sin tutor), el seed falla en vez de sembrarlo.
+    const input = createPatientSchema.parse({
+      ...p,
+      coverageType: p.coverage ? "HEALTH_INSURANCE" : "PRIVATE",
+      healthInsurerId: plan?.healthInsurerId,
+      insurancePlanId,
+      memberNumber: p.coverage?.memberNumber,
+      guardianName: p.guardian?.name,
+      guardianPhone: p.guardian?.phone,
+    });
+
+    const data = {
+      lastName: input.lastName,
+      firstName: input.firstName,
+      gender: input.gender,
+      documentType: input.documentType,
+      documentNumber: input.documentNumber,
+      // Igual que `createPatient`: la fecha se guarda a medianoche UTC.
+      birthDate: new Date(`${input.birthDate}T00:00:00.000Z`),
+      phone: input.phone,
+      email: input.email,
+      coverageType: input.coverageType,
+      guardianName: input.guardianName ?? null,
+      guardianPhone: input.guardianPhone ?? null,
+      active: true,
+      createdById: idOf(userIds, p.createdBy, "Usuario"),
+    };
+
+    const { id: patientId } = await prisma.patient.upsert({
+      where: {
+        documentType_documentNumber: {
+          documentType: input.documentType,
+          documentNumber: input.documentNumber,
+        },
+      },
+      create: data,
+      update: data,
+      select: { id: true },
+    });
+
+    if (insurancePlanId && input.memberNumber) {
+      // Coseguro en 0, igual que el alta desde la UI.
+      const coverage = {
+        insurancePlanId,
+        memberNumber: input.memberNumber,
+        copayAmount: 0,
+      };
+      await prisma.coverage.upsert({
+        where: { patientId },
+        create: { ...coverage, patientId },
+        update: coverage,
+      });
+    } else {
+      await prisma.coverage.deleteMany({ where: { patientId } });
+    }
+  }
+}
 
 async function main() {
   if (process.env.NODE_ENV === "production") {
@@ -88,55 +299,25 @@ async function main() {
   try {
     console.log("🌱 Sembrando datos...");
 
-    // 1. Usuarios del sistema
-    const passwordHash = await hash(password, ARGON2);
+    const userIds = await seedUsers(prisma, password);
 
-    for (const user of USERS) {
-      // `update` deja la contraseña en un valor conocido si alguien la cambió
-      // probando, que es justamente para lo que sirve este seed.
-      await prisma.user.upsert({
-        where: { email: user.email },
-        create: { ...user, passwordHash, active: true },
-        update: { ...user, passwordHash, active: true },
-      });
-      console.log(`  ${user.role.padEnd(12)}  ${user.email}`);
-    }
+    const { titleIds, serviceIds } = await seedCatalog(prisma);
+    console.log(
+      `✓ ${TITLES.length} títulos, ${SPECIALTIES.length} especialidades y ${SERVICES.length} servicios`,
+    );
 
-    // 2. Títulos profesionales
-    for (const t of TITLES) {
-      await prisma.professionalTitle.upsert({
-        where: { name: t.name },
-        update: {},
-        create: { name: t.name, active: true },
-      });
-    }
-    console.log("✓ Títulos profesionales listos");
+    await seedProfessionals(prisma, userIds, titleIds, serviceIds);
+    console.log(`✓ ${PROFESSIONALS.length} profesionales`);
 
-    // 3. Especialidades / Áreas clínicas (HU-06)
-    for (const spec of SPECIALTIES) {
-      await prisma.specialty.upsert({
-        where: { name: spec.name },
-        update: {},
-        create: { name: spec.name, active: true },
-      });
-    }
-    console.log("✓ Especialidades / Áreas clínicas listas");
+    const plans = await seedHealthInsurers(prisma);
+    console.log(
+      `✓ ${HEALTH_INSURERS.length} obras sociales y ${plans.size} planes`,
+    );
 
-    // 4. Catálogo de servicios
-    for (const s of SERVICES) {
-      await prisma.service.upsert({
-        where: { name: s.name },
-        update: {},
-        create: {
-          name: s.name,
-          durationMinutes: s.durationMinutes,
-          active: true,
-        },
-      });
-    }
-    console.log("✓ Catálogo de servicios listo");
+    await seedPatients(prisma, userIds, plans);
+    console.log(`✓ ${PATIENTS.length} pacientes`);
 
-    console.log(`\nContraseña de los tres usuarios: ${password}`);
+    console.log(`\nContraseña de todos los usuarios: ${password}`);
     console.log("Cambiala con SEED_PASSWORD si te molesta.");
   } finally {
     await prisma.$disconnect();
