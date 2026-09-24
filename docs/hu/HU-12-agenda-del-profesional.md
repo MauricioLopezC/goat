@@ -16,7 +16,7 @@
 ## Comportamiento
 
 - Al ingresar, el profesional aterriza directamente en su agenda del día de hoy.
-- Puede navegar a otros días y ver su semana y su mes.
+- Puede navegar a otros días y ver su semana (la vista mensual queda postergada; ver *A conversar*).
 - Los turnos se muestran ordenados por hora.
 - Los cancelados aparecen diferenciados o se pueden ocultar.
 
@@ -27,6 +27,10 @@
 
 ## Operaciones
 
-Solo lectura: `listAppointments` filtrado por profesional, desde un Server Component.
+Solo lectura: `getProfessionalAgenda` en `src/lib/dal/appointments.ts`, llamada desde el Server Component de `/agenda` ([ADR 0001](../adr/0001-server-actions-y-capa-de-acceso-a-datos.md)).
 
 La restricción de la URL no se resuelve en la interfaz: la pertenencia del recurso se verifica en la DAL, que compara el `professionalId` pedido contra el de la sesión y devuelve `FORBIDDEN` si no coinciden ([`acciones.md`](../acciones.md)).
+
+## A conversar
+
+- **Vista mensual diferida:** Para el Incremento 1 se consensuó priorizar las vistas operativas de trabajo en consultorio: vista diaria (lista cronológica detallada con ficha de turnos y timeline de franjas) y semanal (grilla horaria con franjas de disponibilidad, ausencias y feriados). La perspectiva mensual queda excluida de este incremento y postergada para iteraciones posteriores o sujeta a confirmación de necesidad con el cliente.

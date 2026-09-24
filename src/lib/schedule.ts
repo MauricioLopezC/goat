@@ -132,3 +132,64 @@ export function formatInstant(instant: Date): string {
     minute: "2-digit",
   }).format(instant);
 }
+
+/// Devuelve los 7 días (Lunes a Domingo) de la semana que contiene a `dateStr` (AAAA-MM-DD).
+export function getWeekDays(dateStr: string): {
+  monday: string;
+  sunday: string;
+  days: Array<{
+    date: string;
+    weekday: Weekday;
+    dayNumber: number;
+  }>;
+} {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  const dayOfWeek = d.getUTCDay(); // 0 es domingo, 1 es lunes
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(d);
+  monday.setUTCDate(d.getUTCDate() + diffToMonday);
+
+  const days: Array<{ date: string; weekday: Weekday; dayNumber: number }> = [];
+  for (let i = 0; i < 7; i++) {
+    const cur = new Date(monday);
+    cur.setUTCDate(monday.getUTCDate() + i);
+    const date = cur.toISOString().slice(0, 10);
+    days.push({
+      date,
+      weekday: WEEKDAYS[i],
+      dayNumber: cur.getUTCDate(),
+    });
+  }
+
+  return {
+    monday: days[0].date,
+    sunday: days[6].date,
+    days,
+  };
+}
+
+/// Suma o resta días a una fecha en formato AAAA-MM-DD.
+export function addDays(dateStr: string, daysToAdd: number): string {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + daysToAdd);
+  return d.toISOString().slice(0, 10);
+}
+
+/// Formatea el rango de la semana para títulos de la agenda (ej: "28 de sep – 4 de oct de 2026").
+export function formatWeekRange(monday: string, sunday: string): string {
+  const m = dateToDb(monday);
+  const s = dateToDb(sunday);
+  const mMonth = new Intl.DateTimeFormat("es-AR", {
+    timeZone: "UTC",
+    month: "short",
+  }).format(m);
+  const sMonth = new Intl.DateTimeFormat("es-AR", {
+    timeZone: "UTC",
+    month: "short",
+  }).format(s);
+  const sYear = s.getUTCFullYear();
+  if (mMonth === sMonth) {
+    return `${m.getUTCDate()} al ${s.getUTCDate()} de ${sMonth} de ${sYear}`;
+  }
+  return `${m.getUTCDate()} de ${mMonth} – ${s.getUTCDate()} de ${sMonth} de ${sYear}`;
+}

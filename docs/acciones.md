@@ -618,9 +618,23 @@ No es una Server Action: es una lectura que el Server Component de `/patients/[i
 **Precondiciones:** el actor es `RECEPTIONIST` o `MANAGER`. El paciente existe. No existe otro paciente distinto con la misma combinación de `documentType` y `documentNumber`. Si `coverageType` es `HEALTH_INSURANCE`, el `insurancePlanId` existe y está activo. Si la edad calculada a partir de `birthDate` es menor de 16 años, `guardianName` y `guardianPhone` son obligatorios (validados por Zod tanto en cliente como en servidor).
 **Efectos:** actualiza los datos del `Patient`, registrando `updatedById` con el id del actor y actualizando `updatedAt`. Si `coverageType` es `HEALTH_INSURANCE`, actualiza o crea su `Coverage`. Si la cobertura pasa a `PRIVATE`, remueve la `Coverage` asociada.
 **Errores:** `VALIDATION` (campos obligatorios vacíos, formatos inválidos, menor de 16 años sin tutor), `FORBIDDEN` (profesionales u otros roles sin permiso), `NOT_FOUND` (paciente no encontrado), `DUPLICATE_PATIENT` (documento ya registrado en otro paciente).
-**Revalida:** `/patients` y `/patients/[id]`.
+**Revalida:** `/patients`, `/patients/[id]` y `/patients/[id]/edit`.
 **Devuelve:** `{ id, firstName, lastName, documentType, documentNumber }`.
 
+### `getProfessionalAgenda`
+
+**Historia de usuario:** [HU-12 — Ver mi agenda completa](hu/HU-12-agenda-del-profesional.md)
+**Roles:** `PROFESSIONAL`, `MANAGER`, `RECEPTIONIST`
+**Entrada:** `input: { date?: string, view?: "week" | "day", hideCancelled?: boolean, professionalId?: number }` y `actor: Actor`.
+**Precondiciones:**
+- Si `actor.role === Role.PROFESSIONAL`, el profesional es el correspondiente a su usuario (`Professional.userId`). Si viene `input.professionalId` en los parámetros y no coincide con el suyo, la DAL rechaza la solicitud con `FORBIDDEN`.
+- Si `actor.role` es `MANAGER` o `RECEPTIONIST`, deben especificar `input.professionalId`.
+**Efectos:** ninguno. Es una lectura para la pantalla de agenda. Obtiene el perfil del profesional, sus franjas de atención semanales con consultorio y servicios, los turnos asignados en el rango temporal solicitado (semanal o diario) ordenados cronológicamente con datos clínicos completos (paciente con nombre, apellido y documento; servicio; horario y estado), el resumen de KPIs (total, programados, completados y cancelados), y los feriados y excepciones vigentes. Si `hideCancelled` es verdadero, los turnos cancelados se excluyen del listado de turnos pero se conservan en el contador del resumen.
+**Errores:** `FORBIDDEN` (rol no habilitado, o un `PROFESSIONAL` que consulta la agenda de otro), `NOT_FOUND` (profesional no encontrado), `VALIDATION` (parámetros inválidos o falta `professionalId` en roles administrativos).
+**Revalida:** no aplica.
+**Devuelve:** `{ professional, date, view, hideCancelled, week, windows, appointments, summary, holidays, exceptions }`.
+
+No es una Server Action: el Server Component de `/agenda` la llama directo a la DAL (ADR 0001).
 
 ### Nota: `signIn` y `signOut` frente a `defineAction`
 

@@ -13,25 +13,9 @@ import {
 } from "lucide-react";
 import type { ActionResult } from "@/lib/actions";
 import type { CreatedPatientSummary } from "@/lib/dal/patients";
-import {
-  GENDERS,
-  GENDER_LABEL,
-  COVERAGE_TYPES,
-  COVERAGE_TYPE_LABEL,
-  DOCUMENT_TYPES,
-  DOCUMENT_TYPE_LABEL,
-} from "@/lib/patients";
+import { validatePatientClientForm } from "@/lib/patients";
 import { CoverageType, DocumentType, Gender } from "@/generated/prisma/enums";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -40,16 +24,11 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "cn";
+import {
+  PatientFormFields,
+  type HealthInsurerOption,
+} from "../patient-form-fields";
 import { createPatient } from "./actions";
-
-type HealthInsurerOption = {
-  id: number;
-  name: string;
-  plans: { id: number; name: string }[];
-};
 
 interface NewPatientFormProps {
   healthInsurers: HealthInsurerOption[];
@@ -59,20 +38,17 @@ interface NewPatientFormProps {
 
 type FormState = ActionResult<CreatedPatientSummary> | null;
 
-const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
-const dniRegex = /^\d{7,8}$/;
-const phoneRegex = /^\+?\d{7,15}$/;
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export function NewPatientForm({
   healthInsurers,
   cancelHref,
   initialQuery,
 }: NewPatientFormProps) {
   const cleanQuery = initialQuery?.trim() ?? "";
-  const isNumericQuery = /^\d+$/.test(cleanQuery);
-  const initialDocumentNumber = isNumericQuery ? cleanQuery : "";
-  const initialLastName = !isNumericQuery ? cleanQuery : "";
+  const isDocumentLike = /^[\d.-]+$/.test(cleanQuery);
+  const initialDocumentNumber = isDocumentLike
+    ? cleanQuery.replace(/\D/g, "")
+    : "";
+  const initialLastName = !isDocumentLike ? cleanQuery : "";
 
   const [lastName, setLastName] = useState(initialLastName);
   const [firstName, setFirstName] = useState("");
@@ -105,7 +81,7 @@ export function NewPatientForm({
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  const handleReset = () => {
+  const resetFields = () => {
     setLastName("");
     setFirstName("");
     setGender(Gender.MALE);
@@ -121,170 +97,34 @@ export function NewPatientForm({
     setGuardianName("");
     setGuardianPhone("");
     setTouched({});
+  };
+
+  const handleReset = () => {
+    resetFields();
     setSuccessData(null);
     setState(null);
     setShowToast(false);
   };
 
-  const selectedInsurer = healthInsurers.find(
-    (ins) => String(ins.id) === healthInsurerId,
-  );
-  const availablePlans = selectedInsurer ? selectedInsurer.plans : [];
-
-  // Validaciones del lado del cliente
-  const clientErrors: Record<string, string> = {};
-
-  if (!lastName.trim()) {
-    clientErrors.lastName = "El apellido es obligatorio";
-  } else if (lastName.trim().length < 2) {
-    clientErrors.lastName = "El apellido debe tener al menos 2 caracteres";
-  } else if (lastName.trim().length > 60) {
-    clientErrors.lastName = "El apellido debe tener como máximo 60 caracteres";
-  } else if (!nameRegex.test(lastName.trim())) {
-    clientErrors.lastName =
-      "Solo se permiten letras, espacios, tildes y apóstrofes";
-  }
-
-  if (!firstName.trim()) {
-    clientErrors.firstName = "El nombre es obligatorio";
-  } else if (firstName.trim().length < 2) {
-    clientErrors.firstName = "El nombre debe tener al menos 2 caracteres";
-  } else if (firstName.trim().length > 60) {
-    clientErrors.firstName = "El nombre debe tener como máximo 60 caracteres";
-  } else if (!nameRegex.test(firstName.trim())) {
-    clientErrors.firstName =
-      "Solo se permiten letras, espacios, tildes y apóstrofes";
-  }
-
-  if (!documentNumber.trim()) {
-    clientErrors.documentNumber = "El número de documento es obligatorio";
-  } else if (documentType === DocumentType.DNI) {
-    if (!dniRegex.test(documentNumber.trim())) {
-      clientErrors.documentNumber =
-        "El DNI debe tener exactamente 7 u 8 dígitos numéricos sin puntos ni espacios";
-    }
-  } else if (documentType === DocumentType.PASSPORT) {
-    if (!/^[a-zA-Z0-9]{3,20}$/.test(documentNumber.trim())) {
-      clientErrors.documentNumber =
-        "El pasaporte debe tener entre 3 y 20 caracteres alfanuméricos";
-    }
-  } else {
-    if (!/^\d{4,10}$/.test(documentNumber.trim())) {
-      clientErrors.documentNumber =
-        "El número de documento debe tener entre 4 y 10 dígitos numéricos";
-    }
-  }
-
-  // Calcular si el paciente es menor de 16 años (para feedback visual y validación)
-  let isMinor = false;
-  if (birthDate) {
-    const birthForAge = new Date(`${birthDate}T00:00:00`);
-    if (!isNaN(birthForAge.getTime())) {
-      const nowForAge = new Date();
-      const todayForAge = new Date(
-        nowForAge.getFullYear(),
-        nowForAge.getMonth(),
-        nowForAge.getDate(),
-      );
-      if (birthForAge <= todayForAge) {
-        let computedAge = todayForAge.getFullYear() - birthForAge.getFullYear();
-        const mForAge = todayForAge.getMonth() - birthForAge.getMonth();
-        if (
-          mForAge < 0 ||
-          (mForAge === 0 && todayForAge.getDate() < birthForAge.getDate())
-        ) {
-          computedAge--;
-        }
-        isMinor = computedAge < 16;
-      }
-    }
-  }
-
-  if (!birthDate) {
-    clientErrors.birthDate = "La fecha de nacimiento es obligatoria";
-  } else {
-    const birth = new Date(`${birthDate}T00:00:00`);
-    if (isNaN(birth.getTime())) {
-      clientErrors.birthDate = "Fecha inválida";
-    } else {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      if (birth > today) {
-        clientErrors.birthDate = "La fecha de nacimiento no puede ser futura";
-      } else {
-        const minDate = new Date(
-          now.getFullYear() - 120,
-          now.getMonth(),
-          now.getDate(),
-        );
-        if (birth < minDate) {
-          clientErrors.birthDate =
-            "La fecha de nacimiento no puede ser anterior a 120 años";
-        } else if (isMinor) {
-          // Validar tutor si menor de 16 años
-          if (!guardianName.trim()) {
-            clientErrors.guardianName =
-              "El nombre del responsable es obligatorio para menores de 16 años";
-          } else if (guardianName.trim().length > 120) {
-            clientErrors.guardianName =
-              "El nombre del responsable debe tener como máximo 120 caracteres";
-          } else if (!nameRegex.test(guardianName.trim())) {
-            clientErrors.guardianName =
-              "Solo se permiten letras, espacios, tildes y apóstrofes";
-          }
-          if (!guardianPhone.trim()) {
-            clientErrors.guardianPhone =
-              "El teléfono del responsable es obligatorio para menores de 16 años";
-          } else if (!phoneRegex.test(guardianPhone.trim())) {
-            clientErrors.guardianPhone =
-              "El teléfono del responsable debe contener únicamente números y puede comenzar con el signo + (entre 7 y 15 dígitos)";
-          }
-        }
-      }
-    }
-  }
-
-  if (!phone.trim()) {
-    clientErrors.phone = "El teléfono es obligatorio";
-  } else if (!phoneRegex.test(phone.trim())) {
-    clientErrors.phone =
-      "El teléfono debe contener únicamente números y puede comenzar con el signo + (entre 7 y 15 dígitos)";
-  }
-
-  if (!email.trim()) {
-    clientErrors.email = "El correo electrónico es obligatorio";
-  } else if (!emailRegex.test(email.trim())) {
-    clientErrors.email = "Correo electrónico inválido";
-  }
-
-  if (coverageType === CoverageType.HEALTH_INSURANCE) {
-    if (!healthInsurerId) {
-      clientErrors.healthInsurerId = "La obra social es obligatoria";
-    }
-    if (!insurancePlanId) {
-      clientErrors.insurancePlanId = "El plan es obligatorio";
-    }
-    if (!memberNumber.trim()) {
-      clientErrors.memberNumber = "El número de afiliado es obligatorio";
-    }
-  }
-
-  if (guardianName.trim()) {
-    if (guardianName.trim().length > 120) {
-      clientErrors.guardianName =
-        "El nombre del responsable debe tener como máximo 120 caracteres";
-    } else if (!nameRegex.test(guardianName.trim())) {
-      clientErrors.guardianName =
-        "Solo se permiten letras, espacios, tildes y apóstrofes";
-    }
-  }
-
-  if (guardianPhone.trim() && !phoneRegex.test(guardianPhone.trim())) {
-    clientErrors.guardianPhone =
-      "El teléfono del responsable debe contener únicamente números y puede comenzar con el signo + (entre 7 y 15 dígitos)";
-  }
-
-  const isFormValid = Object.keys(clientErrors).length === 0;
+  const {
+    errors: clientErrors,
+    isValid: isFormValid,
+    isMinor,
+  } = validatePatientClientForm({
+    lastName,
+    firstName,
+    documentType,
+    documentNumber,
+    birthDate,
+    phone,
+    email,
+    coverageType,
+    healthInsurerId,
+    insurancePlanId,
+    memberNumber,
+    guardianName,
+    guardianPhone,
+  });
 
   // Errores del servidor
   const serverFieldErrors =
@@ -339,6 +179,7 @@ export function NewPatientForm({
         birthDate: true,
         phone: true,
         email: true,
+        coverageType: true,
         healthInsurerId: true,
         insurancePlanId: true,
         memberNumber: true,
@@ -380,24 +221,9 @@ export function NewPatientForm({
         setState(res);
 
         if (res.ok) {
+          resetFields();
           setSuccessData(res.data);
           setShowToast(true);
-
-          // Limpiar campos del formulario
-          setLastName("");
-          setFirstName("");
-          setGender(Gender.MALE);
-          setDocumentNumber("");
-          setBirthDate("");
-          setPhone("");
-          setEmail("");
-          setCoverageType(CoverageType.PRIVATE);
-          setHealthInsurerId("");
-          setInsurancePlanId("");
-          setMemberNumber("");
-          setGuardianName("");
-          setGuardianPhone("");
-          setTouched({});
 
           // Scroll hacia arriba para visualizar inmediatamente la confirmación
           window.scrollTo({ top: 0, behavior: "smooth" });
@@ -529,594 +355,64 @@ export function NewPatientForm({
       )}
 
       {/* Formulario principal */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-headline-sm">Datos del paciente</CardTitle>
-          <CardDescription className="text-body-md text-muted-foreground">
-            Completá los datos mínimos para registrar al paciente y asignarle un
-            turno.
-          </CardDescription>
-        </CardHeader>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <PatientFormFields
+          lastName={lastName}
+          setLastName={setLastName}
+          firstName={firstName}
+          setFirstName={setFirstName}
+          documentType={documentType}
+          setDocumentType={setDocumentType}
+          documentNumber={documentNumber}
+          setDocumentNumber={setDocumentNumber}
+          gender={gender}
+          setGender={setGender}
+          birthDate={birthDate}
+          setBirthDate={setBirthDate}
+          phone={phone}
+          setPhone={setPhone}
+          email={email}
+          setEmail={setEmail}
+          coverageType={coverageType}
+          setCoverageType={setCoverageType}
+          healthInsurerId={healthInsurerId}
+          setHealthInsurerId={setHealthInsurerId}
+          insurancePlanId={insurancePlanId}
+          setInsurancePlanId={setInsurancePlanId}
+          memberNumber={memberNumber}
+          setMemberNumber={setMemberNumber}
+          guardianName={guardianName}
+          setGuardianName={setGuardianName}
+          guardianPhone={guardianPhone}
+          setGuardianPhone={setGuardianPhone}
+          healthInsurers={healthInsurers}
+          isMinor={isMinor}
+          markTouched={markTouched}
+          getFieldError={getFieldError}
+          getFieldBorderClass={getFieldBorderClass}
+        />
 
-        <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-            {/* SECCIÓN 1: Identificación y datos personales */}
-            <div>
-              <h3 className="text-label-sm font-semibold uppercase text-muted-foreground tracking-wider mb-4">
-                Identificación y datos personales
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Apellido */}
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="lastName">
-                    Apellido <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="lastName"
-                    name="lastName"
-                    required
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    onBlur={() => markTouched("lastName")}
-                    placeholder="Ej. González"
-                    className={cn(getFieldBorderClass("lastName"))}
-                    aria-invalid={!!getFieldError("lastName")}
-                    aria-describedby={
-                      getFieldError("lastName") ? "lastName-error" : undefined
-                    }
-                    disabled={isPending}
-                  />
-                  {getFieldError("lastName") && (
-                    <p
-                      id="lastName-error"
-                      className="text-body-sm text-destructive"
-                    >
-                      {getFieldError("lastName")}
-                    </p>
-                  )}
-                </div>
-
-                {/* Nombre */}
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="firstName">
-                    Nombre <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="firstName"
-                    name="firstName"
-                    required
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    onBlur={() => markTouched("firstName")}
-                    placeholder="Ej. Martín"
-                    className={cn(getFieldBorderClass("firstName"))}
-                    aria-invalid={!!getFieldError("firstName")}
-                    aria-describedby={
-                      getFieldError("firstName") ? "firstName-error" : undefined
-                    }
-                    disabled={isPending}
-                  />
-                  {getFieldError("firstName") && (
-                    <p
-                      id="firstName-error"
-                      className="text-body-sm text-destructive"
-                    >
-                      {getFieldError("firstName")}
-                    </p>
-                  )}
-                </div>
-
-                {/* Género */}
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="gender">
-                    Género <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={gender}
-                    onValueChange={(val) => setGender(val as Gender)}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger id="gender" className="h-9.5 w-full">
-                      <SelectValue placeholder="Seleccionar género" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {GENDERS.map((g) => (
-                        <SelectItem key={g} value={g}>
-                          {GENDER_LABEL[g]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Tipo de Documento */}
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="documentType">
-                    Tipo de documento{" "}
-                    <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={documentType}
-                    onValueChange={(val) => {
-                      setDocumentType(val as DocumentType);
-                      markTouched("documentType");
-                    }}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger id="documentType" className="h-9.5 w-full">
-                      <SelectValue placeholder="Seleccionar tipo de documento" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DOCUMENT_TYPES.map((dt) => (
-                        <SelectItem key={dt} value={dt}>
-                          {DOCUMENT_TYPE_LABEL[dt]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Número de Documento */}
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="documentNumber">
-                    {documentType === DocumentType.DNI
-                      ? "Número de DNI"
-                      : "Número de documento"}{" "}
-                    <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="documentNumber"
-                    name="documentNumber"
-                    required
-                    value={documentNumber}
-                    onChange={(e) => setDocumentNumber(e.target.value)}
-                    onBlur={() => markTouched("documentNumber")}
-                    placeholder={
-                      documentType === DocumentType.DNI
-                        ? "7 u 8 dígitos sin puntos ni espacios"
-                        : "Número de documento"
-                    }
-                    className={cn(
-                      "font-mono",
-                      getFieldBorderClass("documentNumber"),
-                    )}
-                    aria-invalid={
-                      !!getFieldError("documentNumber") || isDuplicate
-                    }
-                    aria-describedby={
-                      getFieldError("documentNumber")
-                        ? "documentNumber-error"
-                        : undefined
-                    }
-                    disabled={isPending}
-                  />
-                  {getFieldError("documentNumber") && (
-                    <p
-                      id="documentNumber-error"
-                      className="text-body-sm text-destructive"
-                    >
-                      {getFieldError("documentNumber")}
-                    </p>
-                  )}
-                </div>
-
-                {/* Fecha de Nacimiento */}
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="birthDate">
-                    Fecha de nacimiento{" "}
-                    <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="birthDate"
-                    name="birthDate"
-                    type="date"
-                    required
-                    value={birthDate}
-                    onChange={(e) => setBirthDate(e.target.value)}
-                    onBlur={() => markTouched("birthDate")}
-                    className={cn(getFieldBorderClass("birthDate"))}
-                    aria-invalid={!!getFieldError("birthDate")}
-                    aria-describedby={
-                      getFieldError("birthDate") ? "birthDate-error" : undefined
-                    }
-                    disabled={isPending}
-                  />
-                  {getFieldError("birthDate") && (
-                    <p
-                      id="birthDate-error"
-                      className="text-body-sm text-destructive"
-                    >
-                      {getFieldError("birthDate")}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* SECCIÓN 2: Contacto */}
-            <div>
-              <h3 className="text-label-sm font-semibold uppercase text-muted-foreground tracking-wider mb-4">
-                Información de contacto
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Teléfono */}
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="phone">
-                    Teléfono de contacto{" "}
-                    <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    onBlur={() => markTouched("phone")}
-                    placeholder="Ej. +5491144556677 o 1144556677"
-                    className={cn(getFieldBorderClass("phone"))}
-                    aria-invalid={!!getFieldError("phone")}
-                    aria-describedby={
-                      getFieldError("phone") ? "phone-error" : undefined
-                    }
-                    disabled={isPending}
-                  />
-                  {getFieldError("phone") && (
-                    <p
-                      id="phone-error"
-                      className="text-body-sm text-destructive"
-                    >
-                      {getFieldError("phone")}
-                    </p>
-                  )}
-                </div>
-
-                {/* Email */}
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="email">
-                    Correo electrónico{" "}
-                    <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onBlur={() => markTouched("email")}
-                    placeholder="paciente@ejemplo.com"
-                    className={cn(getFieldBorderClass("email"))}
-                    aria-invalid={!!getFieldError("email")}
-                    aria-describedby={
-                      getFieldError("email") ? "email-error" : undefined
-                    }
-                    disabled={isPending}
-                  />
-                  {getFieldError("email") && (
-                    <p
-                      id="email-error"
-                      className="text-body-sm text-destructive"
-                    >
-                      {getFieldError("email")}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* SECCIÓN 3: Cobertura médica */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-label-sm font-semibold uppercase text-muted-foreground tracking-wider">
-                  Cobertura médica
-                </h3>
-                <Badge variant="outline" className="text-label-sm">
-                  {COVERAGE_TYPE_LABEL[coverageType]}
-                </Badge>
-              </div>
-
-              {/* Selector de tipo de cobertura */}
-              <div
-                role="radiogroup"
-                aria-label="Tipo de cobertura"
-                className="flex gap-4 mb-4"
-              >
-                {COVERAGE_TYPES.map((type) => {
-                  const isSelected = coverageType === type;
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      role="radio"
-                      aria-checked={isSelected}
-                      disabled={isPending}
-                      onClick={() => {
-                        setCoverageType(type);
-                        if (type === CoverageType.PRIVATE) {
-                          setHealthInsurerId("");
-                          setInsurancePlanId("");
-                          setMemberNumber("");
-                        }
-                      }}
-                      className={`flex-1 rounded-lg border p-3 text-left transition-colors ${
-                        isSelected
-                          ? "border-primary bg-primary-soft/20 ring-2 ring-primary/20"
-                          : "border-border bg-card hover:bg-tray"
-                      } ${isPending ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      <div className="text-title-md font-medium text-foreground">
-                        {COVERAGE_TYPE_LABEL[type]}
-                      </div>
-                      <div className="text-body-sm text-muted-foreground">
-                        {type === CoverageType.PRIVATE
-                          ? "Atención particular sin obra social ni prepaga"
-                          : "Cobertura mediante obra social o seguro médico"}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Campos condicionales para obra social */}
-              {coverageType === CoverageType.HEALTH_INSURANCE && (
-                <div className="rounded-lg border border-border p-4 bg-tray/40 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in duration-200">
-                  {/* Obra Social */}
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="healthInsurerId">
-                      Obra social <span className="text-destructive">*</span>
-                    </Label>
-                    <Select
-                      value={healthInsurerId}
-                      onValueChange={(val) => {
-                        setHealthInsurerId(val);
-                        setInsurancePlanId("");
-                        markTouched("healthInsurerId");
-                      }}
-                      disabled={isPending}
-                    >
-                      <SelectTrigger
-                        id="healthInsurerId"
-                        className={cn(
-                          "h-9.5 w-full bg-card",
-                          getFieldBorderClass("healthInsurerId"),
-                        )}
-                        aria-invalid={!!getFieldError("healthInsurerId")}
-                        aria-describedby={
-                          getFieldError("healthInsurerId")
-                            ? "healthInsurerId-error"
-                            : undefined
-                        }
-                      >
-                        <SelectValue placeholder="Elegir obra social" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {healthInsurers.map((insurer) => (
-                          <SelectItem
-                            key={insurer.id}
-                            value={String(insurer.id)}
-                          >
-                            {insurer.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {getFieldError("healthInsurerId") && (
-                      <p
-                        id="healthInsurerId-error"
-                        className="text-body-sm text-destructive"
-                      >
-                        {getFieldError("healthInsurerId")}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Plan */}
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="insurancePlanId">
-                      Plan <span className="text-destructive">*</span>
-                    </Label>
-                    <Select
-                      value={insurancePlanId}
-                      onValueChange={(val) => {
-                        setInsurancePlanId(val);
-                        markTouched("insurancePlanId");
-                      }}
-                      disabled={
-                        isPending ||
-                        !healthInsurerId ||
-                        availablePlans.length === 0
-                      }
-                    >
-                      <SelectTrigger
-                        id="insurancePlanId"
-                        className={cn(
-                          "h-9.5 w-full bg-card",
-                          getFieldBorderClass("insurancePlanId"),
-                        )}
-                        aria-invalid={!!getFieldError("insurancePlanId")}
-                        aria-describedby={
-                          getFieldError("insurancePlanId")
-                            ? "insurancePlanId-error"
-                            : undefined
-                        }
-                      >
-                        <SelectValue
-                          placeholder={
-                            !healthInsurerId
-                              ? "Primero elija obra social"
-                              : availablePlans.length === 0
-                                ? "Sin planes disponibles"
-                                : "Elegir plan"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availablePlans.map((plan) => (
-                          <SelectItem key={plan.id} value={String(plan.id)}>
-                            {plan.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {getFieldError("insurancePlanId") && (
-                      <p
-                        id="insurancePlanId-error"
-                        className="text-body-sm text-destructive"
-                      >
-                        {getFieldError("insurancePlanId")}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Número de afiliado */}
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="memberNumber">
-                      Nº de afiliado <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="memberNumber"
-                      name="memberNumber"
-                      value={memberNumber}
-                      onChange={(e) => setMemberNumber(e.target.value)}
-                      onBlur={() => markTouched("memberNumber")}
-                      placeholder="Ej. 12345678/00"
-                      className={cn(
-                        "bg-card font-mono",
-                        getFieldBorderClass("memberNumber"),
-                      )}
-                      aria-invalid={!!getFieldError("memberNumber")}
-                      aria-describedby={
-                        getFieldError("memberNumber")
-                          ? "memberNumber-error"
-                          : undefined
-                      }
-                      disabled={isPending}
-                    />
-                    {getFieldError("memberNumber") && (
-                      <p
-                        id="memberNumber-error"
-                        className="text-body-sm text-destructive"
-                      >
-                        {getFieldError("memberNumber")}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* SECCIÓN 4: Responsable o tutor */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-label-sm font-semibold uppercase text-muted-foreground tracking-wider">
-                  {isMinor
-                    ? "Responsable o tutor (obligatorio para menores de 16 años)"
-                    : "Responsable o tutor (opcional)"}
-                </h3>
-                {!isMinor && (
-                  <span className="text-body-sm text-muted-foreground">
-                    Para menores de edad o pacientes a cargo
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Nombre del tutor */}
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="guardianName">
-                    Nombre del responsable o tutor{" "}
-                    {isMinor && <span className="text-destructive">*</span>}
-                  </Label>
-                  <Input
-                    id="guardianName"
-                    name="guardianName"
-                    value={guardianName}
-                    onChange={(e) => setGuardianName(e.target.value)}
-                    onBlur={() => markTouched("guardianName")}
-                    placeholder="Ej. Laura González"
-                    className={cn(getFieldBorderClass("guardianName"))}
-                    aria-invalid={!!getFieldError("guardianName")}
-                    aria-describedby={
-                      getFieldError("guardianName")
-                        ? "guardianName-error"
-                        : undefined
-                    }
-                    disabled={isPending}
-                  />
-                  {getFieldError("guardianName") && (
-                    <p
-                      id="guardianName-error"
-                      className="text-body-sm text-destructive"
-                    >
-                      {getFieldError("guardianName")}
-                    </p>
-                  )}
-                </div>
-
-                {/* Teléfono del tutor */}
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="guardianPhone">
-                    Teléfono del responsable{" "}
-                    {isMinor && <span className="text-destructive">*</span>}
-                  </Label>
-                  <Input
-                    id="guardianPhone"
-                    name="guardianPhone"
-                    type="tel"
-                    value={guardianPhone}
-                    onChange={(e) => setGuardianPhone(e.target.value)}
-                    onBlur={() => markTouched("guardianPhone")}
-                    placeholder="Ej. +5491188990011 o 1188990011"
-                    className={cn(getFieldBorderClass("guardianPhone"))}
-                    aria-invalid={!!getFieldError("guardianPhone")}
-                    aria-describedby={
-                      getFieldError("guardianPhone")
-                        ? "guardianPhone-error"
-                        : undefined
-                    }
-                    disabled={isPending}
-                  />
-                  {getFieldError("guardianPhone") && (
-                    <p
-                      id="guardianPhone-error"
-                      className="text-body-sm text-destructive"
-                    >
-                      {getFieldError("guardianPhone")}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Botones de acción */}
-            <div className="flex items-center justify-end gap-3 pt-4">
-              <Button asChild variant="outline" disabled={isPending}>
-                <Link href={cancelHref}>Cancelar</Link>
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitDisabled}
-                className="bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed min-w-36"
-              >
-                {isPending ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin inline-start" />
-                    Registrando...
-                  </>
-                ) : (
-                  "Registrar paciente"
-                )}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+        {/* Botones de acción */}
+        <div className="flex items-center justify-end gap-3 pt-4">
+          <Button asChild variant="outline" disabled={isPending}>
+            <Link href={cancelHref}>Cancelar</Link>
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitDisabled}
+            className="bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed min-w-36"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="size-4 animate-spin inline-start" />
+                Registrando...
+              </>
+            ) : (
+              "Registrar paciente"
+            )}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

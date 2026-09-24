@@ -33,3 +33,12 @@ export const cancelAppointmentSchema = z.object({
     .max(100),
 });
 export type CancelAppointmentInput = z.infer<typeof cancelAppointmentSchema>;
+
+export const professionalAgendaSchema = z.object({
+  date: appointmentDateSchema.optional(),
+  view: z.enum(["week", "day"]).default("week"),
+  hideCancelled: z.boolean().default(false),
+  professionalId: z.number().int().positive().optional(),
+});
+export type ProfessionalAgendaInput = z.input<typeof professionalAgendaSchema>;
+
