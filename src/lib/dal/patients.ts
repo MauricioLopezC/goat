@@ -216,8 +216,9 @@ export async function searchPatients(query: string, actor: Actor) {
   ];
 
   // Si se ingresó un documento con puntos/guiones (ej. 40.123.456), normalizar a solo dígitos
+  const hasLetters = /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(trimmed);
   const digitsOnly = trimmed.replace(/\D/g, "");
-  if (digitsOnly.length >= 3 && digitsOnly !== trimmed) {
+  if (!hasLetters && digitsOnly.length >= 3 && digitsOnly !== trimmed) {
     orConditions.push({
       documentNumber: { contains: digitsOnly, mode: "insensitive" },
     });

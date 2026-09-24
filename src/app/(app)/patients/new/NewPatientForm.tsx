@@ -44,9 +44,11 @@ export function NewPatientForm({
   initialQuery,
 }: NewPatientFormProps) {
   const cleanQuery = initialQuery?.trim() ?? "";
-  const isNumericQuery = /^\d+$/.test(cleanQuery);
-  const initialDocumentNumber = isNumericQuery ? cleanQuery : "";
-  const initialLastName = !isNumericQuery ? cleanQuery : "";
+  const isDocumentLike = /^[\d.-]+$/.test(cleanQuery);
+  const initialDocumentNumber = isDocumentLike
+    ? cleanQuery.replace(/\D/g, "")
+    : "";
+  const initialLastName = !isDocumentLike ? cleanQuery : "";
 
   const [lastName, setLastName] = useState(initialLastName);
   const [firstName, setFirstName] = useState("");
