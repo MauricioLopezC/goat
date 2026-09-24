@@ -24,13 +24,13 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               <>
                 <Link
                   href="/calendar"
-                  className="text-title-md text-muted-foreground hover:text-foreground"
+                  className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Calendario
                 </Link>
                 <Link
                   href="/appointments/new"
-                  className="text-title-md text-muted-foreground hover:text-foreground"
+                  className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Nuevo turno
                 </Link>
@@ -39,11 +39,17 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             {actor.role === "PROFESSIONAL" && (
               <Link
                 href="/agenda"
-                className="text-title-md text-muted-foreground hover:text-foreground"
+                className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
               >
                 Mi agenda
               </Link>
             )}
+            <Link
+              href="/patients"
+              className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Pacientes
+            </Link>
             {(actor.role === "RECEPTIONIST" || actor.role === "MANAGER") && (
               <Link
                 href="/patients/new"

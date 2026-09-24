@@ -54,6 +54,7 @@ type HealthInsurerOption = {
 interface NewPatientFormProps {
   healthInsurers: HealthInsurerOption[];
   cancelHref: string;
+  initialQuery?: string;
 }
 
 type FormState = ActionResult<CreatedPatientSummary> | null;
@@ -66,14 +67,20 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function NewPatientForm({
   healthInsurers,
   cancelHref,
+  initialQuery,
 }: NewPatientFormProps) {
-  const [lastName, setLastName] = useState("");
+  const cleanQuery = initialQuery?.trim() ?? "";
+  const isNumericQuery = /^\d+$/.test(cleanQuery);
+  const initialDocumentNumber = isNumericQuery ? cleanQuery : "";
+  const initialLastName = !isNumericQuery ? cleanQuery : "";
+
+  const [lastName, setLastName] = useState(initialLastName);
   const [firstName, setFirstName] = useState("");
   const [gender, setGender] = useState<Gender>(Gender.MALE);
   const [documentType, setDocumentType] = useState<DocumentType>(
     DocumentType.DNI,
   );
-  const [documentNumber, setDocumentNumber] = useState("");
+  const [documentNumber, setDocumentNumber] = useState(initialDocumentNumber);
   const [birthDate, setBirthDate] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
