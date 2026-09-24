@@ -209,14 +209,24 @@ export async function searchPatients(query: string, actor: Actor) {
     return [];
   }
 
+  const orConditions: Prisma.PatientWhereInput[] = [
+    { lastName: { contains: trimmed, mode: "insensitive" } },
+    { firstName: { contains: trimmed, mode: "insensitive" } },
+    { documentNumber: { contains: trimmed, mode: "insensitive" } },
+  ];
+
+  // Si se ingresó un documento con puntos/guiones (ej. 40.123.456), normalizar a solo dígitos
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  if (digitsOnly.length >= 3 && digitsOnly !== trimmed) {
+    orConditions.push({
+      documentNumber: { contains: digitsOnly, mode: "insensitive" },
+    });
+  }
+
   return prisma.patient.findMany({
     where: {
       active: true,
-      OR: [
-        { lastName: { contains: trimmed, mode: "insensitive" } },
-        { firstName: { contains: trimmed, mode: "insensitive" } },
-        { documentNumber: { contains: trimmed } },
-      ],
+      OR: orConditions,
     },
     include: {
       coverage: {

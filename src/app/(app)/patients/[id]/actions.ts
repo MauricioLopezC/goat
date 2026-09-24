@@ -13,6 +13,7 @@ export const updatePatient = defineAction({
     const result = await dal.updatePatient(input, actor);
     revalidatePath("/patients");
     revalidatePath(`/patients/${input.id}`);
+    revalidatePath(`/patients/${input.id}/edit`);
     return result;
   },
 });
