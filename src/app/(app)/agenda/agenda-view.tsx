@@ -16,10 +16,22 @@ import {
   toLocalSlot,
 } from "@/lib/schedule";
 import type { AgendaData } from "./agenda-types";
+import {
+  AgendaProfessionalSwitcher,
+  type ProfessionalSummaryItem,
+} from "./agenda-professional-switcher";
 import { DailyAgendaList } from "./daily-agenda-list";
 import { WeeklyAgendaGrid } from "./weekly-agenda-grid";
 
-export function AgendaView({ data }: { data: AgendaData }) {
+export function AgendaView({
+  data,
+  professionals,
+  isStaff,
+}: {
+  data: AgendaData;
+  professionals?: ProfessionalSummaryItem[];
+  isStaff?: boolean;
+}) {
   const isWeek = data.view === "week";
   const todayDate = toLocalSlot(new Date()).date;
 
@@ -32,6 +44,9 @@ export function AgendaView({ data }: { data: AgendaData }) {
     hide?: boolean,
   ) => {
     const params = new URLSearchParams();
+    if (isStaff) {
+      params.set("professionalId", String(data.professional.id));
+    }
     params.set("date", newDate);
     if (newView !== "week") params.set("view", newView);
     if (hide ?? data.hideCancelled) params.set("hideCancelled", "1");
@@ -43,7 +58,9 @@ export function AgendaView({ data }: { data: AgendaData }) {
       {/* Encabezado principal */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-headline-lg font-bold">Mi agenda</h1>
+          <h1 className="text-headline-lg font-bold">
+            {isStaff ? "Agenda del profesional" : "Mi agenda"}
+          </h1>
           <p className="text-muted-foreground text-sm">
             {data.professional.titles
               ? `${data.professional.titles} `
@@ -85,6 +102,17 @@ export function AgendaView({ data }: { data: AgendaData }) {
             </div>
           )}
         </div>
+        {isStaff && professionals && professionals.length > 0 && (
+          <div className="flex items-center gap-2">
+            <AgendaProfessionalSwitcher
+              currentProfessionalId={data.professional.id}
+              professionals={professionals}
+              date={data.date}
+              view={data.view}
+              hideCancelled={data.hideCancelled}
+            />
+          </div>
+        )}
       </header>
 
       {/* Barra de navegación temporal y controles */}
@@ -136,6 +164,13 @@ export function AgendaView({ data }: { data: AgendaData }) {
             method="GET"
             className="flex items-center gap-2"
           >
+            {isStaff && (
+              <input
+                type="hidden"
+                name="professionalId"
+                value={data.professional.id}
+              />
+            )}
             <input type="hidden" name="view" value={data.view} />
             {data.hideCancelled && (
               <input type="hidden" name="hideCancelled" value="1" />

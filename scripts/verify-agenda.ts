@@ -56,6 +56,18 @@ async function main() {
     users.push(managerUser.id);
     const managerActor: Actor = managerUser;
 
+    const receptionistUser = await prisma.user.create({
+      data: {
+        email: `${tag}-rec@example.invalid`,
+        passwordHash: "hash",
+        firstName: "Recepcionista",
+        lastName: tag,
+        role: Role.RECEPTIONIST,
+      },
+    });
+    users.push(receptionistUser.id);
+    const receptionistActor: Actor = receptionistUser;
+
     const doc1User = await prisma.user.create({
       data: {
         email: `${tag}-doc1@example.invalid`,
@@ -236,6 +248,31 @@ async function main() {
           managerActor,
         );
         assert.equal(agenda.professional.id, doc1.id);
+      },
+    );
+
+    await verify(
+      "Recepcionista puede consultar la agenda de cualquier profesional",
+      async () => {
+        const agenda = await getProfessionalAgenda(
+          { date: testMonday, professionalId: doc1.id },
+          receptionistActor,
+        );
+        assert.equal(agenda.professional.id, doc1.id);
+      },
+    );
+
+    await verify(
+      "Roles administrativos son rechazados con VALIDATION si no especifican professionalId",
+      async () => {
+        await rejects(
+          () => getProfessionalAgenda({ date: testMonday }, managerActor),
+          "VALIDATION",
+        );
+        await rejects(
+          () => getProfessionalAgenda({ date: testMonday }, receptionistActor),
+          "VALIDATION",
+        );
       },
     );
 
