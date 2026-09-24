@@ -29,9 +29,9 @@ export function AgendaProfessionalPicker({
   view?: string;
 }) {
   return (
-    <div className="flex flex-col gap-6 max-w-xl mx-auto py-8">
+    <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-headline-lg font-bold">Agenda de profesionales</h1>
+        <h1 className="text-headline-lg">Agenda de profesionales</h1>
         <p className="text-muted-foreground text-sm mt-1">
           Consultá los turnos y la disponibilidad de cualquier profesional del
           centro.

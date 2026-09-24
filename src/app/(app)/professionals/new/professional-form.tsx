@@ -102,7 +102,7 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
   const attempt = state ? (created ? "ok" : "error") : "inicial";
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl">
+    <div className="flex flex-col gap-6">
       {/* Cabecera de la vista */}
       <div className="flex items-center gap-4">
         <Button asChild variant="outline" size="sm">
