@@ -56,6 +56,10 @@ const summarySelect = {
   professional: { select: personSelect },
   service: { select: { id: true, name: true } },
   createdBy: { select: personSelect },
+} satisfies Prisma.AppointmentSelect;
+
+const appointmentDetailSelect = {
+  ...summarySelect,
   events: {
     select: {
       id: true,
@@ -525,7 +529,7 @@ export async function getAppointment(id: number, actor: Actor) {
         ? { professional: { userId: actor.id } }
         : {}),
     },
-    select: summarySelect,
+    select: appointmentDetailSelect,
   });
   if (!appointment)
     throw new DomainError("NOT_FOUND", "El turno no existe o no tenés acceso.");
@@ -801,6 +805,12 @@ export async function cancelAppointment(
   if (!parsed.success)
     throw new DomainError("VALIDATION", "Revisá los datos ingresados.");
   const data = parsed.data;
+  if (!data.reason || data.reason.trim().length === 0) {
+    throw new DomainError(
+      "REASON_REQUIRED",
+      "El motivo de cancelación es obligatorio.",
+    );
+  }
   return prisma.$transaction(
     async (tx) => {
       const appointment = await tx.appointment.findUnique({
