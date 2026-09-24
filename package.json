@@ -18,6 +18,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:appointments:db": "node --env-file=.env --import ./scripts/server-only-test-loader.mjs --import tsx scripts/verify-appointments.ts",
+    "test:agenda:db": "node --env-file=.env --import ./scripts/server-only-test-loader.mjs --import tsx scripts/verify-agenda.ts",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run db:validate && npm test",
     "db:validate": "prisma validate"
   },

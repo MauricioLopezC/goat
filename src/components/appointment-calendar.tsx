@@ -56,6 +56,7 @@ export async function AppointmentCalendar({
               name="date"
               defaultValue={date}
               required
+              className="w-44 tabular-nums"
             />
           </Field>
         </FieldGroup>

@@ -15,14 +15,22 @@ import {
   calculateAvailableSlots,
   rangesOverlap,
 } from "@/lib/appointment-slots";
-import { dateFromDb, dateToDb, parseTime, toLocalSlot } from "@/lib/schedule";
+import {
+  dateFromDb,
+  dateToDb,
+  getWeekDays,
+  parseTime,
+  toLocalSlot,
+} from "@/lib/schedule";
 import {
   appointmentDateSchema,
   appointmentOptionsSchema,
   availableSlotsSchema,
   createAppointmentSchema,
+  professionalAgendaSchema,
   type AvailableSlotsInput,
   type CreateAppointmentInput,
+  type ProfessionalAgendaInput,
 } from "@/lib/validation/appointments";
 
 const occupiedStatuses = [
@@ -561,4 +569,211 @@ export async function cancelProfessionalAppointment(
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
   );
+}
+
+export async function getProfessionalAgenda(
+  input: ProfessionalAgendaInput,
+  actor: Actor,
+) {
+  assertRole(actor, Role.PROFESSIONAL, Role.MANAGER, Role.RECEPTIONIST);
+  const parsed = professionalAgendaSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new DomainError(
+      "VALIDATION",
+      "Revisá los parámetros de consulta de la agenda.",
+    );
+  }
+  const {
+    date,
+    view,
+    hideCancelled,
+    professionalId: requestedProfessionalId,
+  } = parsed.data;
+
+  let targetProfessionalId: number;
+  if (actor.role === Role.PROFESSIONAL) {
+    const own = await prisma.professional.findUnique({
+      where: { userId: actor.id },
+      select: { id: true },
+    });
+    if (!own) {
+      throw new DomainError(
+        "NOT_FOUND",
+        "No se encontró el perfil profesional vinculado a tu usuario.",
+      );
+    }
+    if (
+      requestedProfessionalId !== undefined &&
+      requestedProfessionalId !== own.id
+    ) {
+      throw new DomainError(
+        "FORBIDDEN",
+        "No tenés permiso para ver la agenda de otro profesional.",
+      );
+    }
+    targetProfessionalId = own.id;
+  } else {
+    if (!requestedProfessionalId) {
+      throw new DomainError(
+        "VALIDATION",
+        "Tenés que indicar qué profesional querés consultar.",
+      );
+    }
+    targetProfessionalId = requestedProfessionalId;
+  }
+
+  const professional = await prisma.professional.findUnique({
+    where: { id: targetProfessionalId },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      active: true,
+      titles: { select: { name: true } },
+      services: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+      availabilityWindows: {
+        select: {
+          id: true,
+          weekday: true,
+          startMinute: true,
+          endMinute: true,
+          room: { select: { id: true, name: true } },
+          services: { select: { id: true, name: true } },
+        },
+        orderBy: [{ weekday: "asc" }, { startMinute: "asc" }],
+      },
+    },
+  });
+
+  if (!professional) {
+    throw new DomainError("NOT_FOUND", "El profesional no existe.");
+  }
+
+  const selectedDate = date ?? toLocalSlot(new Date()).date;
+  const week = getWeekDays(selectedDate);
+
+  const rangeStart =
+    view === "week"
+      ? appointmentInstant(week.monday, 0)
+      : appointmentInstant(selectedDate, 0);
+  const rangeEnd =
+    view === "week"
+      ? appointmentInstant(week.sunday, 1440)
+      : appointmentInstant(selectedDate, 1440);
+
+  const fromDateStr = view === "week" ? week.monday : selectedDate;
+  const toDateStr = view === "week" ? week.sunday : selectedDate;
+
+  const [appointments, holidays, exceptions] = await Promise.all([
+    prisma.appointment.findMany({
+      where: {
+        professionalId: professional.id,
+        startsAt: {
+          gte: rangeStart,
+          lt: rangeEnd,
+        },
+      },
+      select: {
+        id: true,
+        startsAt: true,
+        endsAt: true,
+        status: true,
+        notes: true,
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            documentType: true,
+            documentNumber: true,
+          },
+        },
+        service: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+    }),
+    prisma.holiday.findMany({
+      where: {
+        date: {
+          gte: dateToDb(fromDateStr),
+          lte: dateToDb(toDateStr),
+        },
+      },
+      select: {
+        id: true,
+        date: true,
+        description: true,
+      },
+      orderBy: { date: "asc" },
+    }),
+    prisma.availabilityException.findMany({
+      where: {
+        professionalId: professional.id,
+        date: {
+          gte: dateToDb(fromDateStr),
+          lte: dateToDb(toDateStr),
+        },
+      },
+      select: {
+        id: true,
+        date: true,
+        startMinute: true,
+        endMinute: true,
+        reason: true,
+      },
+      orderBy: [{ date: "asc" }, { startMinute: "asc" }],
+    }),
+  ]);
+
+  const summary = {
+    total: appointments.length,
+    scheduled: appointments.filter(
+      (a) => a.status === AppointmentStatus.SCHEDULED,
+    ).length,
+    completed: appointments.filter(
+      (a) => a.status === AppointmentStatus.COMPLETED,
+    ).length,
+    cancelled: appointments.filter(
+      (a) => a.status === AppointmentStatus.CANCELLED,
+    ).length,
+  };
+
+  const displayedAppointments = hideCancelled
+    ? appointments.filter((a) => a.status !== AppointmentStatus.CANCELLED)
+    : appointments;
+
+  return {
+    professional: {
+      id: professional.id,
+      firstName: professional.firstName,
+      lastName: professional.lastName,
+      active: professional.active,
+      titles: professional.titles.map((t) => t.name).join(", ") || null,
+      services: professional.services,
+    },
+    date: selectedDate,
+    view,
+    hideCancelled,
+    week,
+    windows: professional.availabilityWindows,
+    appointments: displayedAppointments,
+    summary,
+    holidays: holidays.map((h) => ({
+      id: h.id,
+      date: dateFromDb(h.date),
+      description: h.description,
+    })),
+    exceptions: exceptions.map((e) => ({
+      id: e.id,
+      date: dateFromDb(e.date),
+      startMinute: e.startMinute,
+      endMinute: e.endMinute,
+      reason: e.reason,
+    })),
+  };
 }

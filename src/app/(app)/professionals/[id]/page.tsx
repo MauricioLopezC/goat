@@ -55,6 +55,13 @@ export default async function ProfessionalDetailPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {actor.role !== "PROFESSIONAL" && (
+            <Button asChild variant="outline">
+              <Link href={`/agenda?professionalId=${professional.id}`}>
+                Ver agenda
+              </Link>
+            </Button>
+          )}
           {manager && (
             <Button asChild>
               <Link href={`/professionals/${professional.id}/edit`}>
