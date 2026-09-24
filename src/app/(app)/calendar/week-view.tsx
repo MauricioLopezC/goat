@@ -113,68 +113,76 @@ export function WeekView({
             </tr>
           </thead>
           <tbody>
-            {[...rows.values()].map((professional) => (
-              <tr key={professional.id}>
-                <th
-                  scope="row"
-                  className="border-b p-2 text-left align-top font-medium"
-                >
-                  {professional.lastName}, {professional.firstName}
-                </th>
-                {days.map((day) => {
-                  const item = day.professionals.find(
-                    (entry) => entry.professional.id === professional.id,
-                  );
-                  const status = cellStatus(item, day.holiday);
-                  return (
-                    <td
-                      key={day.date}
-                      className={cn(
-                        "border-b border-l p-0 align-top",
-                        status && "bg-muted",
-                      )}
-                    >
-                      <Link
-                        href={calendarHref({
-                          ...dayQuery(day.date),
-                          professionalId: professional.id,
-                        })}
-                        aria-label={`Ver el ${WEEKDAY_LABEL[weekdayOf(day.date)].toLowerCase()} de ${professional.lastName}`}
-                        className="hover:bg-accent focus-visible:ring-ring flex h-full min-h-20 flex-col gap-1 p-2 outline-none focus-visible:ring-2 focus-visible:ring-inset"
+            {[...rows.values()]
+              .sort(
+                (a, b) =>
+                  a.lastName.localeCompare(b.lastName, "es") ||
+                  a.firstName.localeCompare(b.firstName, "es"),
+              )
+              .map((professional) => (
+                <tr key={professional.id}>
+                  <th
+                    scope="row"
+                    className="border-b p-2 text-left align-top font-medium"
+                  >
+                    {professional.lastName}, {professional.firstName}
+                  </th>
+                  {days.map((day) => {
+                    const item = day.professionals.find(
+                      (entry) => entry.professional.id === professional.id,
+                    );
+                    const status = cellStatus(item, day.holiday);
+                    return (
+                      <td
+                        key={day.date}
+                        className={cn(
+                          "border-b border-l p-0 align-top",
+                          status && "bg-muted",
+                        )}
                       >
-                        {item?.appointments.map((appointment) => (
-                          <span
-                            key={appointment.id}
-                            className={cn(
-                              "truncate rounded-sm border border-l-4 px-1 text-xs",
-                              APPOINTMENT_STATUS_BORDER_CLASS[
-                                appointment.status
-                              ],
-                              appointment.status === "CANCELLED"
-                                ? "bg-muted text-muted-foreground line-through"
-                                : "bg-card",
-                            )}
-                          >
-                            <span className="tabular-nums">
-                              {formatMinute(
-                                toLocalSlot(appointment.startsAt).minute,
+                        <Link
+                          href={calendarHref({
+                            ...dayQuery(day.date),
+                            professionalId: professional.id,
+                          })}
+                          aria-label={`Ver el ${WEEKDAY_LABEL[weekdayOf(day.date)].toLowerCase()} de ${professional.lastName}`}
+                          className="hover:bg-accent focus-visible:ring-ring flex h-full min-h-20 flex-col gap-1 p-2 outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                        >
+                          {item?.appointments.map((appointment) => (
+                            <span
+                              key={appointment.id}
+                              className={cn(
+                                "truncate rounded-sm border border-l-4 px-1 text-xs",
+                                APPOINTMENT_STATUS_BORDER_CLASS[
+                                  appointment.status
+                                ],
+                                appointment.status === "CANCELLED"
+                                  ? "bg-muted text-muted-foreground line-through"
+                                  : "bg-card",
                               )}
-                            </span>{" "}
-                            {appointment.patient.lastName}
+                            >
+                              <span className="tabular-nums">
+                                {formatMinute(
+                                  toLocalSlot(appointment.startsAt).minute,
+                                )}
+                              </span>{" "}
+                              {appointment.patient.lastName}
+                            </span>
+                          ))}
+                          <span className="text-muted-foreground mt-auto text-xs">
+                            {status ??
+                              (day.date < today
+                                ? null
+                                : item && item.freeBlocks.length
+                                  ? freeLabel(item, Boolean(query.serviceId))
+                                  : "Sin bloques libres")}
                           </span>
-                        ))}
-                        <span className="text-muted-foreground mt-auto text-xs">
-                          {status ??
-                            (item && item.freeBlocks.length
-                              ? freeLabel(item, Boolean(query.serviceId))
-                              : "Sin bloques libres")}
-                        </span>
-                      </Link>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+                        </Link>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>

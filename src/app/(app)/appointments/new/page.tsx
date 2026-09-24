@@ -6,6 +6,7 @@ import {
   listAvailableDates,
   listAvailableSlots,
 } from "@/lib/dal/appointments";
+import { listProfessionals } from "@/lib/dal/professionals";
 import { DomainError } from "@/lib/actions";
 import { type AvailableSlot } from "@/lib/appointment-slots";
 import {
@@ -70,7 +71,20 @@ export default async function NewAppointmentPage({
     { query, patientPage, patientId, serviceId },
     actor,
   );
-  const service = options.services.find((item) => item.id === serviceId);
+  // El profesional del bloque libre elegido en el calendario: se ofrecen solo
+  // los servicios que presta, para no perder la precarga al elegir otro.
+  const presetProfessional =
+    professionalId && preset.has("date") && startTime
+      ? (await listProfessionals({ status: "active" }, actor)).find(
+          (item) => item.id === professionalId,
+        )
+      : undefined;
+  const serviceOptions = presetProfessional
+    ? options.services.filter((item) =>
+        presetProfessional.services.some((offered) => offered.id === item.id),
+      )
+    : options.services;
+  const service = serviceOptions.find((item) => item.id === serviceId);
   const professional = options.professionals.find(
     (item) => item.id === professionalId,
   );
@@ -131,11 +145,11 @@ export default async function NewAppointmentPage({
           corresponden a Argentina.
         </p>
       </header>
-      {!patient && preset.has("date") && startTime && (
+      {presetProfessional && (
         <Alert>
           <AlertDescription>
-            Horario elegido en el calendario: {formatDate(date)}, {startTime}.
-            Elegí el paciente y el servicio para completar el turno.
+            Horario elegido en el calendario: {presetProfessional.lastName},{" "}
+            {presetProfessional.firstName}, {formatDate(date)}, {startTime}.
           </AlertDescription>
         </Alert>
       )}
@@ -254,6 +268,8 @@ export default async function NewAppointmentPage({
             <CardTitle>2. Servicio</CardTitle>
             <CardDescription>
               La duración del servicio determina cuánto ocupa el turno.
+              {presetProfessional &&
+                ` Se muestran los servicios que presta ${presetProfessional.lastName}, ${presetProfessional.firstName}.`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -277,7 +293,7 @@ export default async function NewAppointmentPage({
                     <NativeSelectOption value="">
                       Elegí un servicio
                     </NativeSelectOption>
-                    {options.services.map((item) => (
+                    {serviceOptions.map((item) => (
                       <NativeSelectOption value={item.id} key={item.id}>
                         {item.name} · {item.durationMinutes} min
                       </NativeSelectOption>
