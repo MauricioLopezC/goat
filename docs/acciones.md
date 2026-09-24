@@ -169,12 +169,23 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 **Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md).
 **Roles:** `RECEPTIONIST`, `MANAGER`.
-**Entrada:** texto de búsqueda (hasta 80 caracteres), `patientId?`, `serviceId?`.
+**Entrada:** texto de búsqueda (hasta 80 caracteres), `patientPage` (página de 10, desde 1), `patientId?`, `serviceId?`.
 **Precondiciones:** rol autorizado; IDs válidos.
-**Efectos:** ninguno. Busca hasta 30 pacientes activos por palabras del nombre, apellido o documento; recupera por separado el paciente elegido. Lista servicios activos y profesionales activos asociados al servicio con alguna franja habilitada.
+**Efectos:** ninguno. Sin búsqueda muestra los 10 pacientes activos registrados más recientemente. Con búsqueda filtra por palabras del nombre, apellido o documento. Pagina ambos listados de 10 en 10, ordenados por fecha de alta descendente e ID descendente; recupera por separado el paciente elegido. Lista servicios activos y profesionales activos asociados al servicio con alguna franja habilitada.
 **Errores:** `FORBIDDEN`, `VALIDATION`.
 **Revalida:** no aplica.
-**Devuelve:** pacientes identificados por nombre y documento, paciente elegido, servicios (con duración), profesionales habilitados.
+**Devuelve:** pacientes identificados por nombre y documento, indicador de página siguiente, paciente elegido, servicios (con duración), profesionales habilitados.
+
+### `listAvailableDates`
+
+**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md).
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `professionalId`, `serviceId`, `patientId`.
+**Precondiciones:** entidades activas y relacionadas.
+**Efectos:** ninguno. Calcula en una lectura consistente las fechas con al menos un bloque libre entre hoy y dos meses, aplicando las mismas reglas de `listAvailableSlots` para el servicio y el paciente elegidos.
+**Errores:** `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** fechas disponibles `AAAA-MM-DD[]` en orden ascendente.
 
 ### `listAvailableSlots`
 

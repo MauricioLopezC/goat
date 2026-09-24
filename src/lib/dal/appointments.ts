@@ -15,7 +15,7 @@ import {
   calculateAvailableSlots,
   rangesOverlap,
 } from "@/lib/appointment-slots";
-import { dateToDb, parseTime, toLocalSlot } from "@/lib/schedule";
+import { dateFromDb, dateToDb, parseTime, toLocalSlot } from "@/lib/schedule";
 import {
   appointmentDateSchema,
   appointmentOptionsSchema,
@@ -63,39 +63,53 @@ function validateDate(date: string, now = new Date()) {
 }
 
 export async function getAppointmentOptions(
-  input: { query?: string; patientId?: number; serviceId?: number },
+  input: {
+    query?: string;
+    patientPage?: number;
+    patientId?: number;
+    serviceId?: number;
+  },
   actor: Actor,
 ) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
   const parsed = appointmentOptionsSchema.safeParse(input);
   if (!parsed.success)
     throw new DomainError("VALIDATION", "Revisá los filtros de búsqueda.");
-  const { query, patientId, serviceId } = parsed.data;
-  const [patients, patient, services, professionals] = await Promise.all([
-    query
+  const { query, patientPage, patientId, serviceId } = parsed.data;
+  const [patientResults, patient, services, professionals] = await Promise.all([
+    !patientId
       ? prisma.patient.findMany({
           where: {
             active: true,
-            AND: query.split(/\s+/).map((word) => ({
-              OR: [
-                {
-                  firstName: { contains: word, mode: "insensitive" as const },
-                },
-                {
-                  lastName: { contains: word, mode: "insensitive" as const },
-                },
-                {
-                  documentNumber: {
-                    contains: word,
-                    mode: "insensitive" as const,
-                  },
-                },
-              ],
-            })),
+            AND: query
+              ? query.split(/\s+/).map((word) => ({
+                  OR: [
+                    {
+                      firstName: {
+                        contains: word,
+                        mode: "insensitive" as const,
+                      },
+                    },
+                    {
+                      lastName: {
+                        contains: word,
+                        mode: "insensitive" as const,
+                      },
+                    },
+                    {
+                      documentNumber: {
+                        contains: word,
+                        mode: "insensitive" as const,
+                      },
+                    },
+                  ],
+                }))
+              : [],
           },
           select: patientSelect,
-          orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
-          take: 30,
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          skip: (patientPage - 1) * 10,
+          take: 11,
         })
       : [],
     patientId
@@ -128,7 +142,126 @@ export async function getAppointmentOptions(
         })
       : [],
   ]);
-  return { patients, patient, services, professionals };
+  return {
+    patients: patientResults.slice(0, 10),
+    hasMorePatients: patientResults.length > 10,
+    patient,
+    services,
+    professionals,
+  };
+}
+
+export async function listAvailableDates(
+  input: Pick<
+    AvailableSlotsInput,
+    "patientId" | "serviceId" | "professionalId"
+  >,
+  actor: Actor,
+) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  const parsed = availableSlotsSchema.omit({ date: true }).safeParse(input);
+  if (!parsed.success)
+    throw new DomainError(
+      "VALIDATION",
+      "Revisá los datos para consultar disponibilidad.",
+    );
+  const { patientId, serviceId, professionalId } = parsed.data;
+  const now = new Date();
+  const bounds = appointmentDateBounds(now);
+  const rangeEnd = appointmentInstant(bounds.max, 1440);
+  const rangeStart = appointmentInstant(bounds.min, 0);
+  return prisma.$transaction(
+    async (tx) => {
+      const [
+        patient,
+        service,
+        professional,
+        windows,
+        exceptions,
+        holidays,
+        appointments,
+      ] = await Promise.all([
+        tx.patient.findFirst({
+          where: { id: patientId, active: true },
+          select: { id: true },
+        }),
+        tx.service.findFirst({
+          where: { id: serviceId, active: true },
+          select: { durationMinutes: true },
+        }),
+        tx.professional.findFirst({
+          where: {
+            id: professionalId,
+            active: true,
+            services: { some: { id: serviceId } },
+          },
+          select: { id: true },
+        }),
+        tx.availabilityWindow.findMany({
+          where: {
+            professionalId,
+            OR: [
+              { services: { none: {} } },
+              { services: { some: { id: serviceId } } },
+            ],
+          },
+          select: { weekday: true, startMinute: true, endMinute: true },
+        }),
+        tx.availabilityException.findMany({
+          where: {
+            professionalId,
+            date: { gte: dateToDb(bounds.min), lte: dateToDb(bounds.max) },
+          },
+          select: { date: true, startMinute: true, endMinute: true },
+        }),
+        tx.holiday.findMany({
+          where: {
+            date: { gte: dateToDb(bounds.min), lte: dateToDb(bounds.max) },
+          },
+          select: { date: true },
+        }),
+        tx.appointment.findMany({
+          where: {
+            status: { in: occupiedStatuses },
+            startsAt: { lt: rangeEnd },
+            endsAt: { gt: rangeStart },
+            OR: [{ professionalId }, { patientId }],
+          },
+          select: { startsAt: true, endsAt: true },
+        }),
+      ]);
+      if (!patient || !service || !professional)
+        throw new DomainError(
+          "NOT_FOUND",
+          "El paciente, servicio o profesional ya no está disponible, o el profesional no presta ese servicio.",
+        );
+      const dates: string[] = [];
+      const day = dateToDb(bounds.min);
+      while (dateFromDb(day) <= bounds.max) {
+        const date = dateFromDb(day);
+        const weekday = toLocalSlot(appointmentInstant(date, 0)).weekday;
+        if (
+          calculateAvailableSlots({
+            date,
+            durationMinutes: service.durationMinutes,
+            windows: windows.filter((window) => window.weekday === weekday),
+            exceptions: exceptions.filter(
+              (exception) => dateFromDb(exception.date) === date,
+            ),
+            holiday: holidays.some(
+              (holiday) => dateFromDb(holiday.date) === date,
+            ),
+            appointments,
+            now,
+          }).length > 0
+        )
+          dates.push(date);
+        day.setUTCDate(day.getUTCDate() + 1);
+      }
+      return dates;
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+  );
 }
 
 // Se usa el mismo cálculo al leer y dentro de la transacción de alta.
