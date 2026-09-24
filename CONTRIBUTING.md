@@ -21,6 +21,13 @@ migrada no tiene ninguno. Es idempotente (al volver a correrlo, lo sembrado
 vuelve a sus valores; lo cargado desde la UI no se toca) y se niega a correr con
 `NODE_ENV=production`. `prisma migrate reset` lo corre solo.
 
+Los turnos se siembran en la semana anterior, la actual y la siguiente a la
+corrida, así el calendario siempre tiene datos. Hay turnos ya cerrados
+(Completado, Vencido, Cancelado) y turnos pasados que siguen Programados para
+probar "Marcar completado" y "Marcar vencido". Los turnos solo se agregan: si
+ya cerraste los pendientes, `npx prisma migrate reset` deja todo como al
+principio (borra también lo cargado desde la UI).
+
 Todos los usuarios tienen la contraseña `goat1234` (cambiable con `SEED_PASSWORD`):
 
 | Email | Rol | Para qué |
