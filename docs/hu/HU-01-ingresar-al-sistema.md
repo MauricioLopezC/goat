@@ -35,7 +35,7 @@ Previstas; cada ficha se escribe en [`acciones.md`](../acciones.md) al implement
 
 - `signIn`, `signOut` — inicio y cierre de sesión.
 - `createUser` — alta de usuario con rol, solo `MANAGER`.
-- `listUsers` — listado de usuarios del centro, solo `MANAGER`. Lectura, no acción.
+- `listUsers` — listado de usuarios del centro, paginado de a 10, solo `MANAGER`. Lectura, no acción.
 
 La sesión está decidida en el [ADR 0002](../adr/0002-autenticacion-y-sesion.md): cookie sellada con `iron-session`, contraseñas con argon2id y el rol verificado contra la base en cada request. `getSession()` y `requireRole()` viven en `src/lib/dal/auth.ts`, como fijó el [ADR 0001](../adr/0001-server-actions-y-capa-de-acceso-a-datos.md).
 

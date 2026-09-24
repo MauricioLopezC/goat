@@ -5,6 +5,7 @@ import { Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
 import { assertRole, type Actor } from "@/lib/dal/auth";
+import { emptyPage, paginate } from "@/lib/pagination";
 import type {
   CreatePatientInput,
   UpdatePatientInput,
@@ -200,13 +201,18 @@ export async function listHealthInsurers(actor: Actor) {
 export type UpdatedPatientSummary = CreatedPatientSummary;
 
 /// Búsqueda de pacientes por documento, apellido o nombre (HU-08).
-/// Mínimo 3 caracteres; devuelve arreglo vacío si tiene menos.
-export async function searchPatients(query: string, actor: Actor) {
+/// Mínimo 3 caracteres; devuelve una página vacía si tiene menos. Pagina de a
+/// `PAGE_SIZE` resultados, con el total.
+export async function searchPatients(
+  query: string,
+  page: number,
+  actor: Actor,
+) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
 
   const trimmed = query.trim();
   if (trimmed.length < 3) {
-    return [];
+    return emptyPage<never>();
   }
 
   const orConditions: Prisma.PatientWhereInput[] = [
@@ -224,24 +230,29 @@ export async function searchPatients(query: string, actor: Actor) {
     });
   }
 
-  return prisma.patient.findMany({
-    where: {
-      active: true,
-      OR: orConditions,
-    },
-    include: {
-      coverage: {
+  const where: Prisma.PatientWhereInput = { active: true, OR: orConditions };
+  return paginate(
+    page,
+    () => prisma.patient.count({ where }),
+    (range) =>
+      prisma.patient.findMany({
+        where,
         include: {
-          insurancePlan: {
+          coverage: {
             include: {
-              healthInsurer: true,
+              insurancePlan: {
+                include: {
+                  healthInsurer: true,
+                },
+              },
             },
           },
         },
-      },
-    },
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-  });
+        // El `id` desempata para que ningún paciente salte de página.
+        orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
+        ...range,
+      }),
+  );
 }
 
 /// Ficha completa del paciente por ID (HU-08).

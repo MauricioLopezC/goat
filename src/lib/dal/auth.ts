@@ -8,6 +8,7 @@ import { STAFF_ROLES } from "@/lib/roles";
 import { readSession, startSession, clearSession } from "@/lib/session";
 import { dummyHash, hashPassword, verifyPassword } from "@/lib/password";
 import { DomainError } from "@/lib/actions";
+import { paginate } from "@/lib/pagination";
 import type { SignInInput, CreateUserInput } from "@/lib/validation/auth";
 
 export { STAFF_ROLES };
@@ -157,26 +158,38 @@ export async function signOut(): Promise<void> {
   await clearSession();
 }
 
-/// Listado de usuarios del centro. Solo el gerente.
+/// Listado de usuarios del centro, paginado. Solo el gerente.
 ///
 /// Es una lectura: la consume un Server Component llamando directo a la DAL
 /// (ADR 0001). Devuelve solo lo que la pantalla muestra, nunca el
 /// `passwordHash`.
-export async function listUsers(actor: Actor) {
+export async function listUsers(page: number, actor: Actor) {
   assertRole(actor, Role.MANAGER);
 
-  return prisma.user.findMany({
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-      role: true,
-      active: true,
-      createdAt: true,
-    },
-    orderBy: [{ active: "desc" }, { lastName: "asc" }, { firstName: "asc" }],
-  });
+  return paginate(
+    page,
+    () => prisma.user.count(),
+    (range) =>
+      prisma.user.findMany({
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          role: true,
+          active: true,
+          createdAt: true,
+        },
+        // El `id` desempata para que ningún usuario salte de página.
+        orderBy: [
+          { active: "desc" },
+          { lastName: "asc" },
+          { firstName: "asc" },
+          { id: "asc" },
+        ],
+        ...range,
+      }),
+  );
 }
 
 /// Alta de usuario. Solo el gerente.

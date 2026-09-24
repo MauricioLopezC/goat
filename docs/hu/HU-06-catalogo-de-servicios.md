@@ -20,6 +20,7 @@
 - Los servicios activos son los que se ofrecen al dar un turno.
 - Cada servicio se asocia a uno o más profesionales, desde [HU-02](HU-02-registrar-profesional.md) y [HU-03](HU-03-modificar-baja-profesional.md).
 - La duración del servicio determina el bloque que se ocupa en la agenda.
+- El catálogo se lista de a 10 servicios por página, los activos primero, con el total de servicios.
 
 ## Confirmación
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useRef } from "react";
+import { startTransition, useActionState, useRef, type ReactNode } from "react";
 
 import { ActionErrorAlert } from "@/components/action-error-alert";
 import { ConfirmDelete } from "@/components/confirm-delete";
@@ -27,12 +27,15 @@ import {
 type Holiday = { id: number; date: string; description: string };
 
 /// Feriados de hoy en adelante (HU-05). Solo `MANAGER` los carga y elimina.
+/// `holidays` es la página visible; `pagination`, su pie ya armado.
 export function HolidaysManager({
   holidays,
   canEdit,
+  pagination,
 }: {
   holidays: Holiday[];
   canEdit: boolean;
+  pagination: ReactNode;
 }) {
   return (
     <>
@@ -42,7 +45,7 @@ export function HolidaysManager({
         <CardHeader>
           <CardTitle>Próximos feriados</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
           {holidays.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               No hay feriados cargados de hoy en adelante.
@@ -80,6 +83,7 @@ export function HolidaysManager({
               </TableBody>
             </Table>
           )}
+          {pagination}
         </CardContent>
       </Card>
     </>

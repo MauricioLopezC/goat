@@ -24,6 +24,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { calculateAge } from "@/lib/patients";
+import { emptyPage, parsePageParam } from "@/lib/pagination";
+import { ListPagination } from "@/components/list-pagination";
 import { PatientSearchBar } from "./PatientSearchBar";
 
 export const metadata: Metadata = {
@@ -32,7 +34,7 @@ export const metadata: Metadata = {
 };
 
 interface PatientsPageProps {
-  searchParams?: Promise<{ q?: string }>;
+  searchParams?: Promise<{ q?: string; page?: string }>;
 }
 
 function formatDate(date: Date | string) {
@@ -57,7 +59,10 @@ export default async function PatientsPage({
   const hasMinChars = query.length >= 3;
   const isTooShort = query.length > 0 && query.length < 3;
 
-  const patients = hasMinChars ? await searchPatients(query, actor) : [];
+  const patientsPage = hasMinChars
+    ? await searchPatients(query, parsePageParam(resolvedParams?.page), actor)
+    : emptyPage<never>();
+  const patients = patientsPage.items;
 
   return (
     <div className="flex flex-col gap-6">
@@ -154,11 +159,11 @@ export default async function PatientsPage({
       {hasMinChars && patients.length > 0 && (
         <div className="space-y-4">
           <p className="text-body-sm text-muted-foreground">
-            Se {patients.length === 1 ? "encontró" : "encontraron"}{" "}
+            Se {patientsPage.total === 1 ? "encontró" : "encontraron"}{" "}
             <span className="font-semibold text-foreground">
-              {patients.length}
+              {patientsPage.total}
             </span>{" "}
-            {patients.length === 1 ? "paciente" : "pacientes"}.
+            {patientsPage.total === 1 ? "paciente" : "pacientes"}.
           </p>
 
           <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
@@ -286,6 +291,13 @@ export default async function PatientsPage({
               </TableBody>
             </Table>
           </div>
+
+          <ListPagination
+            page={patientsPage}
+            pathname="/patients"
+            params={{ q: query }}
+            label="Páginas de pacientes"
+          />
         </div>
       )}
     </div>

@@ -17,7 +17,7 @@
 
 ## Comportamiento
 
-- Resultados ordenados por apellido.
+- Resultados ordenados por apellido, de a 10 por página, con el total de pacientes encontrados. Una búsqueda nueva vuelve a la primera página.
 - Sin resultados: mensaje claro y acceso directo a registrar un paciente nuevo, con el texto buscado ya precargado.
 - Desde el resultado se puede abrir la ficha, editarla o dar un turno.
 - Cada modificación registra usuario, fecha y hora.
@@ -30,7 +30,7 @@
 ## Operaciones
 
 - `updatePatient` — modificación de datos y cobertura.
-- Búsqueda y ficha son lecturas: `searchPatients(query)`, `getPatient(id)` en `src/lib/dal/patients.ts`, llamadas desde Server Components.
+- Búsqueda y ficha son lecturas: `searchPatients(query, page)`, `getPatient(id)` en `src/lib/dal/patients.ts`, llamadas desde Server Components.
 
 ## Nota de alcance
 

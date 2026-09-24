@@ -68,13 +68,24 @@ export async function cancelAppointment(input: CancelAppointmentInput, actor: Ac
 
 // Server Component: la lectura también recibe el actor.
 const actor = await requirePageRole("MANAGER")
-const users = await listUsers(actor)
+const users = await listUsers(page, actor)
 ```
 
 - **El `actor` va como último parámetro**, también en las lecturas. La función no lee la sesión ni confía en que quien la llama haya chequeado.
 - **`assertRole` es la primera línea** de la función, antes de tocar la base.
 - **Los roles de la ficha valen para las dos barreras.** Si cambian, cambian en la acción y en la DAL en el mismo commit.
 - Sin `actor` quedan solo las funciones que crean o leen la sesión: `getSession`, `requireRole`, `requirePageRole`, `signIn` y `signOut`.
+
+## Listados paginados
+
+Los listados de entidades de una pantalla (`searchPatients`, `listProfessionalsPage`, `listUsers`, `listServices`, `listHolidays`) se paginan en la DAL con los helpers de `src/lib/pagination.ts`:
+
+- Reciben `page` antes del `actor` y devuelven `Page<T>`: `{ items, total, page, pageSize, pageCount }`, de a `PAGE_SIZE` (10) registros.
+- Cuentan el total con los mismos filtros y traen solo la página pedida. Una página fuera de rango devuelve la última; un valor inválido, la primera.
+- El orden termina en un campo único (`id` o uno `@unique`), para que ningún registro salte de página o aparezca en dos.
+- La página viaja en la URL como `?page=N` junto a los filtros (`parsePageParam` la lee). Cambiar un filtro o la búsqueda vuelve a la página 1. La interfaz usa `ListPagination` (`src/components/list-pagination.tsx`), que se oculta si hay una sola página.
+
+Las listas que alimentan un selector (por ejemplo, `listProfessionals` en la agenda y el calendario) no se paginan: necesitan todas las opciones.
 
 ## `ActionResult`
 
@@ -378,12 +389,12 @@ No vincula la cuenta con un `Professional`: esa relación (`Professional.userId`
 
 **Historia de usuario:** [HU-01 — Ingresar al sistema con mi rol](hu/HU-01-ingresar-al-sistema.md)
 **Roles:** `MANAGER`.
-**Entrada:** el `actor`. No recibe parámetros de la interfaz.
+**Entrada:** `page` (de `?page=`) y el `actor`.
 **Precondiciones:** el actor es `MANAGER`.
 **Efectos:** ninguno. Es una lectura.
 **Errores:** `FORBIDDEN` si el actor no es `MANAGER`. En `/users` no llega a dispararse: `requirePageRole` redirige antes a la pantalla del rol. Queda como barrera por si la función se llama desde otro lado.
 **Revalida:** no aplica.
-**Devuelve:** `{ id, firstName, lastName, email, role, active, createdAt }[]`, ordenado por estado y apellido. Nunca el `passwordHash`.
+**Devuelve:** `Page<{ id, firstName, lastName, email, role, active, createdAt }>`, ordenado por estado, apellido, nombre e `id` ([listados paginados](#listados-paginados)). Nunca el `passwordHash`.
 
 No es una Server Action: es una lectura que el Server Component de `/users`
 llama directo a la DAL (ADR 0001). Lleva ficha igual porque tiene una
@@ -398,9 +409,22 @@ restricción de rol y decide qué datos del usuario salen a la interfaz.
 **Efectos:** ninguno. Es una lectura.
 **Errores:** `FORBIDDEN` si el actor no es `MANAGER` ni `RECEPTIONIST`. En `/professionals` no llega a dispararse: `requirePageRole` redirige antes. Queda como barrera por si la función se llama desde otro lado.
 **Revalida:** no aplica.
-**Devuelve:** `{ id, lastName, firstName, documentType, documentNumber, licenseNumber, phone, email, active, titles: { id, name }[], services: { id, name, durationMinutes }[] }[]`, con todos los estados por defecto y ordenado por apellido y nombre.
+**Devuelve:** `{ id, lastName, firstName, documentType, documentNumber, licenseNumber, phone, email, active, titles: { id, name }[], services: { id, name, durationMinutes }[] }[]`, con todos los estados por defecto y ordenado por apellido y nombre. Sin paginar: la usan los selectores de profesional de `/agenda`, `/calendar` y `/appointments/new`.
 
-No es una Server Action: es una lectura que el Server Component de `/professionals` llama directo a la DAL (ADR 0001).
+No es una Server Action: es una lectura que los Server Components llaman directo a la DAL (ADR 0001).
+
+### `listProfessionalsPage`
+
+**Historia de usuario:** [HU-04 — Buscar y listar profesionales](hu/HU-04-buscar-profesionales.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`
+**Entrada:** `filters` (los mismos de `listProfessionals`), `page` (de `?page=`) y `actor`.
+**Precondiciones:** las de `listProfessionals`. Con una búsqueda de menos de 2 caracteres devuelve una página vacía sin consultar la base.
+**Efectos:** ninguno. Es una lectura.
+**Errores:** `FORBIDDEN` si el actor no es `MANAGER` ni `RECEPTIONIST`.
+**Revalida:** no aplica.
+**Devuelve:** `Page<…>` con los mismos campos que `listProfessionals`, ordenado por apellido, nombre e `id` ([listados paginados](#listados-paginados)).
+
+No es una Server Action: es la lectura del listado de `/professionals` (ADR 0001).
 
 ### `listActiveProfessionalTitles`
 
@@ -426,12 +450,12 @@ No es una Server Action: es una lectura que el Server Component de `/professiona
 
 **Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
 **Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
-**Entrada:** el `actor`. No recibe parámetros de la interfaz.
+**Entrada:** `page` (de `?page=`) y el `actor`.
 **Precondiciones:** el actor pertenece a `STAFF_ROLES`.
-**Efectos:** ninguno. Es una lectura de todos los servicios (activos e inactivos) del centro.
+**Efectos:** ninguno. Es una lectura de los servicios (activos e inactivos) del centro.
 **Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
 **Revalida:** no aplica.
-**Devuelve:** `{ id, name, description, durationMinutes, requiresReferral, active, specialty: { id, name } | null }[]`, ordenado por estado activo primero y nombre alfabético.
+**Devuelve:** `Page<{ id, name, description, durationMinutes, requiresReferral, active, specialtyId, specialty: { id, name } | null }>`, ordenado por estado activo primero, nombre alfabético e `id` ([listados paginados](#listados-paginados)).
 
 No es una Server Action: es una lectura que el Server Component de `/services` llama directo a la DAL (ADR 0001).
 
@@ -597,12 +621,12 @@ No es una Server Action: la página `/my-schedule` la llama directo a la DAL y r
 
 **Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
 **Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
-**Entrada:** el `actor`.
+**Entrada:** `page` (de `?page=`) y el `actor`.
 **Precondiciones:** el actor pertenece a `STAFF_ROLES`.
 **Efectos:** ninguno. Es una lectura.
 **Errores:** `FORBIDDEN`.
 **Revalida:** no aplica.
-**Devuelve:** `{ id, date, description }[]` de hoy en adelante, ordenado por fecha.
+**Devuelve:** `Page<{ id, date, description }>` de hoy en adelante, ordenado por fecha ([listados paginados](#listados-paginados)).
 
 No es una Server Action: la página `/holidays` la llama directo a la DAL (ADR 0001).
 
@@ -632,12 +656,12 @@ No es una Server Action: la página `/holidays` la llama directo a la DAL (ADR 0
 
 **Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`
-**Entrada:** `query` (cadena de búsqueda) y el `actor`.
-**Precondiciones:** el actor pertenece a `STAFF_ROLES`. Si `query.trim().length < 3`, la operación no ejecuta la consulta a la base y retorna un listado vacío `[]`.
+**Entrada:** `query` (cadena de búsqueda), `page` (de `?page=`) y el `actor`.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`. Si `query.trim().length < 3`, la operación no ejecuta la consulta a la base y retorna una página vacía.
 **Efectos:** ninguno. Es una lectura de pacientes activos (`active: true`) con coincidencia parcial insensible a mayúsculas en `lastName` o `firstName`, o coincidencia en `documentNumber`. Incluye la afiliación (`coverage`) con su plan y obra social.
 **Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
 **Revalida:** no aplica.
-**Devuelve:** `Patient[]` con `coverage` incluida, ordenados alfabéticamente por apellido y nombre.
+**Devuelve:** `Page<Patient>` con `coverage` incluida, ordenados alfabéticamente por apellido, nombre e `id` ([listados paginados](#listados-paginados)).
 
 No es una Server Action: es una lectura que el Server Component de `/patients` llama directo a la DAL (ADR 0001).
 

@@ -11,6 +11,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { assertRole, type Actor } from "@/lib/dal/auth";
 import { STAFF_ROLES } from "@/lib/roles";
 import { getTodayDateString } from "@/lib/utils";
+import { paginate } from "@/lib/pagination";
 import {
   WEEKDAY_LABEL,
   type AffectedAppointment,
@@ -534,17 +535,29 @@ export async function getOwnProfessionalId(actor: Actor) {
 
 // ─────────────────────────── Feriados ──────────────────────────────────
 
-export async function listHolidays(actor: Actor) {
+/// Feriados de hoy en adelante, paginados y ordenados por fecha (HU-05).
+export async function listHolidays(page: number, actor: Actor) {
   assertRole(actor, ...STAFF_ROLES);
-  const holidays = await prisma.holiday.findMany({
-    where: { date: { gte: dateToDb(getTodayDateString()) } },
-    select: { id: true, date: true, description: true },
-    orderBy: { date: "asc" },
-  });
-  return holidays.map((holiday) => ({
-    ...holiday,
-    date: dateFromDb(holiday.date),
-  }));
+  const where = { date: { gte: dateToDb(getTodayDateString()) } };
+  const holidays = await paginate(
+    page,
+    () => prisma.holiday.count({ where }),
+    // La fecha es única: no hace falta desempatar.
+    (range) =>
+      prisma.holiday.findMany({
+        where,
+        select: { id: true, date: true, description: true },
+        orderBy: { date: "asc" },
+        ...range,
+      }),
+  );
+  return {
+    ...holidays,
+    items: holidays.items.map((holiday) => ({
+      ...holiday,
+      date: dateFromDb(holiday.date),
+    })),
+  };
 }
 
 export async function createHoliday(input: HolidayInput, actor: Actor) {

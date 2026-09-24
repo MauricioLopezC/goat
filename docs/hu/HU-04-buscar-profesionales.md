@@ -18,6 +18,7 @@
 - Búsqueda por apellido, nombre, documento o matrícula, con coincidencia parcial.
 - Filtros por servicio y por estado (activo, inactivo, todos).
 - Por defecto muestra todos los estados, ordenados por apellido. Al limpiar los filtros vuelve a mostrar todos.
+- El listado se pagina de a 10 profesionales, con el total de resultados. Cambiar la búsqueda o un filtro vuelve a la primera página.
 - Sin resultados: mensaje claro y opción de limpiar filtros.
 - El listado ofrece **Ver ficha** para consultar los datos y las franjas semanales; la edición se inicia con una acción separada, disponible para el gerente.
 
@@ -30,7 +31,7 @@
 
 Historia de solo lectura: no lleva Server Action. Las consultas van en la DAL y se llaman desde Server Components ([ADR 0001](../adr/0001-server-actions-y-capa-de-acceso-a-datos.md)).
 
-- `listProfessionals(filters)`, `getProfessional(id)` en `src/lib/dal/professionals.ts`.
+- `listProfessionalsPage(filters, page)`, `getProfessional(id)` en `src/lib/dal/professionals.ts`. `listProfessionals(filters)` devuelve la lista completa para los selectores de profesional.
 
 ## A conversar
 

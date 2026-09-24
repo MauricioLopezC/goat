@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { CheckCircle2, Edit2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,15 +46,21 @@ export interface ServiceListItem {
 }
 
 interface ServicesManagerProps {
+  /// La página visible del catálogo.
   services: ServiceListItem[];
+  /// Total de servicios del catálogo, de todas las páginas.
+  total: number;
   specialties: SpecialtyOption[];
   isManager: boolean;
+  pagination: ReactNode;
 }
 
 export function ServicesManager({
   services,
+  total,
   specialties,
   isManager,
+  pagination,
 }: ServicesManagerProps) {
   const [editingService, setEditingService] = useState<EditingService | null>(
     null,
@@ -165,12 +171,12 @@ export function ServicesManager({
             Catálogo de prestaciones
           </CardTitle>
           <CardDescription>
-            {services.length === 1
+            {total === 1
               ? "1 servicio registrado."
-              : `${services.length} servicios registrados en el centro.`}
+              : `${total} servicios registrados en el centro.`}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
           <Table>
             <TableHeader>
               <TableRow>
@@ -276,6 +282,7 @@ export function ServicesManager({
               ))}
             </TableBody>
           </Table>
+          {pagination}
         </CardContent>
       </Card>
     </div>

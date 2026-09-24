@@ -25,7 +25,7 @@
 - La agenda se define como patrón semanal y se repite hasta que se modifique.
 - Al guardar, el calendario ([HU-11](HU-11-calendario-del-centro.md)) refleja de inmediato los espacios disponibles.
 - La grilla de horarios se calcula a partir de la franja. Cada servicio tiene una duración estimada fija, sin importar de cuál se trate.
-- Los feriados no generan disponibilidad: el centro permanece cerrado. El gerente los administra en una pantalla propia; el seed trae los nacionales.
+- Los feriados no generan disponibilidad: el centro permanece cerrado. El gerente los administra en una pantalla propia; el seed trae los nacionales. Esa pantalla lista los feriados de hoy en adelante de a 10 por página.
 - Cada profesional puede tener excepciones a su patrón semanal (ausencias puntuales).
 - Solo se pueden asignar turnos hasta dos meses hacia adelante.
 
