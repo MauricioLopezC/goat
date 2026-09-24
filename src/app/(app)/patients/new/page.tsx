@@ -8,9 +8,18 @@ export const metadata: Metadata = {
   title: "Registrar paciente nuevo · Goat",
 };
 
-export default async function NewPatientPage() {
+interface NewPatientPageProps {
+  searchParams?: Promise<{ q?: string }>;
+}
+
+export default async function NewPatientPage({
+  searchParams,
+}: NewPatientPageProps) {
   // Solo RECEPCIONISTA y GERENTE pueden registrar pacientes (HU-07)
   const actor = await requirePageRole(Role.RECEPTIONIST, Role.MANAGER);
+
+  const resolvedParams = searchParams ? await searchParams : undefined;
+  const initialQuery = resolvedParams?.q;
 
   const healthInsurers = await listHealthInsurers(actor);
   const cancelHref = landingPath(actor.role);
@@ -26,7 +35,11 @@ export default async function NewPatientPage() {
         </p>
       </div>
 
-      <NewPatientForm healthInsurers={healthInsurers} cancelHref={cancelHref} />
+      <NewPatientForm
+        healthInsurers={healthInsurers}
+        cancelHref={cancelHref}
+        initialQuery={initialQuery}
+      />
     </div>
   );
 }
