@@ -6,6 +6,7 @@ export const appointmentDateSchema = z
   .refine(isCalendarDate, "Ingresá una fecha válida.");
 export const appointmentOptionsSchema = z.object({
   query: z.string().trim().max(80).default(""),
+  patientPage: z.number().int().min(1).max(1000).default(1),
   patientId: z.number().int().positive().optional(),
   serviceId: z.number().int().positive().optional(),
 });

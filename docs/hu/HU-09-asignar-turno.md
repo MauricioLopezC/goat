@@ -23,7 +23,9 @@
 
 ## Comportamiento
 
-- Flujo esperado: elegir paciente (o crearlo), elegir servicio, elegir profesional, el sistema muestra los horarios libres, elegir fecha y hora, confirmar.
+- Flujo esperado: elegir paciente (o crearlo), elegir servicio y profesional; el sistema muestra las fechas con al menos un horario libre, elegir fecha y luego horario, confirmar.
+- Al entrar sin paciente elegido se muestran los 10 pacientes activos registrados más recientemente. La búsqueda se actualiza mientras se escribe y sus resultados, igual que la lista inicial, se recorren de 10 en 10 sin perder el texto ingresado.
+- Las fechas ofrecidas respetan el servicio y los turnos del paciente, además de las franjas, ausencias, feriados y turnos ocupados del profesional. Se recorren de 14 en 14 desde hoy hasta dos meses inclusive.
 - Al guardar, el turno queda en estado Programado y el bloque se ocupa en el calendario al instante.
 - El turno queda visible en la agenda del profesional y en el calendario general.
 - Queda registrado quién lo creó y cuándo.
@@ -43,7 +45,8 @@
 ## Operaciones
 
 - `createAppointment` — alta transaccional; ficha en [`acciones.md`](../acciones.md).
-- `getAppointmentOptions` — pacientes por nombre/documento, paciente elegido, servicios activos y profesionales habilitados.
+- `getAppointmentOptions` — pacientes recientes o buscados, paginados de 10 en 10, paciente elegido, servicios activos y profesionales habilitados.
+- `listAvailableDates` — fechas que tienen al menos un horario libre para el profesional, servicio y paciente elegidos.
 - `listAvailableSlots` — disponibilidad del profesional, servicio, fecha y paciente; lectura desde Server Component.
 - `listAppointments` — calendario del centro y agenda propia, con autorización en la DAL.
 - `getAppointment` — resumen de confirmación y consulta autorizada.
