@@ -102,15 +102,22 @@ export function AgendaView({
             </div>
           )}
         </div>
-        {isStaff && professionals && professionals.length > 0 && (
+        {isStaff && (
           <div className="flex items-center gap-2">
-            <AgendaProfessionalSwitcher
-              currentProfessionalId={data.professional.id}
-              professionals={professionals}
-              date={data.date}
-              view={data.view}
-              hideCancelled={data.hideCancelled}
-            />
+            {professionals && professionals.length > 0 && (
+              <AgendaProfessionalSwitcher
+                currentProfessionalId={data.professional.id}
+                professionals={professionals}
+                date={data.date}
+                view={data.view}
+                hideCancelled={data.hideCancelled}
+              />
+            )}
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/professionals/${data.professional.id}`}>
+                Volver a la ficha
+              </Link>
+            </Button>
           </div>
         )}
       </header>
