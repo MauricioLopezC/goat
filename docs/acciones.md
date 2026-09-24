@@ -610,6 +610,20 @@ No es una Server Action: es una lectura que el Server Component de `/patients/[i
 **Revalida:** `/patients` y `/patients/[id]`.
 **Devuelve:** `{ id, firstName, lastName, documentType, documentNumber }`.
 
+### `getProfessionalAgenda`
+
+**Historia de usuario:** [HU-12 — Ver mi agenda completa](hu/HU-12-agenda-del-profesional.md)
+**Roles:** `PROFESSIONAL`, `MANAGER`, `RECEPTIONIST`
+**Entrada:** `input: { date?: string, view?: "week" | "day", hideCancelled?: boolean, professionalId?: number }` y `actor: Actor`.
+**Precondiciones:**
+- Si `actor.role === Role.PROFESSIONAL`, el profesional es el correspondiente a su usuario (`Professional.userId`). Si viene `input.professionalId` en los parámetros y no coincide con el suyo, la DAL rechaza la solicitud con `FORBIDDEN`.
+- Si `actor.role` es `MANAGER` o `RECEPTIONIST`, deben especificar `input.professionalId`.
+**Efectos:** ninguno. Es una lectura para la pantalla de agenda. Obtiene el perfil del profesional, sus franjas de atención semanales con consultorio y servicios, los turnos asignados en el rango temporal solicitado (semanal o diario) ordenados cronológicamente con datos clínicos completos (paciente con nombre, apellido y documento; servicio; horario y estado), el resumen de KPIs (total, programados, completados y cancelados), y los feriados y excepciones vigentes. Si `hideCancelled` es verdadero, los turnos cancelados se excluyen del listado de turnos pero se conservan en el contador del resumen.
+**Errores:** `FORBIDDEN` (rol no habilitado, o un `PROFESSIONAL` que consulta la agenda de otro), `NOT_FOUND` (profesional no encontrado), `VALIDATION` (parámetros inválidos o falta `professionalId` en roles administrativos).
+**Revalida:** no aplica.
+**Devuelve:** `{ professional, date, view, hideCancelled, week, windows, appointments, summary, holidays, exceptions }`.
+
+No es una Server Action: el Server Component de `/agenda` la llama directo a la DAL (ADR 0001).
 
 ### Nota: `signIn` y `signOut` frente a `defineAction`
 
