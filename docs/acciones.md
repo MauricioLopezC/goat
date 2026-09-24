@@ -248,7 +248,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Roles:** `RECEPTIONIST`, `MANAGER`.
 **Entrada:** `appointmentId` (entero positivo), `reason` (hasta 500 caracteres, opcional).
 **Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya comenzó (`startsAt` no es posterior a ahora).
-**Efectos:** transacción `Serializable` que actualiza `Appointment.status` a `COMPLETED` y crea un `AppointmentEvent` de tipo `COMPLETED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). El horario sigue ocupado.
+**Efectos:** en una transacción, actualiza `Appointment.status` a `COMPLETED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya comenzado, y crea un `AppointmentEvent` de tipo `COMPLETED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Si otro usuario cambió el turno antes, la condición no coincide y se devuelve `INVALID_STATUS_TRANSITION` sin pisar su cambio. El horario sigue ocupado.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no comenzó).
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
 **Devuelve:** `{ id }`.
@@ -259,7 +259,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Roles:** `RECEPTIONIST`, `MANAGER`.
 **Entrada:** `appointmentId` (entero positivo), `reason` (hasta 500 caracteres, opcional).
 **Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya terminó (`endsAt` no es posterior a ahora). La restricción de exclusión no cubre `EXPIRED`: vencer un turno futuro liberaría su horario, por eso la DAL lo impide.
-**Efectos:** transacción `Serializable` que actualiza `Appointment.status` a `EXPIRED` y crea un `AppointmentEvent` de tipo `EXPIRED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora).
+**Efectos:** en una transacción, actualiza `Appointment.status` a `EXPIRED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya terminado, y crea un `AppointmentEvent` de tipo `EXPIRED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Igual que al completar, un cambio concurrente no se pisa.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no terminó).
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
 **Devuelve:** `{ id }`.

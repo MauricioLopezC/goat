@@ -9,11 +9,21 @@ import {
   formatInstant,
   toLocalSlot,
 } from "@/lib/schedule";
-import { APPOINTMENT_STATUS_LABEL } from "@/components/appointment-calendar";
+import {
+  APPOINTMENT_STATUS_BADGE_CLASS,
+  APPOINTMENT_STATUS_LABEL,
+} from "@/lib/appointment-status";
+import {
+  calendarHref,
+  calendarSearch,
+  parseCalendarQuery,
+} from "@/lib/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CancelAppointmentDialog } from "./cancel-dialog";
+import { StatusChangeDialog } from "./status-dialog";
 import type { AppointmentEventType } from "@/generated/prisma/enums";
 
 const EVENT_TYPE_LABEL: Record<AppointmentEventType, string> = {
@@ -33,7 +43,8 @@ export default async function AppointmentPage({
     "PROFESSIONAL",
   );
   const { id } = await params;
-  const { created, cancelled } = await searchParams;
+  const query = await searchParams;
+  const { created, cancelled, changed } = query;
   let appointment;
   try {
     appointment = await getAppointment(Number(id), actor);
@@ -44,14 +55,17 @@ export default async function AppointmentPage({
   const start = toLocalSlot(appointment.startsAt);
   const end = toLocalSlot(appointment.endsAt);
   const own = actor.role === "PROFESSIONAL";
-  const canCancel =
-    !own &&
-    appointment.status === "SCHEDULED" &&
-    (actor.role === "RECEPTIONIST" || actor.role === "MANAGER");
+  const scheduled = appointment.status === "SCHEDULED";
+  const canChangeStatus = !own && scheduled;
+  const now = new Date();
+  const canComplete = canChangeStatus && appointment.startsAt <= now;
+  const canExpire = canChangeStatus && appointment.endsAt <= now;
 
-  const cancelSummary = canCancel
-    ? `${appointment.patient.lastName}, ${appointment.patient.firstName} · ${appointment.professional.lastName}, ${appointment.professional.firstName} · ${appointment.service.name} · ${formatDate(start.date)}, ${formatMinute(start.minute)}–${formatMinute(end.minute)}`
-    : "";
+  const summary = `${appointment.patient.lastName}, ${appointment.patient.firstName} · ${appointment.professional.lastName}, ${appointment.professional.firstName} · ${appointment.service.name} · ${formatDate(start.date)}, ${formatMinute(start.minute)}–${formatMinute(end.minute)}`;
+  // Se vuelve al mismo calendario (vista, fecha y filtros) desde el que se
+  // abrió el turno; sin parámetros, al día del turno.
+  const calendarQuery = parseCalendarQuery(query, start.date);
+  const returnSearch = calendarSearch(calendarQuery);
 
   return (
     <>
@@ -82,9 +96,26 @@ export default async function AppointmentPage({
           </AlertDescription>
         </Alert>
       )}
+      {(changed === "COMPLETED" || changed === "EXPIRED") && !own && (
+        <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
+          <AlertTitle>
+            Turno marcado como {APPOINTMENT_STATUS_LABEL[changed].toLowerCase()}
+          </AlertTitle>
+          <AlertDescription className="text-success-soft-foreground">
+            El cambio quedó registrado en el historial del turno.
+          </AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardHeader>
-          <CardTitle>{APPOINTMENT_STATUS_LABEL[appointment.status]}</CardTitle>
+          <CardTitle>
+            <Badge
+              variant="outline"
+              className={APPOINTMENT_STATUS_BADGE_CLASS[appointment.status]}
+            >
+              {APPOINTMENT_STATUS_LABEL[appointment.status]}
+            </Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 sm:grid-cols-2">
@@ -187,7 +218,11 @@ export default async function AppointmentPage({
       </Alert>
       <div className="flex flex-wrap gap-3">
         <Button asChild variant="outline">
-          <Link href={`${own ? "/agenda" : "/calendar"}?date=${start.date}`}>
+          <Link
+            href={
+              own ? `/agenda?date=${start.date}` : calendarHref(calendarQuery)
+            }
+          >
             {own ? "Volver a mi agenda" : "Volver al calendario"}
           </Link>
         </Button>
@@ -196,13 +231,37 @@ export default async function AppointmentPage({
             <Link href="/appointments/new">Dar otro turno</Link>
           </Button>
         )}
-        {canCancel && (
+        {canComplete && (
+          <StatusChangeDialog
+            appointmentId={appointment.id}
+            target="COMPLETED"
+            summary={summary}
+            returnSearch={returnSearch}
+          />
+        )}
+        {canExpire && (
+          <StatusChangeDialog
+            appointmentId={appointment.id}
+            target="EXPIRED"
+            summary={summary}
+            returnSearch={returnSearch}
+          />
+        )}
+        {canChangeStatus && (
           <CancelAppointmentDialog
             appointmentId={appointment.id}
-            summary={cancelSummary}
+            summary={summary}
+            returnSearch={returnSearch}
           />
         )}
       </div>
+      {canChangeStatus && !canExpire && (
+        <p className="text-muted-foreground">
+          {canComplete
+            ? "Podrás marcarlo como vencido cuando termine su horario."
+            : "Podrás marcarlo como completado cuando comience y como vencido cuando termine."}
+        </p>
+      )}
     </>
   );
 }

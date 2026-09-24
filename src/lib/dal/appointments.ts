@@ -25,11 +25,17 @@ import {
 import {
   appointmentDateSchema,
   appointmentOptionsSchema,
+  appointmentStatusChangeSchema,
   availableSlotsSchema,
+  calendarAppointmentsSchema,
+  calendarAvailabilitySchema,
   cancelAppointmentSchema,
   createAppointmentSchema,
   professionalAgendaSchema,
+  type AppointmentStatusChangeInput,
   type AvailableSlotsInput,
+  type CalendarAppointmentsInput,
+  type CalendarAvailabilityInput,
   type CancelAppointmentInput,
   type CreateAppointmentInput,
   type ProfessionalAgendaInput,
@@ -499,23 +505,140 @@ export async function createAppointment(
   throw new Error("Unreachable appointment retry state");
 }
 
-export async function listAppointments(date: string, actor: Actor) {
+export async function listAppointments(
+  input: CalendarAppointmentsInput,
+  actor: Actor,
+) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
-  if (!appointmentDateSchema.safeParse(date).success)
-    throw new DomainError("VALIDATION", "Elegí una fecha válida.");
+  const parsed = calendarAppointmentsSchema.safeParse(input);
+  if (!parsed.success)
+    throw new DomainError("VALIDATION", "Elegí un rango de fechas válido.");
+  const { from, to, professionalId, serviceId, hideCancelled } = parsed.data;
+  let professionalWhere: Prisma.AppointmentWhereInput = professionalId
+    ? { professionalId }
+    : {};
+  if (actor.role === Role.PROFESSIONAL) {
+    // Pertenencia: el profesional solo ve su propia agenda.
+    const own = await prisma.professional.findUnique({
+      where: { userId: actor.id },
+      select: { id: true },
+    });
+    if (!own || (professionalId !== undefined && professionalId !== own.id))
+      throw new DomainError(
+        "FORBIDDEN",
+        "No tenés permiso para ver la agenda de otro profesional.",
+      );
+    professionalWhere = { professionalId: own.id };
+  }
   return prisma.appointment.findMany({
     where: {
       startsAt: {
-        gte: appointmentInstant(date, 0),
-        lt: appointmentInstant(date, 1440),
+        gte: appointmentInstant(from, 0),
+        lt: appointmentInstant(to, 1440),
       },
-      ...(actor.role === Role.PROFESSIONAL
-        ? { professional: { userId: actor.id } }
+      ...professionalWhere,
+      ...(serviceId ? { serviceId } : {}),
+      ...(hideCancelled
+        ? { status: { not: AppointmentStatus.CANCELLED } }
         : {}),
     },
     select: summarySelect,
     orderBy: [{ startsAt: "asc" }, { id: "asc" }],
   });
+}
+
+/// Datos para calcular los bloques libres del calendario del centro (HU-11).
+/// El cálculo lo hace `calculateFreeBlocks`, fuera de la DAL.
+export async function listAvailabilityWindows(
+  input: CalendarAvailabilityInput,
+  actor: Actor,
+) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  const parsed = calendarAvailabilitySchema.safeParse(input);
+  if (!parsed.success)
+    throw new DomainError("VALIDATION", "Elegí un rango de fechas válido.");
+  const { from, to, professionalId, serviceId } = parsed.data;
+  const service = serviceId
+    ? await prisma.service.findFirst({
+        where: { id: serviceId, active: true },
+        select: { durationMinutes: true },
+      })
+    : null;
+  if (serviceId && !service)
+    throw new DomainError(
+      "NOT_FOUND",
+      "El servicio no existe o está inactivo.",
+    );
+  const dateRange = { gte: dateToDb(from), lte: dateToDb(to) };
+  const [professionals, holidays] = await Promise.all([
+    prisma.professional.findMany({
+      where: {
+        active: true,
+        ...(professionalId ? { id: professionalId } : {}),
+        ...(serviceId ? { services: { some: { id: serviceId } } } : {}),
+      },
+      select: {
+        ...personSelect,
+        availabilityWindows: {
+          where: serviceId
+            ? {
+                OR: [
+                  { services: { none: {} } },
+                  { services: { some: { id: serviceId } } },
+                ],
+              }
+            : undefined,
+          select: { weekday: true, startMinute: true, endMinute: true },
+          orderBy: [{ weekday: "asc" }, { startMinute: "asc" }],
+        },
+        exceptions: {
+          where: { date: dateRange },
+          select: {
+            id: true,
+            date: true,
+            startMinute: true,
+            endMinute: true,
+            reason: true,
+          },
+          orderBy: [{ date: "asc" }, { startMinute: "asc" }],
+        },
+        // Turnos que ocupan, de cualquier servicio: el filtro de servicio del
+        // calendario no debe hacer aparecer libre un horario tomado.
+        appointments: {
+          where: {
+            status: { in: occupiedStatuses },
+            startsAt: { lt: appointmentInstant(to, 1440) },
+            endsAt: { gt: appointmentInstant(from, 0) },
+          },
+          select: { startsAt: true, endsAt: true },
+        },
+      },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
+    }),
+    prisma.holiday.findMany({
+      where: { date: dateRange },
+      select: { date: true, description: true },
+      orderBy: { date: "asc" },
+    }),
+  ]);
+  return {
+    professionals: professionals.map(
+      ({ availabilityWindows, exceptions, appointments, ...professional }) => ({
+        ...professional,
+        windows: availabilityWindows,
+        exceptions: exceptions.map((exception) => ({
+          ...exception,
+          date: dateFromDb(exception.date),
+        })),
+        busy: appointments,
+      }),
+    ),
+    holidays: holidays.map((holiday) => ({
+      date: dateFromDb(holiday.date),
+      description: holiday.description,
+    })),
+    serviceDurationMinutes: service?.durationMinutes,
+  };
 }
 
 export async function getAppointment(id: number, actor: Actor) {
@@ -841,4 +964,74 @@ export async function cancelAppointment(
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
   );
+}
+
+/// Completar o marcar Vencido un turno Programado (HU-11). La condición de
+/// estado y de tiempo va en el mismo `UPDATE`: si otro usuario cambió el turno
+/// antes, la fila ya no coincide y no se pisa su cambio. Quien la llama ya
+/// verificó el rol.
+async function closeAppointment(
+  input: AppointmentStatusChangeInput,
+  target: typeof AppointmentStatus.COMPLETED | typeof AppointmentStatus.EXPIRED,
+  actor: Actor,
+) {
+  const parsed = appointmentStatusChangeSchema.safeParse(input);
+  if (!parsed.success)
+    throw new DomainError("VALIDATION", "Revisá los datos ingresados.");
+  const { appointmentId, reason } = parsed.data;
+  const completing = target === AppointmentStatus.COMPLETED;
+  return prisma.$transaction(async (tx) => {
+    const now = new Date();
+    const { count } = await tx.appointment.updateMany({
+      where: {
+        id: appointmentId,
+        status: AppointmentStatus.SCHEDULED,
+        ...(completing ? { startsAt: { lte: now } } : { endsAt: { lte: now } }),
+      },
+      data: { status: target },
+    });
+    if (count === 0) {
+      const appointment = await tx.appointment.findUnique({
+        where: { id: appointmentId },
+        select: { status: true },
+      });
+      if (!appointment)
+        throw new DomainError("NOT_FOUND", "El turno no existe.");
+      throw new DomainError(
+        "INVALID_STATUS_TRANSITION",
+        appointment.status !== AppointmentStatus.SCHEDULED
+          ? "Solo se puede cambiar el estado de un turno Programado."
+          : completing
+            ? "Solo se puede marcar Completado un turno que ya comenzó."
+            : "Solo se puede marcar Vencido un turno que ya terminó.",
+      );
+    }
+    await tx.appointmentEvent.create({
+      data: {
+        appointmentId,
+        type: completing
+          ? AppointmentEventType.COMPLETED
+          : AppointmentEventType.EXPIRED,
+        reason: reason || null,
+        userId: actor.id,
+      },
+    });
+    return { id: appointmentId };
+  });
+}
+
+export async function completeAppointment(
+  input: AppointmentStatusChangeInput,
+  actor: Actor,
+) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  return closeAppointment(input, AppointmentStatus.COMPLETED, actor);
+}
+
+export async function expireAppointment(
+  input: AppointmentStatusChangeInput,
+  actor: Actor,
+) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  return closeAppointment(input, AppointmentStatus.EXPIRED, actor);
 }

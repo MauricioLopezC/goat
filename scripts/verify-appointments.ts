@@ -9,6 +9,10 @@ import {
   getAppointmentOptions,
   getAppointment,
   listAppointments,
+  listAvailabilityWindows,
+  cancelAppointment,
+  completeAppointment,
+  expireAppointment,
 } from "../src/lib/dal/appointments";
 import { DomainError } from "../src/lib/actions";
 import { Role } from "../src/generated/prisma/enums";
@@ -16,7 +20,7 @@ import {
   appointmentInstant,
   appointmentDateBounds,
 } from "../src/lib/appointment-slots";
-import { dateToDb, toLocalSlot } from "../src/lib/schedule";
+import { addDays, dateToDb, toLocalSlot } from "../src/lib/schedule";
 import type { Actor } from "../src/lib/dal/auth";
 
 async function main() {
@@ -243,14 +247,14 @@ async function main() {
           30 * 60_000,
         );
         assert.ok(
-          (await listAppointments(date, manager)).some(
+          (await listAppointments({ from: date, to: date }, manager)).some(
             (a) => a.id === created.id,
           ),
         );
         assert.ok(
-          (await listAppointments(date, professionalActor)).some(
-            (a) => a.id === created.id,
-          ),
+          (
+            await listAppointments({ from: date, to: date }, professionalActor)
+          ).some((a) => a.id === created.id),
         );
         assert.ok(
           !(await listAvailableSlots(input, manager)).some(
@@ -307,9 +311,9 @@ async function main() {
           "NOT_FOUND",
         );
         assert.ok(
-          !(await listAppointments(date, professionalActor)).some(
-            (a) => a.id === other.id,
-          ),
+          !(
+            await listAppointments({ from: date, to: date }, professionalActor)
+          ).some((a) => a.id === other.id),
         );
       },
     );
@@ -433,6 +437,157 @@ async function main() {
           !(
             await getAppointmentOptions({ serviceId: service.id }, manager)
           ).professionals.some((p) => p.id === professionals[0]),
+        );
+      },
+    );
+    await verify(
+      "HU-11: calendario por rango, filtros y permisos",
+      async () => {
+        const availability = await listAvailabilityWindows(
+          { from: date, to: date, professionalId: professionals[1] },
+          receptionist,
+        );
+        assert.deepEqual(
+          availability.professionals.map((p) => p.id),
+          [professionals[1]],
+        );
+        assert.equal(availability.professionals[0].windows.length, 1);
+        assert.ok(availability.professionals[0].busy.length > 0);
+        assert.equal(availability.serviceDurationMinutes, undefined);
+        assert.equal(
+          (
+            await listAvailabilityWindows(
+              { from: date, to: date, serviceId: longService.id },
+              manager,
+            )
+          ).serviceDurationMinutes,
+          60,
+        );
+        await rejects(
+          () =>
+            listAvailabilityWindows(
+              { from: date, to: date },
+              professionalActor,
+            ),
+          "FORBIDDEN",
+        );
+        await rejects(
+          () => listAppointments({ from: date, to: addDays(date, 7) }, manager),
+          "VALIDATION",
+        );
+        await rejects(
+          () =>
+            listAppointments(
+              { from: date, to: date, professionalId: professionals[1] },
+              professionalActor,
+            ),
+          "FORBIDDEN",
+        );
+        assert.ok(
+          (
+            await listAppointments(
+              { from: date, to: date, professionalId: professionals[1] },
+              manager,
+            )
+          ).every((a) => a.professional.id === professionals[1]),
+        );
+      },
+    );
+    await verify(
+      "HU-11: completar, vencer, ocultar cancelados y concurrencia",
+      async () => {
+        const yesterday = addDays(toLocalSlot(new Date()).date, -1);
+        const insert = (day: string, minute: number) =>
+          prisma.appointment.create({
+            data: {
+              patientId: patients[1],
+              professionalId: professionals[1],
+              serviceId: service.id,
+              startsAt: appointmentInstant(day, minute),
+              endsAt: appointmentInstant(day, minute + 30),
+              createdById: manager.id,
+            },
+          });
+        const [past, pastToExpire, pastRace, future] = [
+          await insert(yesterday, 540),
+          await insert(yesterday, 600),
+          await insert(yesterday, 660),
+          await insert(date, 1200),
+        ];
+        await rejects(
+          () => completeAppointment({ appointmentId: future.id }, manager),
+          "INVALID_STATUS_TRANSITION",
+        );
+        await rejects(
+          () => expireAppointment({ appointmentId: future.id }, manager),
+          "INVALID_STATUS_TRANSITION",
+        );
+        await rejects(
+          () =>
+            completeAppointment({ appointmentId: past.id }, professionalActor),
+          "FORBIDDEN",
+        );
+        await rejects(
+          () => completeAppointment({ appointmentId: 2_147_483_647 }, manager),
+          "NOT_FOUND",
+        );
+
+        await completeAppointment({ appointmentId: past.id }, receptionist);
+        const completed = await prisma.appointment.findUniqueOrThrow({
+          where: { id: past.id },
+          include: { events: true },
+        });
+        assert.equal(completed.status, "COMPLETED");
+        assert.equal(completed.events.length, 1);
+        assert.equal(completed.events[0].type, "COMPLETED");
+        assert.equal(completed.events[0].userId, receptionist.id);
+        assert.equal(completed.events[0].reason, null);
+        await rejects(
+          () => expireAppointment({ appointmentId: past.id }, manager),
+          "INVALID_STATUS_TRANSITION",
+        );
+
+        await expireAppointment(
+          { appointmentId: pastToExpire.id, reason: "No se presentó" },
+          manager,
+        );
+        const expired = await prisma.appointment.findUniqueOrThrow({
+          where: { id: pastToExpire.id },
+          include: { events: true },
+        });
+        assert.equal(expired.status, "EXPIRED");
+        assert.equal(expired.events[0].reason, "No se presentó");
+
+        const race = await Promise.allSettled([
+          completeAppointment({ appointmentId: pastRace.id }, manager),
+          expireAppointment({ appointmentId: pastRace.id }, receptionist),
+        ]);
+        assert.equal(race.filter((r) => r.status === "fulfilled").length, 1);
+        assert.equal(
+          await prisma.appointmentEvent.count({
+            where: { appointmentId: pastRace.id },
+          }),
+          1,
+        );
+
+        await cancelAppointment(
+          {
+            appointmentId: future.id,
+            reason: "Prueba HU-11",
+            requestedBy: "el centro",
+          },
+          manager,
+        );
+        const range = { from: date, to: date };
+        assert.ok(
+          (await listAppointments(range, manager)).some(
+            (a) => a.id === future.id,
+          ),
+        );
+        assert.ok(
+          !(
+            await listAppointments({ ...range, hideCancelled: true }, manager)
+          ).some((a) => a.id === future.id),
         );
       },
     );

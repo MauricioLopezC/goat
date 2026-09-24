@@ -168,6 +168,11 @@ export function getWeekDays(dateStr: string): {
   };
 }
 
+/// Día de la semana de una fecha `AAAA-MM-DD`, sin depender de la zona horaria.
+export function weekdayOf(date: string): Weekday {
+  return WEEKDAYS[(dateToDb(date).getUTCDay() + 6) % 7];
+}
+
 /// Suma o resta días a una fecha en formato AAAA-MM-DD.
 export function addDays(dateStr: string, daysToAdd: number): string {
   const d = new Date(`${dateStr}T12:00:00Z`);

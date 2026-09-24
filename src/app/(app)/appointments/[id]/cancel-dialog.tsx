@@ -26,10 +26,13 @@ import type { ActionResult } from "@/lib/actions";
 export function CancelAppointmentDialog({
   appointmentId,
   summary,
+  returnSearch,
 }: {
   appointmentId: number;
   /** Texto que se muestra en la descripción del diálogo: paciente, profesional, servicio, día y hora. */
   summary: string;
+  /** Parámetros del calendario de origen, para conservarlos al volver (HU-11). */
+  returnSearch: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -46,7 +49,9 @@ export function CancelAppointmentDialog({
     });
     if (result.ok) {
       setOpen(false);
-      router.push(`/appointments/${appointmentId}?cancelled=1`);
+      const search = new URLSearchParams(returnSearch);
+      search.set("cancelled", "1");
+      router.push(`/appointments/${appointmentId}?${search}`);
     }
     return result;
   }, null);

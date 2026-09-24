@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-export function PatientSearch({ initialQuery }: { initialQuery: string }) {
+export function PatientSearch({
+  initialQuery,
+  preset,
+}: {
+  initialQuery: string;
+  /** Profesional, fecha y hora que vienen del calendario (HU-11). */
+  preset: string;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const [previousQuery, setPreviousQuery] = useState(initialQuery);
@@ -20,7 +27,7 @@ export function PatientSearch({ initialQuery }: { initialQuery: string }) {
     if (query === initialQuery) return;
 
     const timer = window.setTimeout(() => {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams(preset);
       if (query.trim()) params.set("q", query);
       startTransition(() => {
         router.replace(`/appointments/new?${params.toString()}`, {
@@ -30,7 +37,7 @@ export function PatientSearch({ initialQuery }: { initialQuery: string }) {
     }, 300);
 
     return () => window.clearTimeout(timer);
-  }, [query, initialQuery, router]);
+  }, [query, initialQuery, preset, router]);
 
   useEffect(() => {
     function syncQueryFromHistory() {
