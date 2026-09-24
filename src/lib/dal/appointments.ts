@@ -20,8 +20,10 @@ import {
   appointmentDateSchema,
   appointmentOptionsSchema,
   availableSlotsSchema,
+  cancelAppointmentSchema,
   createAppointmentSchema,
   type AvailableSlotsInput,
+  type CancelAppointmentInput,
   type CreateAppointmentInput,
 } from "@/lib/validation/appointments";
 
@@ -46,6 +48,18 @@ const summarySelect = {
   professional: { select: personSelect },
   service: { select: { id: true, name: true } },
   createdBy: { select: personSelect },
+  events: {
+    select: {
+      id: true,
+      type: true,
+      reason: true,
+      requestedBy: true,
+      createdAt: true,
+      user: { select: personSelect },
+    },
+    orderBy: { createdAt: "desc" as const },
+    take: 5,
+  },
 } satisfies Prisma.AppointmentSelect;
 
 function validateDate(date: string, now = new Date()) {
@@ -554,6 +568,47 @@ export async function cancelProfessionalAppointment(
           type: AppointmentEventType.CANCELLED,
           reason: input.reason,
           requestedBy: input.requestedBy,
+          userId: actor.id,
+        },
+      });
+      return { id: appointment.id };
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
+}
+
+export async function cancelAppointment(
+  input: CancelAppointmentInput,
+  actor: Actor,
+) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  const parsed = cancelAppointmentSchema.safeParse(input);
+  if (!parsed.success)
+    throw new DomainError("VALIDATION", "Revisá los datos ingresados.");
+  const data = parsed.data;
+  return prisma.$transaction(
+    async (tx) => {
+      const appointment = await tx.appointment.findUnique({
+        where: { id: data.appointmentId },
+        select: { id: true, status: true },
+      });
+      if (!appointment)
+        throw new DomainError("NOT_FOUND", "El turno no existe.");
+      if (appointment.status !== AppointmentStatus.SCHEDULED)
+        throw new DomainError(
+          "INVALID_STATUS_TRANSITION",
+          "Solo se puede cancelar un turno en estado Programado.",
+        );
+      await tx.appointment.update({
+        where: { id: appointment.id },
+        data: { status: AppointmentStatus.CANCELLED },
+      });
+      await tx.appointmentEvent.create({
+        data: {
+          appointmentId: appointment.id,
+          type: AppointmentEventType.CANCELLED,
+          reason: data.reason,
+          requestedBy: data.requestedBy,
           userId: actor.id,
         },
       });

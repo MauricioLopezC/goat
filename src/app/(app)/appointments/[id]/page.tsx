@@ -13,6 +13,15 @@ import { APPOINTMENT_STATUS_LABEL } from "@/components/appointment-calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { CancelAppointmentDialog } from "./cancel-dialog";
+import type { AppointmentEventType } from "@/generated/prisma/enums";
+
+const EVENT_TYPE_LABEL: Record<AppointmentEventType, string> = {
+  UPDATED: "Modificado",
+  CANCELLED: "Cancelado",
+  COMPLETED: "Completado",
+  EXPIRED: "Vencido",
+};
 
 export default async function AppointmentPage({
   params,
@@ -35,6 +44,15 @@ export default async function AppointmentPage({
   const start = toLocalSlot(appointment.startsAt);
   const end = toLocalSlot(appointment.endsAt);
   const own = actor.role === "PROFESSIONAL";
+  const canCancel =
+    !own &&
+    appointment.status === "SCHEDULED" &&
+    (actor.role === "RECEPTIONIST" || actor.role === "MANAGER");
+
+  const cancelSummary = canCancel
+    ? `${appointment.patient.lastName}, ${appointment.patient.firstName} · ${appointment.professional.lastName}, ${appointment.professional.firstName} · ${appointment.service.name} · ${formatDate(start.date)}, ${formatMinute(start.minute)}–${formatMinute(end.minute)}`
+    : "";
+
   return (
     <>
       <h1 className="text-headline-lg">Turno #{appointment.id}</h1>
@@ -44,6 +62,14 @@ export default async function AppointmentPage({
           <AlertDescription className="text-success-soft-foreground">
             El horario quedó reservado y ya aparece en el calendario y en la
             agenda del profesional.
+          </AlertDescription>
+        </Alert>
+      )}
+      {appointment.status === "CANCELLED" && (
+        <Alert className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border">
+          <AlertTitle>Turno cancelado</AlertTitle>
+          <AlertDescription className="text-destructive-soft-foreground">
+            Este turno fue cancelado. El horario quedó disponible.
           </AlertDescription>
         </Alert>
       )}
@@ -111,6 +137,38 @@ export default async function AppointmentPage({
           </dl>
         </CardContent>
       </Card>
+      {appointment.events.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Historial</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="flex flex-col gap-3">
+              {appointment.events.map((event) => (
+                <li key={event.id} className="flex flex-col gap-0.5 text-sm">
+                  <p className="font-medium">
+                    {EVENT_TYPE_LABEL[event.type]} ·{" "}
+                    {formatInstant(event.createdAt)}
+                  </p>
+                  <p className="text-muted-foreground">
+                    Por: {event.user.lastName}, {event.user.firstName}
+                  </p>
+                  {event.reason && (
+                    <p className="text-muted-foreground">
+                      Motivo: {event.reason}
+                    </p>
+                  )}
+                  {event.requestedBy && (
+                    <p className="text-muted-foreground">
+                      Solicitó: {event.requestedBy}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
       <Alert>
         <AlertTitle>Email al paciente: PENDIENTE</AlertTitle>
         <AlertDescription>
@@ -128,6 +186,12 @@ export default async function AppointmentPage({
           <Button asChild>
             <Link href="/appointments/new">Dar otro turno</Link>
           </Button>
+        )}
+        {canCancel && (
+          <CancelAppointmentDialog
+            appointmentId={appointment.id}
+            summary={cancelSummary}
+          />
         )}
       </div>
     </>

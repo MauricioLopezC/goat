@@ -22,3 +22,14 @@ export const createAppointmentSchema = availableSlotsSchema.extend({
 });
 export type AvailableSlotsInput = z.infer<typeof availableSlotsSchema>;
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
+
+export const cancelAppointmentSchema = z.object({
+  appointmentId: z.number().int().positive(),
+  reason: z.string().trim().min(1, "El motivo es obligatorio.").max(500),
+  requestedBy: z
+    .string()
+    .trim()
+    .min(1, "Indicá quién solicitó la cancelación.")
+    .max(100),
+});
+export type CancelAppointmentInput = z.infer<typeof cancelAppointmentSchema>;
