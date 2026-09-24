@@ -10,7 +10,12 @@ import {
 } from "lucide-react";
 
 import { requirePageRole } from "@/lib/dal/auth";
-import { listActiveServices, listProfessionals } from "@/lib/dal/professionals";
+import {
+  listActiveServices,
+  listProfessionalsPage,
+} from "@/lib/dal/professionals";
+import { emptyPage, parsePageParam } from "@/lib/pagination";
+import { ListPagination } from "@/components/list-pagination";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +30,7 @@ type SearchParams = Promise<{
   q?: string | string[];
   serviceId?: string | string[];
   status?: string | string[];
+  page?: string | string[];
 }>;
 
 function single(value: string | string[] | undefined) {
@@ -51,12 +57,17 @@ export default async function ProfessionalsPage({
       ? statusValue
       : "all";
   const tooShort = query.length === 1;
-  const [professionals, services] = await Promise.all([
+  const [professionalsPage, services] = await Promise.all([
     tooShort
-      ? Promise.resolve([])
-      : listProfessionals({ query, serviceId, status }, actor),
+      ? Promise.resolve(emptyPage<never>())
+      : listProfessionalsPage(
+          { query, serviceId, status },
+          parsePageParam(params.page),
+          actor,
+        ),
     listActiveServices(actor),
   ]);
+  const professionals = professionalsPage.items;
 
   const isManager = actor.role === "MANAGER";
 
@@ -209,6 +220,16 @@ export default async function ProfessionalsPage({
               </CardContent>
             </Card>
           ))}
+          <ListPagination
+            page={professionalsPage}
+            pathname="/professionals"
+            params={{
+              q: query || undefined,
+              serviceId: serviceId ? String(serviceId) : undefined,
+              status,
+            }}
+            label="Páginas de profesionales"
+          />
         </div>
       )}
     </div>

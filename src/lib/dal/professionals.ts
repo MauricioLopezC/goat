@@ -13,6 +13,7 @@ import { assertRole, type Actor } from "@/lib/dal/auth";
 import { canViewProfessional } from "@/lib/dal/availability";
 import { STAFF_ROLES } from "@/lib/roles";
 import { getTodayDateString } from "@/lib/utils";
+import { emptyPage, paginate, type Page } from "@/lib/pagination";
 
 // ─────────────────────── Tipos de entrada ────────────────────────────
 
@@ -439,18 +440,65 @@ export async function reactivateProfessional(
 
 // ─────────────────────── Funciones de lectura ──────────────────────────
 
-/**
- * Devuelve el listado de profesionales para las pantallas del centro.
- *
- * Es una lectura: la consume un Server Component llamando directo a la DAL
- * (ADR 0001). Devuelve la ficha resumida con títulos y servicios asociados.
- */
 export interface ProfessionalFilters {
   query?: string;
   serviceId?: number;
   status?: "active" | "inactive" | "all";
 }
 
+function professionalFiltersWhere(
+  filters: ProfessionalFilters,
+): Prisma.ProfessionalWhereInput {
+  const query = filters.query?.trim();
+  return {
+    active:
+      filters.status === "active"
+        ? true
+        : filters.status === "inactive"
+          ? false
+          : undefined,
+    services: filters.serviceId
+      ? { some: { id: filters.serviceId } }
+      : undefined,
+    OR: query
+      ? [
+          { lastName: { contains: query, mode: "insensitive" } },
+          { firstName: { contains: query, mode: "insensitive" } },
+          { documentNumber: { contains: query, mode: "insensitive" } },
+          { licenseNumber: { contains: query, mode: "insensitive" } },
+        ]
+      : undefined,
+  };
+}
+
+const professionalListSelect = {
+  id: true,
+  lastName: true,
+  firstName: true,
+  documentType: true,
+  documentNumber: true,
+  licenseNumber: true,
+  phone: true,
+  email: true,
+  active: true,
+  titles: {
+    select: { id: true, name: true },
+  },
+  services: {
+    select: { id: true, name: true, durationMinutes: true },
+  },
+} satisfies Prisma.ProfessionalSelect;
+
+export type ProfessionalListItem = Prisma.ProfessionalGetPayload<{
+  select: typeof professionalListSelect;
+}>;
+
+/**
+ * Devuelve todos los profesionales que cumplen los filtros, sin paginar.
+ *
+ * La usan los selectores de profesional (agenda, calendario, alta de turno).
+ * El listado de `/professionals` usa `listProfessionalsPage`.
+ */
 export async function listProfessionals(
   filters: ProfessionalFilters,
   actor: Actor,
@@ -462,44 +510,43 @@ export async function listProfessionals(
   if (query && query.length < 2) return [];
 
   return prisma.professional.findMany({
-    where: {
-      active:
-        filters.status === "active"
-          ? true
-          : filters.status === "inactive"
-            ? false
-            : undefined,
-      services: filters.serviceId
-        ? { some: { id: filters.serviceId } }
-        : undefined,
-      OR: query
-        ? [
-            { lastName: { contains: query, mode: "insensitive" } },
-            { firstName: { contains: query, mode: "insensitive" } },
-            { documentNumber: { contains: query, mode: "insensitive" } },
-            { licenseNumber: { contains: query, mode: "insensitive" } },
-          ]
-        : undefined,
-    },
+    where: professionalFiltersWhere(filters),
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-    select: {
-      id: true,
-      lastName: true,
-      firstName: true,
-      documentType: true,
-      documentNumber: true,
-      licenseNumber: true,
-      phone: true,
-      email: true,
-      active: true,
-      titles: {
-        select: { id: true, name: true },
-      },
-      services: {
-        select: { id: true, name: true, durationMinutes: true },
-      },
-    },
+    select: professionalListSelect,
   });
+}
+
+/**
+ * Devuelve una página del listado de profesionales de `/professionals`.
+ *
+ * Es una lectura: la consume un Server Component llamando directo a la DAL
+ * (ADR 0001). Devuelve la ficha resumida con títulos y servicios asociados,
+ * de a `PAGE_SIZE` por página y con el total de resultados.
+ */
+export async function listProfessionalsPage(
+  filters: ProfessionalFilters,
+  page: number,
+  actor: Actor,
+): Promise<Page<ProfessionalListItem>> {
+  // HU-04: el listado es para gerencia y mesa de entradas.
+  assertRole(actor, Role.MANAGER, Role.RECEPTIONIST);
+
+  const query = filters.query?.trim();
+  if (query && query.length < 2) return emptyPage();
+
+  const where = professionalFiltersWhere(filters);
+  return paginate(
+    page,
+    () => prisma.professional.count({ where }),
+    (range) =>
+      prisma.professional.findMany({
+        where,
+        // El `id` desempata para que ningún profesional salte de página.
+        orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
+        select: professionalListSelect,
+        ...range,
+      }),
+  );
 }
 
 /**

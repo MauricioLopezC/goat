@@ -5,6 +5,7 @@ import { DomainError } from "@/lib/actions";
 import { Role } from "@/generated/prisma/enums";
 import { assertRole, type Actor } from "@/lib/dal/auth";
 import { STAFF_ROLES } from "@/lib/roles";
+import { paginate } from "@/lib/pagination";
 
 // ─────────────────────── Tipos de entrada ────────────────────────────
 
@@ -28,30 +29,37 @@ export interface UpdateServiceInput {
 // ─────────────────────── Funciones de lectura ──────────────────────────
 
 /**
- * Devuelve todos los servicios del catálogo (activos e inactivos),
+ * Devuelve una página del catálogo de servicios (activos e inactivos),
  * ordenados con los activos primero y alfabéticamente por nombre.
  */
-export async function listServices(actor: Actor) {
+export async function listServices(page: number, actor: Actor) {
   assertRole(actor, ...STAFF_ROLES);
 
-  return prisma.service.findMany({
-    orderBy: [{ active: "desc" }, { name: "asc" }],
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      durationMinutes: true,
-      requiresReferral: true,
-      active: true,
-      specialtyId: true,
-      specialty: {
+  return paginate(
+    page,
+    () => prisma.service.count(),
+    (range) =>
+      prisma.service.findMany({
+        // El `id` desempata para que ningún servicio salte de página.
+        orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
         select: {
           id: true,
           name: true,
+          description: true,
+          durationMinutes: true,
+          requiresReferral: true,
+          active: true,
+          specialtyId: true,
+          specialty: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
-      },
-    },
-  });
+        ...range,
+      }),
+  );
 }
 
 /**

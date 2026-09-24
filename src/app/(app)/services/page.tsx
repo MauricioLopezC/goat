@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
 import { listServices, listActiveSpecialties } from "@/lib/dal/services";
+import { parsePageParam } from "@/lib/pagination";
+import { ListPagination } from "@/components/list-pagination";
 import { ServicesManager } from "./services-manager";
 
 export const metadata: Metadata = {
@@ -9,12 +11,15 @@ export const metadata: Metadata = {
     "Catálogo de prestaciones y servicios del centro de traumatología (HU-06).",
 };
 
-export default async function ServicesPage() {
+export default async function ServicesPage({
+  searchParams,
+}: PageProps<"/services">) {
   // HU-06: MANAGER administra; RECEPTIONIST y PROFESSIONAL tienen solo lectura.
   const actor = await requirePageRole(...STAFF_ROLES);
+  const { page } = await searchParams;
 
-  const [services, specialties] = await Promise.all([
-    listServices(actor),
+  const [servicesPage, specialties] = await Promise.all([
+    listServices(parsePageParam(page), actor),
     listActiveSpecialties(actor),
   ]);
 
@@ -33,9 +38,17 @@ export default async function ServicesPage() {
       </div>
 
       <ServicesManager
-        services={services}
+        services={servicesPage.items}
+        total={servicesPage.total}
         specialties={specialties}
         isManager={isManager}
+        pagination={
+          <ListPagination
+            page={servicesPage}
+            pathname="/services"
+            label="Páginas de servicios"
+          />
+        }
       />
     </div>
   );

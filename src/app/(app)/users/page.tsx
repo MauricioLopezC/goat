@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { listUsers, requirePageRole } from "@/lib/dal/auth";
 import { ROLE_LABEL } from "@/lib/roles";
+import { parsePageParam } from "@/lib/pagination";
+import { ListPagination } from "@/components/list-pagination";
 import {
   Card,
   CardContent,
@@ -22,11 +24,13 @@ export const metadata: Metadata = {
   title: "Usuarios · Goat",
 };
 
-export default async function UsersPage() {
+export default async function UsersPage({ searchParams }: PageProps<"/users">) {
   // Solo el gerente crea usuarios y asigna roles (HU-01). La página redirige a
   // otro rol; `listUsers` vuelve a verificarlo por su cuenta.
   const actor = await requirePageRole("MANAGER");
-  const users = await listUsers(actor);
+  const { page } = await searchParams;
+  const usersPage = await listUsers(parsePageParam(page), actor);
+  const users = usersPage.items;
 
   return (
     <>
@@ -49,12 +53,12 @@ export default async function UsersPage() {
             Usuarios del centro
           </CardTitle>
           <CardDescription>
-            {users.length === 1
+            {usersPage.total === 1
               ? "1 usuario."
-              : `${users.length} usuarios, los inactivos al final.`}
+              : `${usersPage.total} usuarios, los inactivos al final.`}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
           <Table>
             <TableHeader>
               <TableRow>
@@ -92,6 +96,11 @@ export default async function UsersPage() {
               ))}
             </TableBody>
           </Table>
+          <ListPagination
+            page={usersPage}
+            pathname="/users"
+            label="Páginas de usuarios"
+          />
         </CardContent>
       </Card>
     </>
