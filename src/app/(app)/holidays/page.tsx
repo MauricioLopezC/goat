@@ -16,7 +16,7 @@ export default async function HolidaysPage() {
   const holidays = await listHolidays(actor);
 
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-headline-lg">Feriados</h1>
         <p className="text-muted-foreground">

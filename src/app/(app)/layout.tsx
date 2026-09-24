@@ -1,124 +1,43 @@
-import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { cookies } from "next/headers";
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
-import { ROLE_LABEL } from "@/lib/roles";
-import { Button } from "@/components/ui/button";
-import { signOut } from "@/app/(auth)/login/actions";
+import { AppSidebar } from "@/components/app-sidebar";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+
+// La cookie que escribe el `SidebarProvider` de shadcn. No se importa de
+// `sidebar.tsx`: es un módulo de cliente y en el servidor sus constantes llegan
+// como referencias, no como valores.
+const SIDEBAR_COOKIE_NAME = "sidebar_state";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   // Barrera autoritativa: `proxy.ts` ya hizo el chequeo optimista, pero es
   // acá donde se relee el usuario y se decide (ADR 0001, ADR 0002).
   const actor = await requirePageRole(...STAFF_ROLES);
 
+  // El sidebar recuerda si quedó abierto o cerrado; sin cookie, abierto.
+  const cookieStore = await cookies();
+  const defaultOpen = cookieStore.get(SIDEBAR_COOKIE_NAME)?.value !== "false";
+
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="border-border bg-card border-b">
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-3 md:px-6 lg:px-8">
-          <span className="bg-primary text-title-md text-primary-foreground flex size-8 items-center justify-center rounded-lg">
-            G
-          </span>
-          <span className="text-title-lg">Goat</span>
+    <SidebarProvider defaultOpen={defaultOpen}>
+      <AppSidebar actor={actor} />
+      {/* `SidebarInset` ya es el <main>. `min-w-0` evita que el contenido
+          ancho (la grilla del calendario) empuje la página en vez de hacer
+          scroll dentro de su tarjeta. */}
+      <SidebarInset className="min-w-0">
+        <header className="border-border bg-card flex h-12 items-center gap-2 border-b px-4">
+          <SidebarTrigger />
+        </header>
 
-          <nav className="ml-6 flex flex-wrap items-center gap-4">
-            {(actor.role === "RECEPTIONIST" || actor.role === "MANAGER") && (
-              <>
-                <Link
-                  href="/calendar"
-                  className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Calendario
-                </Link>
-                <Link
-                  href="/appointments/new"
-                  className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Nuevo turno
-                </Link>
-              </>
-            )}
-            {actor.role === "PROFESSIONAL" && (
-              <Link
-                href="/agenda"
-                className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Mi agenda
-              </Link>
-            )}
-            <Link
-              href="/patients"
-              className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Pacientes
-            </Link>
-            {(actor.role === "RECEPTIONIST" || actor.role === "MANAGER") && (
-              <Link
-                href="/patients/new"
-                className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Nuevo paciente
-              </Link>
-            )}
-            {actor.role === "PROFESSIONAL" && (
-              <Link
-                href="/my-schedule"
-                className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Mis horarios
-              </Link>
-            )}
-            {(actor.role === "RECEPTIONIST" || actor.role === "MANAGER") && (
-              <Link
-                href="/professionals"
-                className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Profesionales
-              </Link>
-            )}
-            <Link
-              href="/services"
-              className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Servicios
-            </Link>
-            <Link
-              href="/holidays"
-              className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Feriados
-            </Link>
-            {actor.role === "MANAGER" && (
-              <Link
-                href="/users"
-                className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Usuarios
-              </Link>
-            )}
-          </nav>
-
-          <div className="ml-auto flex items-center gap-4">
-            <div className="hidden text-right sm:block">
-              <p className="text-title-md">
-                {actor.firstName} {actor.lastName}
-              </p>
-              <p className="text-label-md text-muted-foreground uppercase">
-                {ROLE_LABEL[actor.role]}
-              </p>
-            </div>
-            {/* Cerrar sesión disponible desde cualquier pantalla (HU-01). */}
-            <form action={signOut}>
-              <Button type="submit" variant="outline" size="sm">
-                <LogOut data-icon="inline-start" />
-                Salir
-              </Button>
-            </form>
-          </div>
+        {/* Ancho de lectura por defecto; una página con `data-layout="wide"`
+            (el calendario) usa todo el ancho disponible. */}
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 has-[[data-layout=wide]]:max-w-none md:px-6 lg:px-8">
+          {children}
         </div>
-      </header>
-
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 md:px-6 lg:px-8">
-        {children}
-      </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

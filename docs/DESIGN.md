@@ -163,6 +163,7 @@ Profundidad por **bordes de bajo contraste** y sombras tenues teñidas de slate.
 - Solo **tema claro**. `dark:` está atado a la clase `.dark`, que no se usa; el modo oscuro no está diseñado.
 - Al agregar estos componentes, ajustar el radio para cumplir la tabla de Formas: `badge` (`rounded-4xl` → `rounded-lg`) y `dialog`/`sheet`/`drawer` (`rounded-xl` → `rounded-2xl`). Las tarjetas ya salen a 8 px con `rounded-xl`.
 - Alto de controles: 38 px por defecto (`h-9.5`) al ajustar `button` e `input`.
+- **Navegación:** `Sidebar` de shadcn a la izquierda, sobre `sidebar` (`#F1F5F9`), con el link activo en `sidebar-primary`. Se pliega en escritorio (recuerda el estado en la cookie `sidebar_state`) y en móvil pasa a un panel lateral. Los links y los roles que ven cada uno están en `src/lib/navigation.ts`; qué rol puede abrir cada ruta, en `src/lib/route-access.ts`. El contenido se limita a `max-w-6xl`; una página que necesita todo el ancho (el calendario) lo pide con `data-layout="wide"` en su contenedor raíz. En `sidebar.tsx`, `tooltip.tsx` y `skeleton.tsx` se pasó `rounded-md` a `rounded-lg` (4 px, controles); los textos de `sidebar.tsx` y `sheet.tsx` están en español.
 
 ## Qué se quitó del diseño genérico
 
