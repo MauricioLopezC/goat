@@ -207,7 +207,18 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Efectos:** ninguno.
 **Errores:** `FORBIDDEN`, `VALIDATION`, `NOT_FOUND`.
 **Revalida:** no aplica.
-**Devuelve:** resúmenes con paciente, servicio, profesional, horario, estado y autoría.
+**Devuelve:** resúmenes con paciente, servicio, profesional, horario, estado y autoría. Incluye los últimos eventos de trazabilidad.
+
+### `cancelAppointment`
+
+**Historia de usuario:** [HU-10 — Cancelar un turno](hu/HU-10-cancelar-turno.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `appointmentId` (entero positivo), `reason` (1–500 caracteres, obligatorio), `requestedBy` (1–100 caracteres, obligatorio).
+**Precondiciones:** el turno existe y está en estado `SCHEDULED`.
+**Efectos:** transacción `Serializable` que actualiza `Appointment.status` a `CANCELLED` y crea un `AppointmentEvent` de tipo `CANCELLED` con `reason`, `requestedBy`, `userId` (actor) y `createdAt` (ahora). El horario queda libre de inmediato.
+**Errores:** `VALIDATION` (campo vacío o ID inválido), `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`), `REASON_REQUIRED` (falta el motivo de cancelación).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
+**Devuelve:** `{ id }`.
 
 ## Catálogo
 

@@ -23,6 +23,17 @@ export const createAppointmentSchema = availableSlotsSchema.extend({
 export type AvailableSlotsInput = z.infer<typeof availableSlotsSchema>;
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
 
+export const cancelAppointmentSchema = z.object({
+  appointmentId: z.number().int().positive(),
+  reason: z.string().trim().max(500),
+  requestedBy: z
+    .string()
+    .trim()
+    .min(1, "Indicá quién solicitó la cancelación.")
+    .max(100),
+});
+export type CancelAppointmentInput = z.infer<typeof cancelAppointmentSchema>;
+
 export const professionalAgendaSchema = z.object({
   date: appointmentDateSchema.optional(),
   view: z.enum(["week", "day"]).default("week"),
