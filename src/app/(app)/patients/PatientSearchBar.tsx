@@ -15,6 +15,12 @@ export function PatientSearchBar({ initialQuery = "" }: PatientSearchBarProps) {
   const [query, setQuery] = useState(initialQuery);
   const [isPending, startTransition] = useTransition();
 
+  const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
+  if (initialQuery !== prevInitialQuery) {
+    setPrevInitialQuery(initialQuery);
+    setQuery(initialQuery);
+  }
+
   const handleSearch = (term: string) => {
     startTransition(() => {
       const trimmed = term.trim();
@@ -57,6 +63,7 @@ export function PatientSearchBar({ initialQuery = "" }: PatientSearchBarProps) {
             onClick={handleClear}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded"
             title="Limpiar búsqueda"
+            aria-label="Limpiar búsqueda"
           >
             <X className="size-4" />
           </button>

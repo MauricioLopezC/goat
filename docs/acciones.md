@@ -607,7 +607,7 @@ No es una Server Action: es una lectura que el Server Component de `/patients/[i
 **Precondiciones:** el actor es `RECEPTIONIST` o `MANAGER`. El paciente existe. No existe otro paciente distinto con la misma combinación de `documentType` y `documentNumber`. Si `coverageType` es `HEALTH_INSURANCE`, el `insurancePlanId` existe y está activo. Si la edad calculada a partir de `birthDate` es menor de 16 años, `guardianName` y `guardianPhone` son obligatorios (validados por Zod tanto en cliente como en servidor).
 **Efectos:** actualiza los datos del `Patient`, registrando `updatedById` con el id del actor y actualizando `updatedAt`. Si `coverageType` es `HEALTH_INSURANCE`, actualiza o crea su `Coverage`. Si la cobertura pasa a `PRIVATE`, remueve la `Coverage` asociada.
 **Errores:** `VALIDATION` (campos obligatorios vacíos, formatos inválidos, menor de 16 años sin tutor), `FORBIDDEN` (profesionales u otros roles sin permiso), `NOT_FOUND` (paciente no encontrado), `DUPLICATE_PATIENT` (documento ya registrado en otro paciente).
-**Revalida:** `/patients` y `/patients/[id]`.
+**Revalida:** `/patients`, `/patients/[id]` y `/patients/[id]/edit`.
 **Devuelve:** `{ id, firstName, lastName, documentType, documentNumber }`.
 
 ### `getProfessionalAgenda`

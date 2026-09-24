@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { calculateAge } from "@/lib/patients";
 import { PatientSearchBar } from "./PatientSearchBar";
 
 export const metadata: Metadata = {
@@ -40,17 +41,6 @@ function formatDate(date: Date | string) {
   const month = String(d.getUTCMonth() + 1).padStart(2, "0");
   const year = d.getUTCFullYear();
   return `${day}/${month}/${year}`;
-}
-
-function calculateAge(date: Date | string) {
-  const birth = new Date(date);
-  const now = new Date();
-  let age = now.getFullYear() - birth.getUTCFullYear();
-  const m = now.getMonth() - birth.getUTCMonth();
-  if (m < 0 || (m === 0 && now.getDate() < birth.getUTCDate())) {
-    age--;
-  }
-  return age;
 }
 
 export default async function PatientsPage({

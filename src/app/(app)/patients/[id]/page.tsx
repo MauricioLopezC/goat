@@ -20,7 +20,9 @@ import {
   GENDER_LABEL,
   COVERAGE_TYPE_LABEL,
   DOCUMENT_TYPE_LABEL,
+  calculateAge,
 } from "@/lib/patients";
+import { CENTER_TIME_ZONE } from "@/lib/schedule";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -52,25 +54,23 @@ function formatDate(date: Date | string) {
   return `${day}/${month}/${year}`;
 }
 
-function formatDateTime(date: Date | string) {
-  const d = new Date(date);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  const hours = String(d.getHours()).padStart(2, "0");
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  return `${day}/${month}/${year} a las ${hours}:${minutes} hs`;
-}
+const auditDateFormatter = new Intl.DateTimeFormat("es-AR", {
+  timeZone: CENTER_TIME_ZONE,
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
 
-function calculateAge(date: Date | string) {
-  const birth = new Date(date);
-  const now = new Date();
-  let age = now.getFullYear() - birth.getUTCFullYear();
-  const m = now.getMonth() - birth.getUTCMonth();
-  if (m < 0 || (m === 0 && now.getDate() < birth.getUTCDate())) {
-    age--;
+function formatDateTime(date: Date | string) {
+  const parts = auditDateFormatter.formatToParts(new Date(date));
+  const p: Record<string, string> = {};
+  for (const part of parts) {
+    p[part.type] = part.value;
   }
-  return age;
+  return `${p.day}/${p.month}/${p.year} a las ${p.hour}:${p.minute} hs`;
 }
 
 export default async function PatientDetailPage({
