@@ -77,41 +77,39 @@ export async function getAppointmentOptions(
     throw new DomainError("VALIDATION", "Revisá los filtros de búsqueda.");
   const { query, patientPage, patientId, serviceId } = parsed.data;
   const [patientResults, patient, services, professionals] = await Promise.all([
-    !patientId
-      ? prisma.patient.findMany({
-          where: {
-            active: true,
-            AND: query
-              ? query.split(/\s+/).map((word) => ({
-                  OR: [
-                    {
-                      firstName: {
-                        contains: word,
-                        mode: "insensitive" as const,
-                      },
-                    },
-                    {
-                      lastName: {
-                        contains: word,
-                        mode: "insensitive" as const,
-                      },
-                    },
-                    {
-                      documentNumber: {
-                        contains: word,
-                        mode: "insensitive" as const,
-                      },
-                    },
-                  ],
-                }))
-              : [],
-          },
-          select: patientSelect,
-          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          skip: (patientPage - 1) * 10,
-          take: 11,
-        })
-      : [],
+    prisma.patient.findMany({
+      where: {
+        active: true,
+        AND: query
+          ? query.split(/\s+/).map((word) => ({
+              OR: [
+                {
+                  firstName: {
+                    contains: word,
+                    mode: "insensitive" as const,
+                  },
+                },
+                {
+                  lastName: {
+                    contains: word,
+                    mode: "insensitive" as const,
+                  },
+                },
+                {
+                  documentNumber: {
+                    contains: word,
+                    mode: "insensitive" as const,
+                  },
+                },
+              ],
+            }))
+          : [],
+      },
+      select: patientSelect,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (patientPage - 1) * 10,
+      take: 11,
+    }),
     patientId
       ? prisma.patient.findFirst({
           where: { id: patientId, active: true },
