@@ -81,7 +81,7 @@ export function NewPatientForm({
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  const handleReset = () => {
+  const resetFields = () => {
     setLastName("");
     setFirstName("");
     setGender(Gender.MALE);
@@ -97,6 +97,10 @@ export function NewPatientForm({
     setGuardianName("");
     setGuardianPhone("");
     setTouched({});
+  };
+
+  const handleReset = () => {
+    resetFields();
     setSuccessData(null);
     setState(null);
     setShowToast(false);
@@ -217,9 +221,7 @@ export function NewPatientForm({
         setState(res);
 
         if (res.ok) {
-          setSuccessData(res.data);
-          setShowToast(true);
-          handleReset();
+          resetFields();
           setSuccessData(res.data);
           setShowToast(true);
 

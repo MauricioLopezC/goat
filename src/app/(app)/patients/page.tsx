@@ -80,7 +80,7 @@ export default async function PatientsPage({
         )}
       </div>
 
-      <PatientSearchBar key={rawQuery} initialQuery={rawQuery} />
+      <PatientSearchBar initialQuery={rawQuery} />
 
       {/* Caso 1: Búsqueda con menos de 3 caracteres */}
       {isTooShort && (
