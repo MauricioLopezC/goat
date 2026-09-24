@@ -1,12 +1,20 @@
 import { requirePageRole } from "@/lib/dal/auth";
-import { Placeholder } from "../placeholder";
+import { AppointmentCalendar } from "@/components/appointment-calendar";
+import { isCalendarDate, toLocalSlot } from "@/lib/schedule";
 
-export default async function CalendarPage() {
-  await requirePageRole("RECEPTIONIST", "MANAGER");
-
+export default async function CalendarPage({
+  searchParams,
+}: PageProps<"/calendar">) {
+  const actor = await requirePageRole("RECEPTIONIST", "MANAGER");
+  const { date } = await searchParams;
   return (
-    <Placeholder title="Calendario del centro" story="HU-11">
-      El calendario del día, que es donde aterriza mesa de entradas al ingresar.
-    </Placeholder>
+    <AppointmentCalendar
+      actor={actor}
+      date={
+        typeof date === "string" && isCalendarDate(date)
+          ? date
+          : toLocalSlot(new Date()).date
+      }
+    />
   );
 }

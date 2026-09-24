@@ -19,7 +19,31 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </span>
           <span className="text-title-lg">Goat</span>
 
-          <nav className="ml-6 flex items-center gap-5">
+          <nav className="ml-6 flex flex-wrap items-center gap-4">
+            {(actor.role === "RECEPTIONIST" || actor.role === "MANAGER") && (
+              <>
+                <Link
+                  href="/calendar"
+                  className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Calendario
+                </Link>
+                <Link
+                  href="/appointments/new"
+                  className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Nuevo turno
+                </Link>
+              </>
+            )}
+            {actor.role === "PROFESSIONAL" && (
+              <Link
+                href="/agenda"
+                className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Mi agenda
+              </Link>
+            )}
             <Link
               href="/patients"
               className="text-title-md text-muted-foreground hover:text-foreground transition-colors"
