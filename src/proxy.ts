@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getIronSession, nextProxyCookies } from "iron-session";
 import { sessionOptions, type SessionPayload } from "@/lib/session-config";
-import { Role } from "@/generated/prisma/enums";
+import { canAccess } from "@/lib/route-access";
 
 // Chequeo optimista y nada más (ADR 0001, regla 6). Corre en cada ruta,
 // incluidas las de prefetch, así que solo lee la cookie: no consulta la base.
@@ -10,28 +10,6 @@ import { Role } from "@/generated/prisma/enums";
 // `requireRole()` dentro de cada página y cada acción, releyendo el usuario.
 // Si este archivo desapareciera, el sistema seguiría siendo seguro; solo
 // mostraría el login más tarde.
-
-/// Prefijo de ruta → roles que pueden verla. Lo que no está acá solo requiere
-/// sesión.
-const BY_ROLE: Array<{ prefix: string; roles: Role[] }> = [
-  { prefix: "/appointments/new", roles: [Role.RECEPTIONIST, Role.MANAGER] },
-  { prefix: "/professionals/new", roles: [Role.MANAGER] },
-  {
-    prefix: "/professionals",
-    roles: [Role.MANAGER, Role.RECEPTIONIST, Role.PROFESSIONAL],
-  },
-  {
-    prefix: "/services",
-    roles: [Role.MANAGER, Role.RECEPTIONIST, Role.PROFESSIONAL],
-  },
-  { prefix: "/users", roles: [Role.MANAGER] },
-  {
-    prefix: "/agenda",
-    roles: [Role.PROFESSIONAL, Role.MANAGER, Role.RECEPTIONIST],
-  },
-  { prefix: "/my-schedule", roles: [Role.PROFESSIONAL] },
-  { prefix: "/calendar", roles: [Role.RECEPTIONIST, Role.MANAGER] },
-];
 
 const PUBLIC_PATHS = ["/login"];
 
@@ -56,8 +34,8 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.nextUrl));
   }
 
-  const rule = BY_ROLE.find((entry) => pathname.startsWith(entry.prefix));
-  if (rule && session.role && !rule.roles.includes(session.role)) {
+  // Qué rol abre cada ruta está en `route-access.ts`, compartido con el menú.
+  if (session.role && !canAccess(pathname, session.role)) {
     return NextResponse.redirect(new URL("/", request.nextUrl));
   }
 
