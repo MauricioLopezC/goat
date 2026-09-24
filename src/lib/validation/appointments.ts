@@ -1,5 +1,5 @@
 import { z } from "@/lib/validation/zod";
-import { isCalendarDate, TIME_PATTERN } from "@/lib/schedule";
+import { dateToDb, isCalendarDate, TIME_PATTERN } from "@/lib/schedule";
 
 export const appointmentDateSchema = z
   .string()
@@ -33,6 +33,43 @@ export const cancelAppointmentSchema = z.object({
     .max(100),
 });
 export type CancelAppointmentInput = z.infer<typeof cancelAppointmentSchema>;
+
+export const appointmentStatusChangeSchema = z.object({
+  appointmentId: z.number().int().positive(),
+  reason: z.string().trim().max(500).default(""),
+});
+export type AppointmentStatusChangeInput = z.input<
+  typeof appointmentStatusChangeSchema
+>;
+
+// Calendario del centro (HU-11): un día o una semana.
+const CALENDAR_MAX_DAYS = 7;
+const calendarRangeShape = {
+  from: appointmentDateSchema,
+  to: appointmentDateSchema,
+  professionalId: z.number().int().positive().optional(),
+  serviceId: z.number().int().positive().optional(),
+};
+function isValidRange({ from, to }: { from: string; to: string }) {
+  const days = (dateToDb(to).getTime() - dateToDb(from).getTime()) / 86_400_000;
+  return days >= 0 && days < CALENDAR_MAX_DAYS;
+}
+const rangeMessage = "El rango del calendario debe ser de uno a siete días.";
+export const calendarAppointmentsSchema = z
+  .object({
+    ...calendarRangeShape,
+    hideCancelled: z.boolean().default(false),
+  })
+  .refine(isValidRange, rangeMessage);
+export type CalendarAppointmentsInput = z.input<
+  typeof calendarAppointmentsSchema
+>;
+export const calendarAvailabilitySchema = z
+  .object(calendarRangeShape)
+  .refine(isValidRange, rangeMessage);
+export type CalendarAvailabilityInput = z.input<
+  typeof calendarAvailabilitySchema
+>;
 
 export const professionalAgendaSchema = z.object({
   date: appointmentDateSchema.optional(),

@@ -198,16 +198,38 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** `{ startTime, endTime }[]` en hora del centro.
 
-### `listAppointments` / `getAppointment`
+### `listAppointments`
 
-**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), consulta del turno creado.
+**Historia de usuario:** [HU-11 — Ver el calendario de turnos del centro](hu/HU-11-calendario-del-centro.md). También la usa la consulta del turno creado en [HU-09](hu/HU-09-asignar-turno.md).
 **Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
-**Entrada:** fecha del calendario / ID del turno.
+**Entrada:** `from` y `to` (AAAA-MM-DD, inclusive, hasta 7 días), `professionalId?`, `serviceId?`, `hideCancelled?` (booleano, por defecto `false`).
+**Precondiciones:** `from` no es posterior a `to`. El profesional solo accede a turnos cuyo `professional.userId` coincida con su usuario, verificado en la DAL; si pide otro `professionalId`, se rechaza.
+**Efectos:** ninguno. Devuelve los turnos que empiezan en el rango, en hora del centro, ordenados por inicio e ID, filtrados por profesional y servicio. Con `hideCancelled` excluye los `CANCELLED`.
+**Errores:** `FORBIDDEN`, `VALIDATION`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** resúmenes con paciente, servicio, profesional, horario, estado y autoría.
+
+### `listAvailabilityWindows`
+
+**Historia de usuario:** [HU-11](hu/HU-11-calendario-del-centro.md).
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `from` y `to` (AAAA-MM-DD, inclusive, hasta 7 días), `professionalId?`, `serviceId?`.
+**Precondiciones:** `from` no es posterior a `to`.
+**Efectos:** ninguno. Lista los profesionales activos, filtrados por `professionalId` y por los que prestan `serviceId`, con sus `AvailabilityWindow` (con `serviceId`, solo las que no restringen servicios o incluyen ese servicio) y sus `AvailabilityException` del rango, más los `Holiday` del rango. Si viene `serviceId`, incluye la duración del servicio. El cálculo de bloques libres se hace fuera de la DAL, con una función pura.
+**Errores:** `FORBIDDEN`, `VALIDATION`, `NOT_FOUND` (el servicio no existe o está inactivo).
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ professionals: { id, firstName, lastName, windows, exceptions }[], holidays, serviceDurationMinutes? }`.
+
+### `getAppointment`
+
+**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), consulta del turno creado; [HU-11](hu/HU-11-calendario-del-centro.md), detalle del turno desde el calendario.
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
+**Entrada:** ID del turno.
 **Precondiciones:** el profesional solo accede a registros cuyo `professional.userId` coincida con su usuario, verificado en la DAL.
 **Efectos:** ninguno.
-**Errores:** `FORBIDDEN`, `VALIDATION`, `NOT_FOUND`.
+**Errores:** `FORBIDDEN`, `NOT_FOUND`.
 **Revalida:** no aplica.
-**Devuelve:** resúmenes con paciente, servicio, profesional, horario, estado y autoría. Incluye los últimos eventos de trazabilidad.
+**Devuelve:** resumen con paciente, servicio, profesional, horario, estado y autoría. Incluye los últimos eventos de trazabilidad.
 
 ### `cancelAppointment`
 
@@ -217,6 +239,28 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Precondiciones:** el turno existe y está en estado `SCHEDULED`.
 **Efectos:** transacción `Serializable` que actualiza `Appointment.status` a `CANCELLED` y crea un `AppointmentEvent` de tipo `CANCELLED` con `reason`, `requestedBy`, `userId` (actor) y `createdAt` (ahora). El horario queda libre de inmediato.
 **Errores:** `VALIDATION` (campo vacío o ID inválido), `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`), `REASON_REQUIRED` (falta el motivo de cancelación).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
+**Devuelve:** `{ id }`.
+
+### `completeAppointment`
+
+**Historia de usuario:** [HU-11](hu/HU-11-calendario-del-centro.md), cambio de estado desde el detalle del turno.
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `appointmentId` (entero positivo), `reason` (hasta 500 caracteres, opcional).
+**Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya comenzó (`startsAt` no es posterior a ahora).
+**Efectos:** en una transacción, actualiza `Appointment.status` a `COMPLETED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya comenzado, y crea un `AppointmentEvent` de tipo `COMPLETED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Si otro usuario cambió el turno antes, la condición no coincide y se devuelve `INVALID_STATUS_TRANSITION` sin pisar su cambio. El horario sigue ocupado.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no comenzó).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
+**Devuelve:** `{ id }`.
+
+### `expireAppointment`
+
+**Historia de usuario:** [HU-11](hu/HU-11-calendario-del-centro.md), cambio de estado desde el detalle del turno.
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `appointmentId` (entero positivo), `reason` (hasta 500 caracteres, opcional).
+**Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya terminó (`endsAt` no es posterior a ahora). La restricción de exclusión no cubre `EXPIRED`: vencer un turno futuro liberaría su horario, por eso la DAL lo impide.
+**Efectos:** en una transacción, actualiza `Appointment.status` a `EXPIRED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya terminado, y crea un `AppointmentEvent` de tipo `EXPIRED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Igual que al completar, un cambio concurrente no se pisa.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no terminó).
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
 **Devuelve:** `{ id }`.
 

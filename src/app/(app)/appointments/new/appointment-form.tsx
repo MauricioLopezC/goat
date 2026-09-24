@@ -24,18 +24,21 @@ import { formatDate } from "@/lib/schedule";
 export function AppointmentForm({
   input,
   slots,
+  initialStartTime,
   patientName,
   serviceName,
   professionalName,
 }: {
   input: AvailableSlotsInput;
   slots: AvailableSlot[];
+  /** Hora precargada desde un bloque libre del calendario (HU-11). */
+  initialStartTime?: string;
   patientName: string;
   serviceName: string;
   professionalName: string;
 }) {
   const router = useRouter();
-  const [startTime, setStartTime] = useState("");
+  const [startTime, setStartTime] = useState(initialStartTime ?? "");
   const [notes, setNotes] = useState("");
   const [state, action, pending] = useActionState<
     ActionResult<{ id: number }> | null,

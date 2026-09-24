@@ -30,6 +30,7 @@
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-placeholder: var(--placeholder);
   --color-ring: var(--ring);
 
   --color-primary-soft: var(--primary-soft);
@@ -148,6 +149,7 @@
   --destructive: #c62828;
   --border: #e2e8f0;
   --input: #cbd5e1;
+  --placeholder: #94a3b8;
   --ring: #0d47a1;
   --radius: 0.25rem;
 

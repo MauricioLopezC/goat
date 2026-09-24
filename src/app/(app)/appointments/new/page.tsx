@@ -6,9 +6,15 @@ import {
   listAvailableDates,
   listAvailableSlots,
 } from "@/lib/dal/appointments";
+import { listProfessionals } from "@/lib/dal/professionals";
 import { DomainError } from "@/lib/actions";
 import { type AvailableSlot } from "@/lib/appointment-slots";
-import { dateToDb, isCalendarDate } from "@/lib/schedule";
+import {
+  dateToDb,
+  formatDate,
+  isCalendarDate,
+  TIME_PATTERN,
+} from "@/lib/schedule";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -44,11 +50,41 @@ export default async function NewAppointmentPage({
   const serviceId = positiveId(params.serviceId);
   const professionalId = positiveId(params.professionalId);
   const date = typeof params.date === "string" ? params.date : "";
+  const startTime =
+    typeof params.startTime === "string" && TIME_PATTERN.test(params.startTime)
+      ? params.startTime
+      : "";
+  // Desde un bloque libre del calendario (HU-11) llegan profesional, fecha y
+  // hora, y el servicio si estaba filtrado. Se conservan mientras se elige
+  // paciente y servicio.
+  const preset = new URLSearchParams();
+  if (serviceId) preset.set("serviceId", String(serviceId));
+  if (professionalId) preset.set("professionalId", String(professionalId));
+  if (date && isCalendarDate(date)) preset.set("date", date);
+  if (startTime) preset.set("startTime", startTime);
+  function withPreset(values: Record<string, string>) {
+    const search = new URLSearchParams(preset);
+    for (const [key, value] of Object.entries(values)) search.set(key, value);
+    return `/appointments/new?${search}`;
+  }
   const options = await getAppointmentOptions(
     { query, patientPage, patientId, serviceId },
     actor,
   );
-  const service = options.services.find((item) => item.id === serviceId);
+  // El profesional del bloque libre elegido en el calendario: se ofrecen solo
+  // los servicios que presta, para no perder la precarga al elegir otro.
+  const presetProfessional =
+    professionalId && preset.has("date") && startTime
+      ? (await listProfessionals({ status: "active" }, actor)).find(
+          (item) => item.id === professionalId,
+        )
+      : undefined;
+  const serviceOptions = presetProfessional
+    ? options.services.filter((item) =>
+        presetProfessional.services.some((offered) => offered.id === item.id),
+      )
+    : options.services;
+  const service = serviceOptions.find((item) => item.id === serviceId);
   const professional = options.professionals.find(
     (item) => item.id === professionalId,
   );
@@ -109,6 +145,14 @@ export default async function NewAppointmentPage({
           corresponden a Argentina.
         </p>
       </header>
+      {presetProfessional && (
+        <Alert>
+          <AlertDescription>
+            Horario elegido en el calendario: {presetProfessional.lastName},{" "}
+            {presetProfessional.firstName}, {formatDate(date)}, {startTime}.
+          </AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>1. Paciente</CardTitle>
@@ -126,7 +170,7 @@ export default async function NewAppointmentPage({
                 · {patient.documentType} {patient.documentNumber}
               </p>
               <Button asChild variant="outline">
-                <Link href="/appointments/new">Cambiar paciente</Link>
+                <Link href={withPreset({})}>Cambiar paciente</Link>
               </Button>
             </div>
           ) : (
@@ -139,7 +183,7 @@ export default async function NewAppointmentPage({
                   </AlertDescription>
                 </Alert>
               )}
-              <PatientSearch initialQuery={query} />
+              <PatientSearch initialQuery={query} preset={preset.toString()} />
               <p className="text-muted-foreground">
                 {options.patients.length
                   ? query
@@ -157,7 +201,7 @@ export default async function NewAppointmentPage({
                       variant="ghost"
                       className="h-auto min-h-14 w-full justify-between gap-4 whitespace-normal text-left"
                     >
-                      <Link href={`/appointments/new?patientId=${item.id}`}>
+                      <Link href={withPreset({ patientId: String(item.id) })}>
                         <span className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                           <span className="font-medium">
                             {item.lastName}, {item.firstName}
@@ -183,7 +227,10 @@ export default async function NewAppointmentPage({
                   {patientPage > 1 && (
                     <Button asChild variant="outline" size="sm">
                       <Link
-                        href={`/appointments/new?${new URLSearchParams({ ...(query ? { q: query } : {}), patientPage: String(patientPage - 1) })}`}
+                        href={withPreset({
+                          ...(query ? { q: query } : {}),
+                          patientPage: String(patientPage - 1),
+                        })}
                         scroll={false}
                       >
                         ← Página anterior
@@ -196,7 +243,10 @@ export default async function NewAppointmentPage({
                   {options.hasMorePatients && (
                     <Button asChild variant="outline" size="sm">
                       <Link
-                        href={`/appointments/new?${new URLSearchParams({ ...(query ? { q: query } : {}), patientPage: String(patientPage + 1) })}`}
+                        href={withPreset({
+                          ...(query ? { q: query } : {}),
+                          patientPage: String(patientPage + 1),
+                        })}
                         scroll={false}
                       >
                         Página siguiente →
@@ -218,11 +268,18 @@ export default async function NewAppointmentPage({
             <CardTitle>2. Servicio</CardTitle>
             <CardDescription>
               La duración del servicio determina cuánto ocupa el turno.
+              {presetProfessional &&
+                ` Se muestran los servicios que presta ${presetProfessional.lastName}, ${presetProfessional.firstName}.`}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form action="/appointments/new" className="flex flex-col gap-3">
               <input type="hidden" name="patientId" value={patient.id} />
+              {[...preset]
+                .filter(([key]) => key !== "serviceId")
+                .map(([key, value]) => (
+                  <input key={key} type="hidden" name={key} value={value} />
+                ))}
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="service">Servicio</FieldLabel>
@@ -236,7 +293,7 @@ export default async function NewAppointmentPage({
                     <NativeSelectOption value="">
                       Elegí un servicio
                     </NativeSelectOption>
-                    {options.services.map((item) => (
+                    {serviceOptions.map((item) => (
                       <NativeSelectOption value={item.id} key={item.id}>
                         {item.name} · {item.durationMinutes} min
                       </NativeSelectOption>
@@ -367,7 +424,16 @@ export default async function NewAppointmentPage({
             <CardHeader>
               <CardTitle>Horario y confirmación</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-col gap-4">
+              {startTime &&
+                !slots.some((slot) => slot.startTime === startTime) && (
+                  <Alert>
+                    <AlertDescription>
+                      El horario de las {startTime} elegido en el calendario no
+                      está disponible para {service.name}. Elegí otro horario.
+                    </AlertDescription>
+                  </Alert>
+                )}
               <AppointmentForm
                 key={`${patient.id}-${service.id}-${professional.id}-${date}`}
                 input={{
@@ -377,6 +443,7 @@ export default async function NewAppointmentPage({
                   date,
                 }}
                 slots={slots}
+                initialStartTime={startTime}
                 patientName={`${patient.lastName}, ${patient.firstName}`}
                 professionalName={`${professional.lastName}, ${professional.firstName}`}
                 serviceName={service.name}
