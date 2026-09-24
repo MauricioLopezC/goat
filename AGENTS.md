@@ -74,12 +74,14 @@ Decisión completa en `docs/adr/0001-server-actions-y-capa-de-acceso-a-datos.md`
 - Toda función de la DAL que lee o escribe datos de negocio recibe el `actor` como último parámetro y verifica ella misma el rol (`assertRole`) y la pertenencia del recurso. No confía en que la acción o la página ya lo hayan chequeado.
 - Zod: importar `z` de `@/lib/validation/zod`, nunca de `"zod"`, para que los mensajes salgan en español (lo impone ESLint).
 - Cada operación nueva se especifica con la plantilla de ficha de `docs/acciones.md`, en el mismo cambio.
+- Permisos por ruta: al crear o cambiar una página, su `requirePageRole(...)` (la barrera real) y su regla en `src/lib/route-access.ts` (la usa `proxy.ts`) tienen que exigir los mismos roles. Si la página va en el menú, agregarla en `src/lib/navigation.ts` con los roles que la ven; `tests/navigation.test.ts` verifica que todo link visible se pueda abrir, pero no detecta una página sin regla ni un link que falta.
 
 ## Interfaz
 
 - shadcn/ui (Radix, preset `nova`) + Tailwind 4. El diseño está en `docs/DESIGN.md`: consultarlo antes de crear UI. El tema (tokens) vive en `src/app/globals.css` y debe mantenerse sincronizado con ese documento.
 - Usar tokens semánticos (`bg-primary`, `text-muted-foreground`, `bg-success-soft`, etc.), nunca colores hex sueltos. Solo tema claro.
 - Componentes nuevos con `npx shadcn@latest add <nombre>`; al agregarlos, aplicar los ajustes de radio que indica `docs/DESIGN.md`.
+- Ancho de página: el layout limita el contenido a `max-w-6xl` y las páginas no fijan su propio ancho en el contenedor raíz. Una pantalla que necesita todo el ancho (el calendario) lo pide con `data-layout="wide"` en su contenedor raíz.
 - No crear desde cero componentes primitivos (botón, input, select, dialog, tabla, tarjeta, etc.) si shadcn/ui ya los ofrece: agregarlos con `npx shadcn@latest add` y usarlos desde `@/components/ui`. El tema ya está configurado, así que no hace falta reestilizarlos. Solo se arma un componente propio cuando no existe en shadcn, y en ese caso se compone a partir de los primitivos de shadcn (en `src/components/`, fuera de `ui/`).
 - La skill `shadcn` (`.agents/skills/shadcn`) se aplica al trabajar con componentes de shadcn/ui. Si sus indicaciones chocan con este documento o con `docs/DESIGN.md`, mandan estos.
 - No correr `npx shadcn@latest apply`, `init --force`, `add --all` ni `add --overwrite` sin consultar: pisarían los ajustes de `docs/DESIGN.md` (radios, alto de controles) y los tokens de `src/app/globals.css`.
