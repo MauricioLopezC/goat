@@ -33,7 +33,7 @@ export default async function AppointmentPage({
     "PROFESSIONAL",
   );
   const { id } = await params;
-  const { created } = await searchParams;
+  const { created, cancelled } = await searchParams;
   let appointment;
   try {
     appointment = await getAppointment(Number(id), actor);
@@ -65,7 +65,16 @@ export default async function AppointmentPage({
           </AlertDescription>
         </Alert>
       )}
-      {appointment.status === "CANCELLED" && (
+      {cancelled === "1" && !own && (
+        <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
+          <AlertTitle>Turno cancelado exitosamente</AlertTitle>
+          <AlertDescription className="text-success-soft-foreground">
+            El turno #{appointment.id} fue cancelado y el horario quedó liberado
+            de inmediato.
+          </AlertDescription>
+        </Alert>
+      )}
+      {appointment.status === "CANCELLED" && cancelled !== "1" && (
         <Alert className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border">
           <AlertTitle>Turno cancelado</AlertTitle>
           <AlertDescription className="text-destructive-soft-foreground">

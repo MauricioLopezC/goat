@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
 import { cancelAppointment } from "./actions";
 import {
   AlertDialog,
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { ActionResult } from "@/lib/actions";
 
 // Diálogo de confirmación para cancelar un turno (HU-10).
 // Solo se muestra cuando el turno está SCHEDULED y el actor es RECEPTIONIST o MANAGER.
@@ -29,23 +31,28 @@ export function CancelAppointmentDialog({
   /** Texto que se muestra en la descripción del diálogo: paciente, profesional, servicio, día y hora. */
   summary: string;
 }) {
-  const [state, formAction, pending] = useActionState(cancelAppointment, null);
-
-  if (state?.ok) {
-    return (
-      <Alert
-        role="status"
-        className="bg-success-soft text-success-soft-foreground border-success-soft-border"
-      >
-        <AlertDescription>
-          Turno #{appointmentId} cancelado. El horario quedó liberado.
-        </AlertDescription>
-      </Alert>
-    );
-  }
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState<
+    ActionResult<{ id: number }> | null,
+    FormData
+  >(async (_prevState, formData) => {
+    const reason = String(formData.get("reason") ?? "");
+    const requestedBy = String(formData.get("requestedBy") ?? "");
+    const result = await cancelAppointment({
+      appointmentId,
+      reason,
+      requestedBy,
+    });
+    if (result.ok) {
+      setOpen(false);
+      router.push(`/appointments/${appointmentId}?cancelled=1`);
+    }
+    return result;
+  }, null);
 
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
         <Button variant="destructive">Cancelar turno</Button>
       </AlertDialogTrigger>
@@ -55,7 +62,6 @@ export function CancelAppointmentDialog({
           <AlertDialogDescription>{summary}</AlertDialogDescription>
         </AlertDialogHeader>
         <form action={formAction} className="flex flex-col gap-4">
-          <input type="hidden" name="appointmentId" value={appointmentId} />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="reason">Motivo de cancelación *</Label>
             <Textarea
@@ -65,6 +71,7 @@ export function CancelAppointmentDialog({
               maxLength={500}
               placeholder="Ej.: el paciente llamó para cancelar por viaje"
               rows={3}
+              disabled={pending}
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -75,6 +82,7 @@ export function CancelAppointmentDialog({
               required
               maxLength={100}
               placeholder="Ej.: el paciente, el profesional, el centro"
+              disabled={pending}
             />
           </div>
           {state?.ok === false && (
@@ -88,7 +96,9 @@ export function CancelAppointmentDialog({
             </Alert>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel type="button">Volver</AlertDialogCancel>
+            <AlertDialogCancel type="button" disabled={pending}>
+              Volver
+            </AlertDialogCancel>
             <Button variant="destructive" type="submit" disabled={pending}>
               {pending ? "Cancelando…" : "Confirmar cancelación"}
             </Button>

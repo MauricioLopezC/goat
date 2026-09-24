@@ -41,4 +41,3 @@ export const professionalAgendaSchema = z.object({
   professionalId: z.number().int().positive().optional(),
 });
 export type ProfessionalAgendaInput = z.input<typeof professionalAgendaSchema>;
-
