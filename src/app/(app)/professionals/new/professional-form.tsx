@@ -139,7 +139,7 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <Button asChild size="sm">
-                <Link href={`/professionals/${created.id}/schedules`}>
+                <Link href={`/professionals/${created.id}/schedule`}>
                   <CalendarPlus className="size-4 mr-1.5" />
                   Cargar horarios de atención
                 </Link>
