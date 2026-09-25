@@ -15,6 +15,7 @@ import {
   UserX,
 } from "lucide-react";
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
+import { canAccess } from "@/lib/route-access";
 import { getPatient } from "@/lib/dal/patients";
 import {
   GENDER_LABEL,
@@ -93,6 +94,7 @@ export default async function PatientDetailPage({
 
   const isManagerOrReceptionist =
     actor.role === "RECEPTIONIST" || actor.role === "MANAGER";
+  const canBookAppointment = canAccess("/appointments/new", actor.role);
 
   const age = calculateAge(patient.birthDate);
   const isMinor = age < 16;
@@ -151,12 +153,14 @@ export default async function PatientDetailPage({
               </Link>
             </Button>
           )}
-          <Button asChild className="gap-2">
-            <Link href={`/appointments/new?patientId=${patient.id}`}>
-              <CalendarPlus className="size-4" />
-              Dar turno
-            </Link>
-          </Button>
+          {canBookAppointment && (
+            <Button asChild className="gap-2">
+              <Link href={`/appointments/new?patientId=${patient.id}`}>
+                <CalendarPlus className="size-4" />
+                Dar turno
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 
