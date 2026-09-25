@@ -31,7 +31,6 @@ test("cada rol ve exactamente sus links", () => {
     "Nuevo turno",
     "Agendas",
     "Pacientes",
-    "Nuevo paciente",
     "Profesionales",
     "Servicios",
     "Feriados",
@@ -48,7 +47,6 @@ test("cada rol ve exactamente sus links", () => {
     "Nuevo turno",
     "Agendas",
     "Pacientes",
-    "Nuevo paciente",
     "Profesionales",
     "Servicios",
     "Feriados",
@@ -72,7 +70,7 @@ test("ningún rol ve dos links con el mismo destino", () => {
 test("activeHref marca el link de prefijo más largo", () => {
   const groups = navForRole("MANAGER");
   assert.equal(activeHref("/patients", groups), "/patients");
-  assert.equal(activeHref("/patients/new", groups), "/patients/new");
+  assert.equal(activeHref("/patients/new", groups), "/patients");
   assert.equal(activeHref("/patients/12/edit", groups), "/patients");
   assert.equal(
     activeHref("/professionals/3/schedule", groups),

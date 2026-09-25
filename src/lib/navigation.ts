@@ -7,7 +7,6 @@ import {
   Clock,
   Stethoscope,
   UserCog,
-  UserPlus,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -65,12 +64,6 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Pacientes",
     items: [
       { href: "/patients", label: "Pacientes", icon: Users, roles: STAFF },
-      {
-        href: "/patients/new",
-        label: "Nuevo paciente",
-        icon: UserPlus,
-        roles: FRONT_DESK,
-      },
     ],
   },
   {
@@ -113,8 +106,8 @@ export function navForRole(role: Role): NavGroup[] {
   })).filter((group) => group.items.length > 0);
 }
 
-/// El link que corresponde a la ruta actual: el de prefijo más largo, para que
-/// en `/patients/new` se marque "Nuevo paciente" y no "Pacientes".
+/// El link que corresponde a la ruta actual: el de prefijo más largo, por si un
+/// link es subruta de otro (en `/patients/12/edit` se marca "Pacientes").
 export function activeHref(
   pathname: string,
   groups: NavGroup[],
