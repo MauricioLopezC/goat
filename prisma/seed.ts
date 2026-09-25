@@ -8,11 +8,13 @@ import {
   AppointmentEventType,
   AppointmentStatus,
   ProfessionalEventType,
+  Weekday,
 } from "../src/generated/prisma/enums";
 import { appointmentInstant } from "../src/lib/appointment-slots";
 import {
   WEEKDAYS,
   addDays,
+  dateToDb,
   getWeekDays,
   parseTime,
   toLocalSlot,
@@ -21,16 +23,19 @@ import { createPatientSchema } from "../src/lib/validation/patients";
 import { createProfessionalSchema } from "../src/lib/validation/professional";
 import { createServiceSchema } from "../src/lib/validation/service";
 import {
+  createAvailabilityExceptionSchema,
   createAvailabilityWindowSchema,
   createHolidaySchema,
 } from "../src/lib/validation/availability";
 import {
   APPOINTMENTS,
   AVAILABILITY,
+  AVAILABILITY_EXCEPTIONS,
   HEALTH_INSURERS,
   HOLIDAYS,
   MANAGER_EMAIL,
   PATIENTS,
+  PROFESSIONAL_HISTORY,
   PROFESSIONALS,
   ROOMS,
   SEED_USERS,
@@ -40,9 +45,9 @@ import {
 } from "./seed-data";
 
 // Datos de prueba para lo que ya está implementado: usuarios (HU-01),
-// profesionales (HU-02), agenda y feriados (HU-05), catálogo de servicios
-// (HU-06), pacientes (HU-07) y turnos (HU-09 a HU-11). Los datos están en
-// `seed-data.ts`.
+// profesionales y su historial (HU-02 y HU-03), agenda, excepciones y
+// feriados (HU-05), catálogo de servicios (HU-06), pacientes (HU-07 y HU-08)
+// y turnos (HU-09 a HU-12). Los datos están en `seed-data.ts`.
 //
 // Existe, además, por un problema de arranque: solo un `MANAGER` crea
 // usuarios, y una base recién migrada no tiene ninguno.
@@ -56,7 +61,8 @@ import {
 //   no pisar la agenda que se armó desde la UI.
 // - Los turnos solo se agregan, nunca se actualizan: su historial es inmutable
 //   y su estado lo cambian las pruebas. Sus fechas son relativas a la semana de
-//   la corrida (ver `seedAppointments`).
+//   la corrida (ver `seedAppointments`). Las excepciones de agenda, también.
+// - El historial de los profesionales se agrega una sola vez: es inmutable.
 
 // Mismos parámetros que `src/lib/password.ts`, que no se puede importar acá
 // porque es `server-only`. Quedan escritos dentro del hash, así que aunque se
@@ -213,6 +219,44 @@ async function seedProfessionals(
   return ids;
 }
 
+/// Eventos de `PROFESSIONAL_HISTORY`, cada uno una sola vez (misma clave:
+/// profesional, tipo y motivo). Todos los hace el gerente, como en la UI.
+async function seedProfessionalHistory(
+  prisma: PrismaClient,
+  userIds: Ids,
+  professionalIds: Ids,
+) {
+  const managerId = idOf(userIds, MANAGER_EMAIL, "Usuario");
+  let created = 0;
+
+  for (const event of PROFESSIONAL_HISTORY) {
+    const professionalId = idOf(
+      professionalIds,
+      event.professional,
+      "Profesional",
+    );
+    const type = ProfessionalEventType[event.type];
+    const logged = await prisma.professionalEvent.count({
+      where: { professionalId, type, reason: event.reason },
+    });
+    if (logged) continue;
+
+    await prisma.professionalEvent.create({
+      data: {
+        professionalId,
+        type,
+        reason: event.reason,
+        changes: event.changes ?? undefined,
+        userId: managerId,
+        createdAt: new Date(`${event.date}T12:00:00.000Z`),
+      },
+    });
+    created++;
+  }
+
+  return created;
+}
+
 async function seedSchedule(
   prisma: PrismaClient,
   professionalIds: Ids,
@@ -350,6 +394,7 @@ async function seedPatients(
       guardianPhone: input.guardianPhone ?? null,
       active: true,
       createdById: idOf(userIds, p.createdBy, "Usuario"),
+      updatedById: p.updatedBy ? idOf(userIds, p.updatedBy, "Usuario") : null,
     };
 
     const { id: patientId } = await prisma.patient.upsert({
@@ -387,12 +432,118 @@ async function seedPatients(
 
 const DAY_MS = 24 * 60 * 60_000;
 
-/// Los turnos de `APPOINTMENTS`, en la semana anterior, la actual y la
-/// siguiente a la corrida. Uno se saltea si ya existe (mismo profesional y
-/// hora), si cae en feriado o si pisaría un turno que ocupa el horario del
-/// profesional o del paciente (por ejemplo, uno dado desde la UI). Así el seed
-/// se puede volver a correr cualquier día sin chocar con la restricción de la
-/// base. Para empezar de cero: `npx prisma migrate reset`.
+/// Fecha (AAAA-MM-DD) del día `weekday` de la semana `week`, contada desde la
+/// semana de la corrida.
+function seedDate(now: Date, week: number, weekday: Weekday): string {
+  const monday = getWeekDays(toLocalSlot(now).date).monday;
+  return addDays(monday, week * 7 + WEEKDAYS.indexOf(weekday));
+}
+
+/// Si la excepción de agenda (en minutos; nulos = el día entero) pisa el
+/// horario de `startMinute` a `endMinute`.
+function overlapsException(
+  exception: { startMinute: number | null; endMinute: number | null },
+  startMinute: number,
+  endMinute: number,
+) {
+  return (
+    exception.startMinute === null ||
+    exception.endMinute === null ||
+    (exception.startMinute < endMinute && startMinute < exception.endMinute)
+  );
+}
+
+/// Las excepciones de `AVAILABILITY_EXCEPTIONS`, con fechas relativas a la
+/// semana de la corrida, como los turnos. Una se saltea si ya existe, si cae en
+/// feriado o si pisa un turno programado (por ejemplo, uno dado desde la UI):
+/// la misma regla que `createAvailabilityException`.
+async function seedExceptions(
+  prisma: PrismaClient,
+  userIds: Ids,
+  professionalIds: Ids,
+) {
+  const now = new Date();
+  const managerId = idOf(userIds, MANAGER_EMAIL, "Usuario");
+  const holidays = new Set(HOLIDAYS.map((h) => h.date));
+  const result = { created: 0, existing: 0, skipped: 0 };
+
+  for (const x of AVAILABILITY_EXCEPTIONS) {
+    const label = `${x.professional} ${x.weekday}`;
+    if (
+      !(AVAILABILITY[x.professional] ?? []).some((w) => w.weekday === x.weekday)
+    ) {
+      throw new Error(
+        `seed-data.ts: la excepción ${label} cae en un día sin franjas.`,
+      );
+    }
+
+    const professionalId = idOf(professionalIds, x.professional, "Profesional");
+    // Mismas reglas que la UI: día entero o un horario con fin posterior.
+    const input = createAvailabilityExceptionSchema.parse({
+      professionalId,
+      date: seedDate(now, x.week, x.weekday),
+      allDay: !x.startTime,
+      startTime: x.startTime,
+      endTime: x.endTime,
+      reason: x.reason,
+    });
+    if (holidays.has(input.date)) {
+      result.skipped++;
+      continue;
+    }
+
+    const date = dateToDb(input.date);
+    const existing = await prisma.availabilityException.count({
+      where: {
+        professionalId,
+        date,
+        startMinute: input.startMinute,
+        endMinute: input.endMinute,
+      },
+    });
+    if (existing) {
+      result.existing++;
+      continue;
+    }
+
+    const overlapping = await prisma.appointment.count({
+      where: {
+        professionalId,
+        status: AppointmentStatus.SCHEDULED,
+        startsAt: {
+          lt: appointmentInstant(input.date, input.endMinute ?? 24 * 60),
+        },
+        endsAt: { gt: appointmentInstant(input.date, input.startMinute ?? 0) },
+      },
+    });
+    if (overlapping) {
+      result.skipped++;
+      continue;
+    }
+
+    await prisma.availabilityException.create({
+      data: {
+        professionalId,
+        date,
+        startMinute: input.startMinute,
+        endMinute: input.endMinute,
+        reason: input.reason,
+        createdById: managerId,
+      },
+    });
+    result.created++;
+  }
+
+  return result;
+}
+
+/// Los turnos de `APPOINTMENTS`, desde la semana anterior a la corrida hasta
+/// tres semanas después. Uno se saltea si ya existe (mismo profesional y
+/// hora), si cae en feriado o en una excepción de agenda, o si pisaría un
+/// turno que ocupa el horario del profesional o del paciente (por ejemplo, uno
+/// dado desde la UI). Así el seed se puede volver a correr cualquier día sin
+/// chocar con la restricción de la base. Para empezar de cero:
+/// `npx prisma migrate reset`.
 async function seedAppointments(
   prisma: PrismaClient,
   userIds: Ids,
@@ -401,7 +552,6 @@ async function seedAppointments(
   patientIds: Ids,
 ) {
   const now = new Date();
-  const monday = getWeekDays(toLocalSlot(now).date).monday;
   const holidays = new Set(HOLIDAYS.map((h) => h.date));
   const result = { created: 0, existing: 0, skipped: 0 };
 
@@ -435,8 +585,28 @@ async function seedAppointments(
     if (!fits) {
       throw new Error(`seed-data.ts: el turno ${label} queda fuera de franja.`);
     }
+    if (
+      AVAILABILITY_EXCEPTIONS.some(
+        (x) =>
+          x.professional === a.professional &&
+          x.week === a.week &&
+          x.weekday === a.weekday &&
+          overlapsException(
+            {
+              startMinute: x.startTime ? parseTime(x.startTime) : null,
+              endMinute: x.endTime ? parseTime(x.endTime) : null,
+            },
+            startMinute,
+            endMinute,
+          ),
+      )
+    ) {
+      throw new Error(
+        `seed-data.ts: el turno ${label} cae en una excepción de agenda.`,
+      );
+    }
 
-    const date = addDays(monday, a.week * 7 + WEEKDAYS.indexOf(a.weekday));
+    const date = seedDate(now, a.week, a.weekday);
     const startsAt = appointmentInstant(date, startMinute);
     const endsAt = new Date(
       startsAt.getTime() + service.durationMinutes * 60_000,
@@ -464,6 +634,16 @@ async function seedAppointments(
 
     const professionalId = idOf(professionalIds, a.professional, "Profesional");
     const patientId = idOf(patientIds, a.patient, "Paciente");
+
+    // Una excepción cargada desde la UI también deja el horario sin atención.
+    const exceptions = await prisma.availabilityException.findMany({
+      where: { professionalId, date: dateToDb(date) },
+      select: { startMinute: true, endMinute: true },
+    });
+    if (exceptions.some((x) => overlapsException(x, startMinute, endMinute))) {
+      result.skipped++;
+      continue;
+    }
 
     const existing = await prisma.appointment.count({
       where: { professionalId, startsAt },
@@ -518,6 +698,7 @@ async function seedAppointments(
         startsAt,
         endsAt,
         status: a.status,
+        notes: a.notes ?? null,
         createdById: userId,
         createdAt,
         updatedAt: eventType ? changedAt : createdAt,
@@ -572,11 +753,23 @@ async function main() {
       titleIds,
       serviceIds,
     );
-    console.log(`✓ ${PROFESSIONALS.length} profesionales`);
+    const history = await seedProfessionalHistory(
+      prisma,
+      userIds,
+      professionalIds,
+    );
+    console.log(
+      `✓ ${PROFESSIONALS.length} profesionales (${history} cambios nuevos en su historial)`,
+    );
 
     const schedule = await seedSchedule(prisma, professionalIds, serviceIds);
     console.log(
       `✓ ${schedule.rooms} consultorios, ${schedule.windows} franjas nuevas y ${HOLIDAYS.length} feriados`,
+    );
+
+    const exceptions = await seedExceptions(prisma, userIds, professionalIds);
+    console.log(
+      `✓ ${exceptions.created} excepciones de agenda nuevas (${exceptions.existing} ya estaban, ${exceptions.skipped} salteadas por feriado o turno programado)`,
     );
 
     const plans = await seedHealthInsurers(prisma);

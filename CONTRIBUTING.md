@@ -21,12 +21,13 @@ migrada no tiene ninguno. Es idempotente (al volver a correrlo, lo sembrado
 vuelve a sus valores; lo cargado desde la UI no se toca) y se niega a correr con
 `NODE_ENV=production`. `prisma migrate reset` lo corre solo.
 
-Los turnos se siembran en la semana anterior, la actual y la siguiente a la
-corrida, así el calendario siempre tiene datos. Hay turnos ya cerrados
-(Completado, Vencido, Cancelado) y turnos pasados que siguen Programados para
-probar "Marcar completado" y "Marcar vencido". Los turnos solo se agregan: si
-ya cerraste los pendientes, `npx prisma migrate reset` deja todo como al
-principio (borra también lo cargado desde la UI).
+Los turnos se siembran desde la semana anterior a la corrida hasta tres semanas
+después, así el calendario y el horizonte para dar turnos siempre tienen datos.
+Hay turnos ya cerrados (Completado, Vencido, Cancelado) y turnos pasados que
+siguen Programados para probar "Marcar completado" y "Marcar vencido". Las
+excepciones de agenda también son relativas a la corrida. Turnos y excepciones
+solo se agregan: si ya cerraste los pendientes, `npx prisma migrate reset` deja
+todo como al principio (borra también lo cargado desde la UI).
 
 Todos los usuarios tienen la contraseña `goat1234` (cambiable con `SEED_PASSWORD`):
 
@@ -43,11 +44,11 @@ Todos los usuarios tienen la contraseña `goat1234` (cambiable con `SEED_PASSWOR
 Además siembra:
 
 - **Catálogo:** 4 títulos, 10 especialidades y 13 servicios (de 30 y 60 min, con y sin orden médica). Hay un título, una especialidad y un servicio inactivos.
-- **Profesionales:** 9, con títulos y servicios. Uno con pasaporte y uno dado de baja.
+- **Profesionales:** 11, con títulos y servicios (el listado ocupa dos páginas). Uno con pasaporte, uno dado de baja, uno que estuvo de baja y volvió, y una recién incorporada sin franjas. El historial tiene una modificación, una baja y una reactivación.
 - **Obras sociales:** 9 con 22 planes. Una obra social y un plan están inactivos.
-- **Pacientes:** 35, particulares y con obra social. Incluye menores con tutor, uno de 16 años sin tutor, adultos mayores con LE, LC o CI, un extranjero con pasaporte y uno con género "Otro".
-
-Franjas, feriados y turnos todavía no se siembran: se agregan con HU-05 y HU-09.
+- **Pacientes:** 35, particulares y con obra social. Incluye menores con tutor, uno de 16 años sin tutor, adultos mayores con LE, LC o CI, un extranjero con pasaporte y uno con género "Otro". Dos tienen modificaciones posteriores al alta.
+- **Agenda:** 7 consultorios, franjas semanales para los 9 profesionales que atienden (varias por día, una restringida a ciertos servicios), feriados hasta marzo de 2027 y 5 excepciones (de día completo y de una parte de la franja) en las semanas siguientes.
+- **Turnos:** unos 120 en cinco semanas, en los cuatro estados, algunos con observaciones. Incluyen series de kinesiología del mismo paciente, cancelaciones pedidas por el paciente y por el profesional, y reprogramaciones.
 
 Las convenciones de código, arquitectura y dominio están en [`AGENTS.md`](AGENTS.md).
 
