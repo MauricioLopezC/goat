@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
+import { canAccess } from "@/lib/route-access";
 import { searchPatients } from "@/lib/dal/patients";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,7 @@ export default async function PatientsPage({
 
   const isManagerOrReceptionist =
     actor.role === "RECEPTIONIST" || actor.role === "MANAGER";
+  const canBookAppointment = canAccess("/appointments/new", actor.role);
 
   const hasMinChars = query.length >= 3;
   const isTooShort = query.length > 0 && query.length < 3;
@@ -270,19 +272,21 @@ export default async function PatientsPage({
                             </Button>
                           )}
 
-                          <Button
-                            asChild
-                            variant="default"
-                            size="sm"
-                            className="h-8 text-xs gap-1"
-                          >
-                            <Link
-                              href={`/appointments/new?patientId=${patient.id}`}
+                          {canBookAppointment && (
+                            <Button
+                              asChild
+                              variant="default"
+                              size="sm"
+                              className="h-8 text-xs gap-1"
                             >
-                              <CalendarPlus className="size-3.5" />
-                              Turno
-                            </Link>
-                          </Button>
+                              <Link
+                                href={`/appointments/new?patientId=${patient.id}`}
+                              >
+                                <CalendarPlus className="size-3.5" />
+                                Turno
+                              </Link>
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
