@@ -185,7 +185,7 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                   {partialExceptions.map((exc) => (
                     <div
                       key={exc.id}
-                      className="bg-destructive/10 border-destructive/30 text-destructive absolute inset-x-1 z-15 overflow-hidden rounded border p-1 text-[11px] font-medium"
+                      className="bg-destructive-soft border-destructive-soft-border text-destructive-soft-foreground absolute inset-x-1 z-15 overflow-hidden rounded border p-1 text-[11px] font-medium"
                       style={{
                         top: offset(exc.startMinute!),
                         height: Math.max(
@@ -203,6 +203,20 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                   {/* Franjas horarias de atención del profesional (Rectángulos base) */}
                   {dayWindows.map((window) => {
                     const isClosed = Boolean(holiday || fullDayException);
+                    // El rótulo de la franja arranca después de las ausencias
+                    // que tapan su inicio, para no quedar debajo de ellas
+                    let labelMinute = window.startMinute;
+                    for (const exc of [...partialExceptions].sort(
+                      (a, b) => a.startMinute! - b.startMinute!,
+                    )) {
+                      if (
+                        exc.startMinute! <= labelMinute &&
+                        exc.endMinute! > labelMinute
+                      ) {
+                        labelMinute = exc.endMinute!;
+                      }
+                    }
+                    const labelVisible = labelMinute < window.endMinute;
 
                     return (
                       <div
@@ -219,7 +233,13 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                             offset(window.startMinute),
                         }}
                       >
-                        <div className="flex flex-col">
+                        <div
+                          className={`flex flex-col ${labelVisible ? "" : "hidden"}`}
+                          style={{
+                            marginTop:
+                              offset(labelMinute) - offset(window.startMinute),
+                          }}
+                        >
                           <span
                             className={`font-semibold tabular-nums text-[10px] uppercase ${
                               isClosed
@@ -264,12 +284,14 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                         type="button"
                         onClick={() => setSelectedAppointment(appointment)}
                         title={`Clic para ver turno: ${appointment.patient.lastName}, ${appointment.patient.firstName}`}
-                        className={`group absolute inset-x-0.5 z-20 flex items-center justify-between overflow-hidden rounded border border-l-4 px-1.5 py-0.5 text-left text-xs transition-all hover:scale-[1.01] hover:shadow-xs cursor-pointer ${
+                        className={`group absolute inset-x-0.5 flex items-center justify-between overflow-hidden rounded border border-l-4 px-1.5 py-0.5 text-left text-xs transition-all hover:scale-[1.01] hover:shadow-xs cursor-pointer ${
+                          // Opaco para tapar el rótulo de la franja; debajo de
+                          // los turnos activos si el horario se volvió a dar
                           isCancelled
-                            ? "border-border border-l-destructive bg-card/90 text-muted-foreground line-through opacity-75"
+                            ? "z-19 border-border border-l-destructive bg-muted text-muted-foreground line-through"
                             : isCompleted
-                              ? "border-border border-l-emerald-600 bg-card text-foreground shadow-2xs hover:border-emerald-600"
-                              : "border-border border-l-primary bg-card text-foreground shadow-2xs hover:border-primary"
+                              ? "z-20 border-border border-l-emerald-600 bg-card text-foreground shadow-2xs hover:border-emerald-600"
+                              : "z-20 border-border border-l-primary bg-card text-foreground shadow-2xs hover:border-primary"
                         }`}
                         style={{
                           top,
@@ -277,11 +299,15 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                         }}
                       >
                         <div className="flex items-center gap-1.5 overflow-hidden w-full">
-                          <span className="font-bold tabular-nums text-[11px] shrink-0 text-foreground">
+                          <span
+                            className={`font-bold tabular-nums text-[11px] shrink-0 ${isCancelled ? "" : "text-foreground"}`}
+                          >
                             {formatMinute(startMinute)}–
                             {formatMinute(endMinute)}
                           </span>
-                          <span className="font-medium text-[11px] truncate text-foreground/90">
+                          <span
+                            className={`font-medium text-[11px] truncate ${isCancelled ? "" : "text-foreground/90"}`}
+                          >
                             {appointment.patient.lastName},{" "}
                             {appointment.patient.firstName}
                           </span>
