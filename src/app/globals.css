@@ -41,6 +41,10 @@
   --color-info-soft: var(--info-soft);
   --color-info-soft-border: var(--info-soft-border);
   --color-info-soft-foreground: var(--info-soft-foreground);
+  --color-scheduled: var(--scheduled);
+  --color-scheduled-soft: var(--scheduled-soft);
+  --color-scheduled-soft-border: var(--scheduled-soft-border);
+  --color-scheduled-soft-foreground: var(--scheduled-soft-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-warning-soft: var(--warning-soft);
@@ -161,16 +165,20 @@
   --info-soft: #e0f7fa;
   --info-soft-border: #80deea;
   --info-soft-foreground: #006064;
+  --scheduled: #b58900;
+  --scheduled-soft: #fbf6dc;
+  --scheduled-soft-border: #e6d17a;
+  --scheduled-soft-foreground: #6b5300;
   --warning: #e65100;
   --warning-foreground: #ffffff;
   --warning-soft: #fff3e0;
   --warning-soft-border: #ffe082;
   --warning-soft-foreground: #bf360c;
-  --success: #00897b;
+  --success: #2e7d32;
   --success-foreground: #ffffff;
-  --success-soft: #e0f2f1;
-  --success-soft-border: #80cbc4;
-  --success-soft-foreground: #00695c;
+  --success-soft: #e8f5e9;
+  --success-soft-border: #a5d6a7;
+  --success-soft-foreground: #1b5e20;
   --destructive-soft: #ffebee;
   --destructive-soft-border: #ffcdd2;
   --destructive-soft-foreground: #c62828;
@@ -178,7 +186,7 @@
   --chart-1: #0d47a1;
   --chart-2: #00838f;
   --chart-3: #e65100;
-  --chart-4: #00897b;
+  --chart-4: #2e7d32;
   --chart-5: #64748b;
 
   --sidebar: #f1f5f9;

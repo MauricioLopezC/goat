@@ -6,8 +6,9 @@ colors:
   primary-hover: '#0A387E'
   primary-active: '#082C63'
   info: '#00838F'
+  scheduled: '#B58900'
   warning: '#E65100'
-  success: '#00897B'
+  success: '#2E7D32'
   destructive: '#C62828'
   # Variantes suaves (badges, avisos): fondo / borde / texto
   primary-soft: '#EAEDFF'
@@ -16,12 +17,15 @@ colors:
   info-soft: '#E0F7FA'
   info-soft-border: '#80DEEA'
   info-soft-foreground: '#006064'
+  scheduled-soft: '#FBF6DC'
+  scheduled-soft-border: '#E6D17A'
+  scheduled-soft-foreground: '#6B5300'
   warning-soft: '#FFF3E0'
   warning-soft-border: '#FFE082'
   warning-soft-foreground: '#BF360C'
-  success-soft: '#E0F2F1'
-  success-soft-border: '#80CBC4'
-  success-soft-foreground: '#00695C'
+  success-soft: '#E8F5E9'
+  success-soft-border: '#A5D6A7'
+  success-soft-foreground: '#1B5E20'
   destructive-soft: '#FFEBEE'
   destructive-soft-border: '#FFCDD2'
   destructive-soft-foreground: '#C62828'
@@ -75,9 +79,10 @@ Estilo: **minimalismo de precisión clínica** — bordes definidos, superficies
 | Rol | Color | Uso |
 |---|---|---|
 | **Primario** `#0D47A1` (azul zafiro) | `primary` | Navegación activa, acciones principales, selección, foco. |
-| **Info** `#00838F` (cian diagnóstico) | `info` | Turnos programados, etiquetas informativas, acciones secundarias técnicas. |
+| **Info** `#00838F` (cian diagnóstico) | `info` | Etiquetas informativas, acciones secundarias técnicas. |
+| **Programado** `#B58900` (mostaza) | `scheduled` | Solo el estado de turno programado (badge y borde del bloque en agenda). |
 | **Advertencia** `#E65100` (ámbar) | `warning` | Turnos vencidos, avisos que requieren atención sin ser críticos. |
-| **Éxito** `#00897B` (verde recuperación) | `success` | Turno completado, pagado, confirmaciones completadas. |
+| **Éxito** `#2E7D32` (verde recuperación) | `success` | Turno completado, pagado, confirmaciones completadas. |
 | **Crítico** `#C62828` | `destructive` | Urgencia/prioridad, errores de validación, acciones destructivas. |
 
 **Superficies:** lienzo `#F8FAFC` (`background`), tarjetas y paneles `#FFFFFF` (`card`), bandejas/columnas laterales `#F1F5F9` (`tray`, `muted`, `sidebar`), bordes `#E2E8F0` (`border`) y `#CBD5E1` (`input`, bordes de paneles activos).
@@ -86,7 +91,7 @@ Estilo: **minimalismo de precisión clínica** — bordes definidos, superficies
 
 | `AppointmentStatus` | Badge (fondo suave) | Borde izquierdo del bloque en agenda |
 |---|---|---|
-| `SCHEDULED` (Programado) | `info-soft` | `info` |
+| `SCHEDULED` (Programado) | `scheduled-soft` | `scheduled` |
 | `COMPLETED` (Completado) | `success-soft` | `success` |
 | `CANCELLED` (Cancelado) | neutro: `muted` + `border-input` + texto `muted-foreground` | `#94A3B8` (`placeholder`) |
 | `EXPIRED` (Vencido) | `warning-soft` | `warning` |
@@ -98,7 +103,8 @@ Los estados de pago (Incremento 2) se definirán cuando se modelen.
 ### Accesibilidad de color
 
 - Texto pequeño sobre fondo suave usa siempre el token `*-soft-foreground`. `warning-soft-foreground` es `#BF360C` y no `#E65100`: este último da 3.5:1 sobre `#FFF3E0` y no llega a AA.
-- Los fondos sólidos `warning` (`#E65100`) y `success` (`#00897B`) con texto blanco quedan por debajo de 4.5:1. Usarlos solo con texto grande/negrita, íconos o indicadores; para etiquetas con texto chico, usar la variante suave.
+- El fondo sólido `warning` (`#E65100`) con texto blanco queda por debajo de 4.5:1. Usarlo solo con texto grande/negrita, íconos o indicadores; para etiquetas con texto chico, usar la variante suave. `success` (`#2E7D32`) con texto blanco da 5.1:1.
+- Los cuatro estados del turno tienen tonos bien separados en el borde del bloque: mostaza (programado), verde (completado), naranja (vencido) y gris (cancelado). `scheduled` (`#B58900`) da 3.2:1 sobre blanco: sirve para bordes e indicadores, nunca como fondo de texto blanco; para texto usar `scheduled-soft-foreground` (`#6B5300`, 6.8:1 sobre `scheduled-soft`).
 - `muted-foreground` es `#475569`. El placeholder de los inputs (`#94A3B8`) no cumple AA y no debe usarse para información necesaria.
 
 ## Tipografía

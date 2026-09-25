@@ -13,7 +13,8 @@ export const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
 /// Badge de estado: fondo suave, borde y texto del mismo tono.
 export const APPOINTMENT_STATUS_BADGE_CLASS: Record<AppointmentStatus, string> =
   {
-    SCHEDULED: "bg-info-soft text-info-soft-foreground border-info-soft-border",
+    SCHEDULED:
+      "bg-scheduled-soft text-scheduled-soft-foreground border-scheduled-soft-border",
     COMPLETED:
       "bg-success-soft text-success-soft-foreground border-success-soft-border",
     CANCELLED: "bg-muted text-muted-foreground border-input",
@@ -26,7 +27,7 @@ export const APPOINTMENT_STATUS_BORDER_CLASS: Record<
   AppointmentStatus,
   string
 > = {
-  SCHEDULED: "border-l-info",
+  SCHEDULED: "border-l-scheduled",
   COMPLETED: "border-l-success",
   CANCELLED: "border-l-placeholder",
   EXPIRED: "border-l-warning",
