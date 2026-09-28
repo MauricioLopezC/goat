@@ -168,11 +168,11 @@ Tres entregas de **una semana** cada una.
 | Calendario | Sí (base) | Completo | Completo |
 | Pagos | — | Se inicia | Completa |
 | Indicadores | — | Iniciales | Completos |
-| Historial / prescripciones | — | A definir | Completo |
+| Historial / prescripciones | — | Cronología de turnos | Completo (atención y prescripciones) |
 
 Criterio del cliente para el Incremento 1: **algo funcional y útil de punta a punta**, antes que muchas pantallas a medias. Y advertencia explícita: si en el Inc. 1 sólo hacemos el alta del paciente, en el Inc. 2 va a pedir la ficha completa (10:54).
 
-Falta ubicar **historial y prescripciones** en un incremento. No figura explícitamente en la grilla de la pantalla clave, pero sí en los procesos principales.
+**Historial y prescripciones** no figuraban en la grilla de la pantalla clave, pero sí en los procesos principales. Decisión del equipo al planificar el Inc. 2: en el Inc. 2 el historial es la cronología de turnos del paciente; la atención registrada (`Encounter`) y las prescripciones entran en el Inc. 3 y lo completan.
 
 ---
 

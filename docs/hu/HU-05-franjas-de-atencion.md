@@ -59,5 +59,6 @@
   - **Supuesto:** el consultorio es opcional y se elige de una lista fija que trae el seed; no se controla que dos profesionales no lo usen a la vez.
 - ¿Quién carga los feriados?
   - **Supuesto del equipo:** el gerente, con los nacionales precargados. Así puede sumar días no laborables locales. A confirmar con el cliente.
+  - **Cliente (revisión del Inc. 1, 25/09/2026):** también mesa de entradas, en una sola acción para todo el centro y marcado en el calendario. Se resuelve en [HU-14](HU-14-cerrar-el-centro.md).
 - ¿Una excepción puede cargarse sobre turnos ya dados?
   - **Supuesto del equipo:** no; se cancelan antes, igual que al acortar una franja. A confirmar con el cliente.

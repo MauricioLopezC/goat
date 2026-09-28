@@ -31,6 +31,16 @@ El repositorio guarda la especificación, que es estable. Trello guarda el estad
 | [HU-10](HU-10-cancelar-turno.md) | Cancelar un turno | Turnos | 1 |
 | [HU-11](HU-11-calendario-del-centro.md) | Ver el calendario de turnos del centro | Calendario | 1 |
 | [HU-12](HU-12-agenda-del-profesional.md) | Ver mi agenda completa | Calendario | 1 |
+| [HU-13](HU-13-buscar-servicio-al-dar-turno.md) | Buscar el servicio al dar un turno | Servicios | 2 |
+| [HU-14](HU-14-cerrar-el-centro.md) | Cerrar el centro por un feriado o un día excepcional | Profesionales | 2 |
+| [HU-15](HU-15-vista-mensual-del-calendario.md) | Ver el calendario por mes | Calendario | 2 |
+| [HU-16](HU-16-reprogramar-turno.md) | Reprogramar un turno | Turnos | 2 |
+| [HU-17](HU-17-ficha-completa-del-paciente.md) | Completar la ficha del paciente | Pacientes | 2 |
+| [HU-18](HU-18-historial-de-turnos-del-paciente.md) | Ver el historial de turnos del paciente | Atención e historial | 2 |
+| [HU-19](HU-19-turno-prioritario.md) | Dar un turno prioritario | Turnos | 2 |
+| [HU-20](HU-20-aranceles-y-medios-de-pago.md) | Configurar valores, coseguros y medios de pago | Pagos | 2 |
+| [HU-21](HU-21-cobrar-turno.md) | Cobrar un turno en el mostrador | Pagos | 2 |
+| [HU-22](HU-22-indicadores-iniciales.md) | Ver la ocupación y el ausentismo del centro | Indicadores | 2 |
 
 Las historias se agregan al final, ordenadas por número. No se reordena la tabla: el orden de trabajo lo decide Trello.
 
