@@ -38,5 +38,6 @@
 ## A conversar
 
 - El Vencido se marca a mano (Inc. 1): si nadie cierra los turnos, el ausentismo sale mal. Por eso la lista de turnos sin cerrar entra en esta historia.
-- **Supuesto del equipo:** estas son las fórmulas de ocupación y ausentismo. A confirmar con el cliente.
+- ¿Son estas las fórmulas de ocupación y ausentismo?
+  - **Decisión del equipo (28/09/2026):** sí. Cada indicador muestra su fórmula como ayuda en el tablero.
 - Ingresos por período, demanda por servicio y el tablero del profesional: Inc. 3.

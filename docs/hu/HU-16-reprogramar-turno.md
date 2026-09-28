@@ -43,4 +43,5 @@
 ## A conversar
 
 - **Supuesto del equipo:** cambiar el servicio no es reprogramar: se cancela y se da un turno nuevo, porque cambia la duración y el valor. A confirmar.
-- **Supuesto del equipo:** no hay límite de reprogramaciones por turno. A confirmar.
+- ¿Hay que limitar las reprogramaciones de un turno?
+  - **Decisión del equipo (28/09/2026):** no hay límite.

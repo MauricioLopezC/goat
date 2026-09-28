@@ -34,5 +34,6 @@
 ## A conversar
 
 - El contexto (D-06) confirma que el turno considera prioridad o urgencia, pero no dice cómo.
-- **Decisión del equipo:** sin sobreturnos. Un sobreturno exige romper la regla de no superposición, que no se negocia. La urgencia se resuelve con la marca y con la búsqueda del primer horario libre. Queda como pregunta para la revisión: ¿el centro necesita sobreturnos?
+- ¿El centro necesita sobreturnos?
+  - **Decisión del equipo (28/09/2026):** no. Un sobreturno exige romper la regla de no superposición, que no se negocia. La urgencia se resuelve con la marca y con la búsqueda del primer horario libre.
 - Si falta tiempo, se entrega solo la marca de prioridad y la búsqueda pasa al Inc. 3.
