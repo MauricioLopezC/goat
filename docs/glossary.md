@@ -49,6 +49,7 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Ausentismo | `absenteeismRate` | Turnos Vencidos sobre Completados más Vencidos, en un período. |
 | Turno sin cerrar | `UnclosedAppointment` | Turno Programado cuya hora de fin ya pasó. Se lista en `/appointments/unclosed` para marcarlo Completado o Vencido. No es una entidad persistida. |
 | Domicilio | `address`, `city` | Del `Patient` ([HU-17](hu/HU-17-ficha-completa-del-paciente.md)). |
+| Observaciones administrativas | `Patient.notes` | Notas del mostrador sobre el paciente ([HU-17](hu/HU-17-ficha-completa-del-paciente.md)). No son datos clínicos. |
 | Contacto de emergencia | `emergencyContactName`, `emergencyContactPhone`, `emergencyContactRelationship` | Del `Patient`. Distinto del responsable o tutor (`guardianName`). |
 
 ## Enums
@@ -69,7 +70,7 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 
 **Día de la semana** (`Weekday`): `MONDAY` a `SUNDAY`. Es el día del patrón semanal de una `AvailabilityWindow`, no una fecha.
 
-**Tipo de cambio en un turno** (`AppointmentEventType`): `UPDATED`, `CANCELLED`, `COMPLETED`, `EXPIRED`, y desde el Inc. 2 `RESCHEDULED` (reprogramado).
+**Tipo de cambio en un turno** (`AppointmentEventType`): `UPDATED`, `CANCELLED`, `COMPLETED`, `EXPIRED`, y desde el Inc. 2 `RESCHEDULED` (reprogramado) y `PRIORITY_CHANGED` (cambio de prioridad, con `previousPriority` y `newPriority`; [HU-19](hu/HU-19-turno-prioritario.md)).
 
 **Prioridad del turno** (`AppointmentPriority`): `NORMAL` o `URGENT` (urgente). Un turno `URGENT` lleva su motivo en `priorityReason` ([HU-19](hu/HU-19-turno-prioritario.md)).
 
