@@ -658,12 +658,12 @@ No es una Server Action: la página `/holidays` la llama directo a la DAL (ADR 0
 
 **Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`
-**Entrada:** `query` (cadena de búsqueda), `page` (de `?page=`) y el `actor`.
-**Precondiciones:** el actor pertenece a `STAFF_ROLES`. Si `query.trim().length < 3`, la operación no ejecuta la consulta a la base y retorna una página vacía.
-**Efectos:** ninguno. Es una lectura de pacientes activos (`active: true`) con coincidencia parcial insensible a mayúsculas en `lastName` o `firstName`, o coincidencia en `documentNumber`. Incluye la afiliación (`coverage`) con su plan y obra social.
+**Entrada:** `query` (cadena de búsqueda, puede venir vacía), `page` (de `?page=`) y el `actor`.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`.
+**Efectos:** ninguno. Es una lectura de pacientes activos (`active: true`). Si `query.trim().length < 3`, no filtra y devuelve el listado completo. Si no, filtra por coincidencia parcial insensible a mayúsculas en `lastName`, `firstName` o `documentNumber` (un documento con puntos o guiones también se busca solo con sus dígitos). Incluye la afiliación (`coverage`) con su plan y obra social.
 **Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
 **Revalida:** no aplica.
-**Devuelve:** `Page<Patient>` con `coverage` incluida, ordenados alfabéticamente por apellido, nombre e `id` ([listados paginados](#listados-paginados)).
+**Devuelve:** `Page<Patient>` con `coverage` incluida, del registrado más recientemente al más antiguo (`createdAt` e `id` descendentes), con o sin búsqueda ([listados paginados](#listados-paginados)).
 
 No es una Server Action: es una lectura que el Server Component de `/patients` llama directo a la DAL (ADR 0001).
 

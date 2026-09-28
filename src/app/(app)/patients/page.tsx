@@ -25,13 +25,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { calculateAge } from "@/lib/patients";
-import { emptyPage, parsePageParam } from "@/lib/pagination";
+import { parsePageParam } from "@/lib/pagination";
 import { ListPagination } from "@/components/list-pagination";
 import { PatientSearchBar } from "./PatientSearchBar";
 
 export const metadata: Metadata = {
   title: "Pacientes · Goat",
-  description: "Búsqueda y gestión de pacientes del centro.",
+  description: "Listado, búsqueda y gestión de pacientes del centro.",
 };
 
 interface PatientsPageProps {
@@ -58,12 +58,15 @@ export default async function PatientsPage({
     actor.role === "RECEPTIONIST" || actor.role === "MANAGER";
   const canBookAppointment = canAccess("/appointments/new", actor.role);
 
-  const hasMinChars = query.length >= 3;
+  // Con menos de 3 caracteres no se filtra: se sigue viendo el listado completo.
+  const isFiltering = query.length >= 3;
   const isTooShort = query.length > 0 && query.length < 3;
 
-  const patientsPage = hasMinChars
-    ? await searchPatients(query, parsePageParam(resolvedParams?.page), actor)
-    : emptyPage<never>();
+  const patientsPage = await searchPatients(
+    query,
+    parsePageParam(resolvedParams?.page),
+    actor,
+  );
   const patients = patientsPage.items;
 
   return (
@@ -74,7 +77,8 @@ export default async function PatientsPage({
             Pacientes
           </h1>
           <p className="text-body-lg text-muted-foreground mt-1">
-            Búsqueda por documento, apellido o nombre y gestión de ficha.
+            Listado de pacientes, del registrado más recientemente al más
+            antiguo. Buscá por documento, apellido o nombre.
           </p>
         </div>
         {isManagerOrReceptionist && (
@@ -89,28 +93,16 @@ export default async function PatientsPage({
 
       <PatientSearchBar initialQuery={rawQuery} />
 
-      {/* Caso 1: Búsqueda con menos de 3 caracteres */}
       {isTooShort && (
-        <Card className="rounded-xl border-dashed border-2 border-border p-8 text-center bg-card">
-          <CardContent className="flex flex-col items-center justify-center gap-3 p-0">
-            <div className="size-10 rounded-lg bg-info-soft text-info-soft-foreground flex items-center justify-center">
-              <Search className="size-5" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-title-md font-semibold text-foreground">
-                Ingresá al menos 3 caracteres
-              </h3>
-              <p className="text-body-sm text-muted-foreground max-w-md">
-                Escribí un apellido, nombre o número de documento con al menos 3
-                caracteres para buscar.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <p className="flex items-center gap-2 text-body-sm text-muted-foreground">
+          <Search className="size-4" />
+          Ingresá al menos 3 caracteres para filtrar. Mientras tanto se muestran
+          todos los pacientes.
+        </p>
       )}
 
-      {/* Caso 2: Sin búsqueda iniciada */}
-      {!query && (
+      {/* Sin pacientes registrados */}
+      {!isFiltering && patients.length === 0 && (
         <Card className="rounded-xl border-dashed border-2 border-border p-12 text-center bg-card">
           <CardContent className="flex flex-col items-center justify-center gap-4 p-0">
             <div className="size-12 rounded-lg bg-primary-soft text-primary-soft-foreground flex items-center justify-center">
@@ -118,19 +110,26 @@ export default async function PatientsPage({
             </div>
             <div className="space-y-1">
               <h3 className="text-title-lg font-semibold text-foreground">
-                Búsqueda de pacientes
+                Todavía no hay pacientes registrados
               </h3>
               <p className="text-body-md text-muted-foreground max-w-md">
-                Ingresá el número de documento o parte del apellido o nombre del
-                paciente en el cuadro de búsqueda para ver sus datos.
+                Los pacientes que registres van a aparecer en este listado.
               </p>
             </div>
+            {isManagerOrReceptionist && (
+              <Button asChild className="gap-2 mt-2">
+                <Link href="/patients/new">
+                  <UserPlus className="size-4" />
+                  Registrar paciente
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Caso 3: Búsqueda ejecutada sin resultados */}
-      {hasMinChars && patients.length === 0 && (
+      {/* Búsqueda sin resultados */}
+      {isFiltering && patients.length === 0 && (
         <Card className="rounded-xl border-dashed border-2 border-border p-10 text-center bg-card">
           <CardContent className="flex flex-col items-center justify-center gap-4 p-0">
             <div className="size-12 rounded-lg bg-warning-soft text-warning-soft-foreground flex items-center justify-center">
@@ -157,15 +156,24 @@ export default async function PatientsPage({
         </Card>
       )}
 
-      {/* Caso 4: Resultados encontrados */}
-      {hasMinChars && patients.length > 0 && (
+      {/* Listado, completo o filtrado */}
+      {patients.length > 0 && (
         <div className="space-y-4">
           <p className="text-body-sm text-muted-foreground">
-            Se {patientsPage.total === 1 ? "encontró" : "encontraron"}{" "}
+            {isFiltering
+              ? patientsPage.total === 1
+                ? "Se encontró "
+                : "Se encontraron "
+              : "Hay "}
             <span className="font-semibold text-foreground">
               {patientsPage.total}
             </span>{" "}
-            {patientsPage.total === 1 ? "paciente" : "pacientes"}.
+            {patientsPage.total === 1 ? "paciente" : "pacientes"}
+            {isFiltering
+              ? "."
+              : patientsPage.total === 1
+                ? " registrado."
+                : " registrados."}
           </p>
 
           <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
@@ -299,7 +307,7 @@ export default async function PatientsPage({
           <ListPagination
             page={patientsPage}
             pathname="/patients"
-            params={{ q: query }}
+            params={{ q: isFiltering ? query : undefined }}
             label="Páginas de pacientes"
           />
         </div>

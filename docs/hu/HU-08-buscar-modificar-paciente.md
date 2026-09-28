@@ -6,18 +6,20 @@
 
 ## Datos
 
+- Sin texto buscado, la pantalla lista todos los pacientes.
 - Búsqueda por número de documento, apellido o nombre, con coincidencia parcial en apellido y nombre.
 - El listado muestra apellido y nombre, documento, fecha de nacimiento, teléfono y cobertura.
 
 ## Validaciones
 
-- Menos de 3 caracteres no dispara la búsqueda.
+- Menos de 3 caracteres no filtra: se sigue viendo el listado completo, con un aviso.
 - Al modificar el documento se revalida la unicidad.
 - Las mismas validaciones de formato que en el alta ([HU-07](HU-07-registrar-paciente.md)).
 
 ## Comportamiento
 
-- Resultados ordenados por apellido, de a 10 por página, con el total de pacientes encontrados. Una búsqueda nueva vuelve a la primera página.
+- La pantalla es un listado: sin texto buscado muestra todos los pacientes; el buscador filtra esa misma tabla.
+- Ordenado del registrado más recientemente al más antiguo, con o sin búsqueda, igual que la lista de pacientes del alta de turno. De a 10 por página, con el total de pacientes. Una búsqueda nueva, o limpiar el buscador, vuelve a la primera página.
 - Sin resultados: mensaje claro y acceso directo a registrar un paciente nuevo, con el texto buscado ya precargado.
 - Desde el resultado se puede abrir la ficha, editarla o dar un turno.
 - Cada modificación registra usuario, fecha y hora.
@@ -30,7 +32,11 @@
 ## Operaciones
 
 - `updatePatient` — modificación de datos y cobertura.
-- Búsqueda y ficha son lecturas: `searchPatients(query, page)`, `getPatient(id)` en `src/lib/dal/patients.ts`, llamadas desde Server Components.
+- Listado, búsqueda y ficha son lecturas: `searchPatients(query, page)`, `getPatient(id)` en `src/lib/dal/patients.ts`, llamadas desde Server Components.
+
+## Ajustes
+
+- **Inc. 2 — Listado de pacientes** ([ajustes de HU-08](../incrementos/2.md#ajustes-de-hu-08)): la pantalla pasó de mostrar solo el buscador a listar todos los pacientes, del más reciente al más antiguo, y el buscador filtra ese listado.
 
 ## Nota de alcance
 
