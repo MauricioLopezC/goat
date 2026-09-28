@@ -95,11 +95,12 @@ export const SPECIALTIES = [
   { name: "Medicina del dolor", active: false },
 ];
 
-/// `price` queda en null: en el Inc. 1 no se cobra.
+/// `price` es el valor de la prestación en pesos (HU-20).
 export const SERVICES: {
   name: string;
   description: string;
   durationMinutes: number;
+  price: number;
   requiresReferral: boolean;
   specialty: string | null;
   active: boolean;
@@ -108,6 +109,7 @@ export const SERVICES: {
     name: "Consulta traumatológica general",
     description: "Primera consulta o seguimiento con el traumatólogo.",
     durationMinutes: 30,
+    price: 35000,
     requiresReferral: false,
     specialty: null,
     active: true,
@@ -116,6 +118,7 @@ export const SERVICES: {
     name: "Consulta de columna",
     description: "Lumbalgia, cervicalgia, hernia de disco y escoliosis.",
     durationMinutes: 30,
+    price: 38000,
     requiresReferral: false,
     specialty: "Columna",
     active: true,
@@ -124,6 +127,7 @@ export const SERVICES: {
     name: "Consulta de rodilla",
     description: "Lesiones meniscales, ligamentarias y artrosis de rodilla.",
     durationMinutes: 30,
+    price: 38000,
     requiresReferral: false,
     specialty: "Rodilla",
     active: true,
@@ -132,6 +136,7 @@ export const SERVICES: {
     name: "Consulta de traumatología infantil",
     description: "Pacientes de 0 a 15 años, siempre con un adulto responsable.",
     durationMinutes: 30,
+    price: 35000,
     requiresReferral: false,
     specialty: "Traumatología infantil",
     active: true,
@@ -140,6 +145,7 @@ export const SERVICES: {
     name: "Control post-quirúrgico",
     description: "Control de la evolución después de una cirugía.",
     durationMinutes: 30,
+    price: 25000,
     requiresReferral: false,
     specialty: null,
     active: true,
@@ -148,6 +154,7 @@ export const SERVICES: {
     name: "Curación y retiro de puntos",
     description: "Curación de heridas quirúrgicas y retiro de suturas.",
     durationMinutes: 30,
+    price: 18000,
     requiresReferral: false,
     specialty: null,
     active: true,
@@ -156,6 +163,7 @@ export const SERVICES: {
     name: "Colocación y retiro de yeso",
     description: "Inmovilización con yeso o férula, y su retiro.",
     durationMinutes: 30,
+    price: 30000,
     requiresReferral: false,
     specialty: null,
     active: true,
@@ -164,6 +172,7 @@ export const SERVICES: {
     name: "Infiltración articular",
     description: "Infiltración con corticoides o ácido hialurónico.",
     durationMinutes: 30,
+    price: 55000,
     requiresReferral: true,
     specialty: null,
     active: true,
@@ -172,6 +181,7 @@ export const SERVICES: {
     name: "Ondas de choque",
     description: "Tendinopatías y fascitis plantar. Se indica por sesiones.",
     durationMinutes: 30,
+    price: 40000,
     requiresReferral: true,
     specialty: "Traumatología deportiva",
     active: true,
@@ -180,6 +190,7 @@ export const SERVICES: {
     name: "Evaluación kinesiológica inicial",
     description: "Evaluación funcional y plan de tratamiento kinésico.",
     durationMinutes: 60,
+    price: 30000,
     requiresReferral: true,
     specialty: "Kinesiología y rehabilitación",
     active: true,
@@ -188,6 +199,7 @@ export const SERVICES: {
     name: "Sesión de kinesiología motora",
     description: "Sesión de tratamiento dentro de un plan kinésico.",
     durationMinutes: 30,
+    price: 18000,
     requiresReferral: true,
     specialty: "Kinesiología y rehabilitación",
     active: true,
@@ -196,6 +208,7 @@ export const SERVICES: {
     name: "Rehabilitación deportiva",
     description: "Readaptación al deporte después de una lesión.",
     durationMinutes: 60,
+    price: 28000,
     requiresReferral: true,
     specialty: "Traumatología deportiva",
     active: true,
@@ -204,6 +217,7 @@ export const SERVICES: {
     name: "Certificado de aptitud física",
     description: "Evaluación médica traumatológica para apto físico deportivo.",
     durationMinutes: 30,
+    price: 25000,
     requiresReferral: false,
     specialty: null,
     active: true,
@@ -212,6 +226,7 @@ export const SERVICES: {
     name: "Vendaje neuromuscular y funcional",
     description: "Colocación de vendaje kinesiológico y estabilizador.",
     durationMinutes: 30,
+    price: 15000,
     requiresReferral: false,
     specialty: null,
     active: true,
@@ -221,6 +236,7 @@ export const SERVICES: {
     description:
       "Infiltración guiada para tratamiento de dolor radicular de columna.",
     durationMinutes: 30,
+    price: 85000,
     requiresReferral: true,
     specialty: "Columna",
     active: true,
@@ -230,6 +246,7 @@ export const SERVICES: {
     description:
       "Examen postural integral y diagnóstico biomecánico de columna.",
     durationMinutes: 30,
+    price: 35000,
     requiresReferral: false,
     specialty: "Columna",
     active: true,
@@ -239,6 +256,7 @@ export const SERVICES: {
     description:
       "Control evolutivo y pautas posturales para escoliosis del adulto o adolescente.",
     durationMinutes: 30,
+    price: 30000,
     requiresReferral: false,
     specialty: "Columna",
     active: true,
@@ -247,6 +265,7 @@ export const SERVICES: {
     name: "Punción y evacuación articular de rodilla",
     description: "Evacuación de derrame articular y toma de muestra.",
     durationMinutes: 30,
+    price: 45000,
     requiresReferral: true,
     specialty: "Rodilla",
     active: true,
@@ -256,6 +275,7 @@ export const SERVICES: {
     description:
       "Seguimiento clínico y radiológico de artroplastia de rodilla.",
     durationMinutes: 30,
+    price: 30000,
     requiresReferral: false,
     specialty: "Rodilla",
     active: true,
@@ -265,6 +285,7 @@ export const SERVICES: {
     description:
       "Pruebas de estabilidad articular para lesiones de LCA y ligamentos colaterales.",
     durationMinutes: 30,
+    price: 38000,
     requiresReferral: false,
     specialty: "Rodilla",
     active: true,
@@ -274,6 +295,7 @@ export const SERVICES: {
     description:
       "Patología del manguito rotador, tendinitis bicipital y epicondilitis.",
     durationMinutes: 30,
+    price: 38000,
     requiresReferral: false,
     specialty: "Hombro y codo",
     active: true,
@@ -283,6 +305,7 @@ export const SERVICES: {
     description:
       "Tratamiento infiltrativo para síndrome de fricción subacromial.",
     durationMinutes: 30,
+    price: 55000,
     requiresReferral: true,
     specialty: "Hombro y codo",
     active: true,
@@ -292,6 +315,7 @@ export const SERVICES: {
     description:
       "Evaluación y manejo conservador de inestabilidad y luxación glenohumeral.",
     durationMinutes: 30,
+    price: 45000,
     requiresReferral: false,
     specialty: "Hombro y codo",
     active: true,
@@ -301,6 +325,7 @@ export const SERVICES: {
     description:
       "Túnel carpiano, dedo en resorte, quiste sinovial y fracturas de muñeca.",
     durationMinutes: 30,
+    price: 38000,
     requiresReferral: false,
     specialty: "Mano y muñeca",
     active: true,
@@ -309,6 +334,7 @@ export const SERVICES: {
     name: "Infiltración de túnel carpiano",
     description: "Infiltración local para compresión del nervio mediano.",
     durationMinutes: 30,
+    price: 55000,
     requiresReferral: true,
     specialty: "Mano y muñeca",
     active: true,
@@ -318,6 +344,7 @@ export const SERVICES: {
     description:
       "Manejo ortopédico e infiltración en tenosinovitis estenosante.",
     durationMinutes: 30,
+    price: 40000,
     requiresReferral: false,
     specialty: "Mano y muñeca",
     active: true,
@@ -327,6 +354,7 @@ export const SERVICES: {
     description:
       "Artrosis de cadera, choque femoroacetabular y bursitis trocantérea.",
     durationMinutes: 30,
+    price: 38000,
     requiresReferral: false,
     specialty: "Cadera",
     active: true,
@@ -336,6 +364,7 @@ export const SERVICES: {
     description:
       "Control periódico de reemplazo articular total o parcial de cadera.",
     durationMinutes: 30,
+    price: 30000,
     requiresReferral: false,
     specialty: "Cadera",
     active: true,
@@ -345,6 +374,7 @@ export const SERVICES: {
     description:
       "Tratamiento de bursitis trocantérea guiado por referencias anatómicas.",
     durationMinutes: 30,
+    price: 55000,
     requiresReferral: true,
     specialty: "Cadera",
     active: true,
@@ -354,6 +384,7 @@ export const SERVICES: {
     description:
       "Esguinces de tobillo, fascitis plantar, pie plano y hallux valgus.",
     durationMinutes: 30,
+    price: 38000,
     requiresReferral: false,
     specialty: "Tobillo y pie",
     active: true,
@@ -363,6 +394,7 @@ export const SERVICES: {
     description:
       "Tratamiento infiltrativo analgésico y antiinflamatorio para fascitis crónica.",
     durationMinutes: 30,
+    price: 55000,
     requiresReferral: true,
     specialty: "Tobillo y pie",
     active: true,
@@ -372,6 +404,7 @@ export const SERVICES: {
     description:
       "Diagnóstico ortopédico estático y dinámico para prescripción de plantillas.",
     durationMinutes: 30,
+    price: 45000,
     requiresReferral: false,
     specialty: "Tobillo y pie",
     active: true,
@@ -381,6 +414,7 @@ export const SERVICES: {
     description:
       "Seguimiento ecográfico y radiológico en lactantes y niños pequeños.",
     durationMinutes: 30,
+    price: 30000,
     requiresReferral: false,
     specialty: "Traumatología infantil",
     active: true,
@@ -390,6 +424,7 @@ export const SERVICES: {
     description:
       "Control ortopédico pediátrico y seguimiento del método Ponseti.",
     durationMinutes: 30,
+    price: 30000,
     requiresReferral: false,
     specialty: "Traumatología infantil",
     active: true,
@@ -399,6 +434,7 @@ export const SERVICES: {
     description:
       "Evaluación del desarrollo esquelético, genu valgo y discrepancia de miembros.",
     durationMinutes: 30,
+    price: 30000,
     requiresReferral: false,
     specialty: "Traumatología infantil",
     active: true,
@@ -408,6 +444,7 @@ export const SERVICES: {
     description:
       "Batería de pruebas de fuerza y rango articular previa al retorno deportivo.",
     durationMinutes: 30,
+    price: 35000,
     requiresReferral: false,
     specialty: "Traumatología deportiva",
     active: true,
@@ -417,6 +454,7 @@ export const SERVICES: {
     description:
       "Entrenamiento kinésico específico de campo y prevención de recidivas.",
     durationMinutes: 60,
+    price: 28000,
     requiresReferral: true,
     specialty: "Traumatología deportiva",
     active: true,
@@ -426,6 +464,7 @@ export const SERVICES: {
     description:
       "Técnica kinésica desedematizante post-traumática o post-quirúrgica.",
     durationMinutes: 60,
+    price: 25000,
     requiresReferral: true,
     specialty: "Kinesiología y rehabilitación",
     active: true,
@@ -435,6 +474,7 @@ export const SERVICES: {
     description:
       "Tratamiento kinesiológico individual de cadenas miofasciales.",
     durationMinutes: 60,
+    price: 30000,
     requiresReferral: true,
     specialty: "Kinesiología y rehabilitación",
     active: true,
@@ -444,10 +484,19 @@ export const SERVICES: {
     name: "Magnetoterapia",
     description: "Se dejó de ofrecer al retirar el equipo.",
     durationMinutes: 30,
+    price: 15000,
     requiresReferral: true,
     specialty: "Kinesiología y rehabilitación",
     active: false,
   },
+];
+
+/// Medios de pago del centro (HU-20).
+export const PAYMENT_METHODS = [
+  { name: "Efectivo", active: true },
+  { name: "Tarjeta de débito", active: true },
+  { name: "Tarjeta de crédito", active: true },
+  { name: "Transferencia", active: true },
 ];
 
 // ─────────────────────────── Profesionales ───────────────────────────
