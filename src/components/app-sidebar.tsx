@@ -1,4 +1,6 @@
+import Image from "next/image";
 import { LogOut } from "lucide-react";
+import logo from "@/assets/logo-goat.png";
 import type { Actor } from "@/lib/dal/auth";
 import { ROLE_LABEL } from "@/lib/roles";
 import { signOut } from "@/app/(auth)/login/actions";
@@ -21,9 +23,14 @@ export function AppSidebar({ actor }: { actor: Actor }) {
     <Sidebar>
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <span className="bg-primary text-title-md text-primary-foreground flex size-8 items-center justify-center rounded-lg">
-            G
-          </span>
+          <Image
+            src={logo}
+            width={32}
+            height={32}
+            alt=""
+            className="size-8 rounded-lg"
+            loading="eager"
+          />
           <span className="text-title-lg">Goat</span>
         </div>
       </SidebarHeader>
