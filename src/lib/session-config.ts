@@ -1,5 +1,6 @@
 import type { SessionOptions } from "iron-session";
 import type { Role } from "@/generated/prisma/enums";
+import { requireEnv } from "@/lib/env";
 
 // Configuración de la cookie de sesión (ADR 0002), aparte de `session.ts`
 // porque `proxy.ts` también la necesita y ahí no se puede importar
@@ -17,12 +18,9 @@ export type SessionPayload = {
 const TTL_SECONDS = 8 * 60 * 60;
 
 export function sessionOptions(): SessionOptions {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error(
-      "Falta SESSION_SECRET, o tiene menos de 32 caracteres. Ver .env.example.",
-    );
-  }
+  // `instrumentation.ts` ya lo valida al arrancar; esto cubre el caso en que
+  // el .env cambie con el servidor andando.
+  const secret = requireEnv("SESSION_SECRET");
 
   return {
     cookieName: "goat_session",
