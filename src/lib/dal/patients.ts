@@ -5,7 +5,7 @@ import { Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
 import { assertRole, type Actor } from "@/lib/dal/auth";
-import { emptyPage, paginate } from "@/lib/pagination";
+import { paginate } from "@/lib/pagination";
 import type {
   CreatePatientInput,
   UpdatePatientInput,
@@ -199,9 +199,10 @@ export async function listHealthInsurers(actor: Actor) {
 
 export type UpdatedPatientSummary = CreatedPatientSummary;
 
-/// Búsqueda de pacientes por documento, apellido o nombre (HU-08).
-/// Mínimo 3 caracteres; devuelve una página vacía si tiene menos. Pagina de a
-/// `PAGE_SIZE` resultados, con el total.
+/// Listado de pacientes, filtrado por documento, apellido o nombre (HU-08).
+/// Con menos de 3 caracteres no filtra y devuelve el listado completo. Ordena
+/// del registrado más recientemente al más antiguo y pagina de a `PAGE_SIZE`
+/// resultados, con el total.
 export async function searchPatients(
   query: string,
   page: number,
@@ -210,26 +211,11 @@ export async function searchPatients(
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
 
   const trimmed = query.trim();
-  if (trimmed.length < 3) {
-    return emptyPage<never>();
-  }
+  const where: Prisma.PatientWhereInput =
+    trimmed.length < 3
+      ? { active: true }
+      : { active: true, OR: patientSearchConditions(trimmed) };
 
-  const orConditions: Prisma.PatientWhereInput[] = [
-    { lastName: { contains: trimmed, mode: "insensitive" } },
-    { firstName: { contains: trimmed, mode: "insensitive" } },
-    { documentNumber: { contains: trimmed, mode: "insensitive" } },
-  ];
-
-  // Si se ingresó un documento con puntos/guiones (ej. 40.123.456), normalizar a solo dígitos
-  const hasLetters = /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(trimmed);
-  const digitsOnly = trimmed.replace(/\D/g, "");
-  if (!hasLetters && digitsOnly.length >= 3 && digitsOnly !== trimmed) {
-    orConditions.push({
-      documentNumber: { contains: digitsOnly, mode: "insensitive" },
-    });
-  }
-
-  const where: Prisma.PatientWhereInput = { active: true, OR: orConditions };
   return paginate(
     page,
     () => prisma.patient.count({ where }),
@@ -248,10 +234,30 @@ export async function searchPatients(
           },
         },
         // El `id` desempata para que ningún paciente salte de página.
-        orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         ...range,
       }),
   );
+}
+
+/// Coincidencia parcial en apellido, nombre o documento para `searchPatients`.
+function patientSearchConditions(trimmed: string) {
+  const orConditions: Prisma.PatientWhereInput[] = [
+    { lastName: { contains: trimmed, mode: "insensitive" } },
+    { firstName: { contains: trimmed, mode: "insensitive" } },
+    { documentNumber: { contains: trimmed, mode: "insensitive" } },
+  ];
+
+  // Si se ingresó un documento con puntos/guiones (ej. 40.123.456), normalizar a solo dígitos
+  const hasLetters = /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(trimmed);
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  if (!hasLetters && digitsOnly.length >= 3 && digitsOnly !== trimmed) {
+    orConditions.push({
+      documentNumber: { contains: digitsOnly, mode: "insensitive" },
+    });
+  }
+
+  return orConditions;
 }
 
 /// Ficha completa del paciente por ID (HU-08).
