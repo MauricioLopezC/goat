@@ -15,21 +15,19 @@
 - No puede haber dos cierres el mismo día.
 - El cierre es siempre del día completo.
 - En un día cerrado no se ofrecen horarios ni se puede asignar un turno (ya lo cumple [HU-09](HU-09-asignar-turno.md)).
+- No se puede cerrar un día que tiene turnos Programados que todavía no comenzaron: el sistema avisa y lista los turnos afectados, que hay que cancelar o reprogramar antes. Es la misma regla que al eliminar o acortar una franja de un profesional ([HU-05](HU-05-franjas-de-atencion.md)).
 
 ## Comportamiento
 
 - Se carga desde el calendario ([HU-11](HU-11-calendario-del-centro.md)), sobre el día que se está viendo, o desde la pantalla de feriados.
-- Si ese día hay turnos Programados que todavía no comenzaron, antes de guardar el sistema muestra cuántos son y la lista (paciente, profesional, hora). Al confirmar:
-  - los **cancela en bloque**, cada uno con el motivo "Cierre del centro: <descripción>" y quién lo solicitó "El centro", igual que una cancelación de [HU-10](HU-10-cancelar-turno.md);
-  - el cierre y las cancelaciones se guardan juntos: si algo falla, no se guarda nada;
-  - si entre la vista previa y la confirmación alguien dio o canceló un turno ese día, el sistema avisa y vuelve a mostrar la lista actualizada.
+- Si el día tiene turnos, la lista de turnos afectados muestra paciente, teléfono, profesional y hora, con acceso al detalle de cada uno para cancelarlo ([HU-10](HU-10-cancelar-turno.md)) o reprogramarlo ([HU-16](HU-16-reprogramar-turno.md)). Con el día libre de turnos, se vuelve a intentar el cierre.
 - El día cerrado aparece **pintado** en todas las vistas del calendario y en la agenda de cada profesional, con la descripción del cierre.
-- Quitar un cierre vuelve a habilitar el día, pero no restaura los turnos cancelados.
+- Quitar un cierre vuelve a habilitar el día.
 
 ## Confirmación
 
-- Pide confirmación explícita con la fecha, la descripción y la cantidad de turnos que se van a cancelar.
-- Al terminar, muestra la lista de pacientes afectados con su teléfono, para avisarles.
+- Pide confirmación explícita con la fecha y la descripción.
+- Mensaje de éxito indicando que el centro quedó cerrado ese día.
 - Quitar un cierre pide confirmación.
 
 ## Permisos
@@ -39,13 +37,12 @@
 
 ## Operaciones
 
-- `createHoliday` — cambia su contrato: ya no rechaza el día con turnos (`FUTURE_APPOINTMENTS`), sino que exige confirmar la cantidad de turnos que va a cancelar y los cancela en la misma transacción.
-- `previewHolidayClosure` — turnos que un cierre cancelaría.
+- `createHoliday` — mantiene su contrato: rechaza el día con turnos con `FUTURE_APPOINTMENTS` y los turnos afectados en `meta.appointments`. Suma el rol `RECEPTIONIST` y el teléfono del paciente en los turnos afectados.
 - `listHolidays`, `deleteHoliday` — suman el rol `RECEPTIONIST`.
 
 ## A conversar
 
 - Revisión del Inc. 1 (25/09/2026): el cliente pidió que mesa de entradas marque feriados y días excepcionales en una sola acción, pintados en el calendario y sin turnos. Responde la pregunta de [HU-05](HU-05-franjas-de-atencion.md) *¿Quién carga los feriados?*
 - **Supuesto del equipo:** un día excepcional es siempre el día completo, no un cierre parcial. A confirmar.
-- **Supuesto del equipo:** al cerrar un día con turnos, se cancelan en bloque. Como el aviso por email sigue pendiente ([HU-09](HU-09-asignar-turno.md)), mesa de entradas avisa por teléfono con la lista que muestra el sistema. A confirmar.
-- Las excepciones por profesional ([HU-05](HU-05-franjas-de-atencion.md)) no cambian: siguen exigiendo cancelar los turnos antes.
+- ¿Qué pasa al cerrar un día que ya tiene turnos?
+  - **Decisión del equipo (28/09/2026):** no se permite. Se maneja con la misma lógica que eliminar o acortar una franja de un profesional ([HU-05](HU-05-franjas-de-atencion.md)): el sistema lista los turnos afectados y hay que cancelarlos o reprogramarlos antes. Como el aviso por email sigue pendiente ([HU-09](HU-09-asignar-turno.md)), la lista incluye el teléfono del paciente para avisarle.

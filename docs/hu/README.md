@@ -38,7 +38,7 @@ El repositorio guarda la especificación, que es estable. Trello guarda el estad
 | [HU-17](HU-17-ficha-completa-del-paciente.md) | Completar la ficha del paciente | Pacientes | 2 |
 | [HU-18](HU-18-historial-de-turnos-del-paciente.md) | Ver el historial de turnos del paciente | Atención e historial | 2 |
 | [HU-19](HU-19-turno-prioritario.md) | Dar un turno prioritario | Turnos | 2 |
-| [HU-20](HU-20-aranceles-y-medios-de-pago.md) | Configurar valores, coseguros y medios de pago | Pagos | 2 |
+| [HU-20](HU-20-aranceles-y-medios-de-pago.md) | Configurar valores y medios de pago | Pagos | 2 |
 | [HU-21](HU-21-cobrar-turno.md) | Cobrar un turno en el mostrador | Pagos | 2 |
 | [HU-22](HU-22-indicadores-iniciales.md) | Ver la ocupación y el ausentismo del centro | Indicadores | 2 |
 

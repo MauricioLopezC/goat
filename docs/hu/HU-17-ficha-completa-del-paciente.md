@@ -7,7 +7,7 @@
 ## Datos
 
 - **Nuevos, opcionales:** domicilio (calle y número, localidad), contacto de emergencia (nombre, teléfono y vínculo), observaciones administrativas.
-- **Cobertura:** obra social, plan, número de afiliado y el coseguro del plan ([HU-20](HU-20-aranceles-y-medios-de-pago.md)), solo lectura.
+- **Cobertura:** obra social, plan y número de afiliado, como en [HU-07](HU-07-registrar-paciente.md).
 - Los datos de [HU-07](HU-07-registrar-paciente.md) no cambian.
 
 ## Validaciones
@@ -34,5 +34,5 @@
 ## A conversar
 
 - En [HU-07](HU-07-registrar-paciente.md) quedaron para la ficha completa: domicilio, contacto de emergencia, coseguro y datos ampliados de cobertura. El cliente anticipó que la iba a pedir en el Inc. 2.
-- **Supuesto del equipo:** el coseguro depende del plan, no del paciente ([HU-20](HU-20-aranceles-y-medios-de-pago.md)). A confirmar.
+- **Decisión del equipo (28/09/2026):** el coseguro sale del Inc. 2 ([HU-20](HU-20-aranceles-y-medios-de-pago.md)); la ficha no lo muestra.
 - **Supuesto del equipo:** todos los campos nuevos son opcionales para no frenar el mostrador. A confirmar.
