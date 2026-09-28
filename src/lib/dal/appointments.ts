@@ -150,7 +150,12 @@ export async function getAppointmentOptions(
       : null,
     prisma.service.findMany({
       where: { active: true },
-      select: { id: true, name: true, durationMinutes: true },
+      select: {
+        id: true,
+        name: true,
+        durationMinutes: true,
+        specialty: { select: { id: true, name: true } },
+      },
       orderBy: { name: "asc" },
     }),
     serviceId
