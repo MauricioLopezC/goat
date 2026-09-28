@@ -19,6 +19,7 @@
 
 - El selector de servicio del alta de turno ([HU-09](HU-09-asignar-turno.md)) pasa a ser un buscador: filtra mientras se escribe y se usa completo con el teclado (flechas y Enter).
 - Sin texto escrito, los servicios aparecen agrupados por especialidad y en orden alfabético.
+- Al elegir el servicio, se muestra su duración solo como información: no es un campo editable ni cambia el servicio elegido.
 - Al elegir el servicio, la lista de profesionales se reduce a los que lo prestan, como hasta ahora.
 - El mismo buscador se usa en el filtro por servicio del calendario ([HU-11](HU-11-calendario-del-centro.md)).
 
