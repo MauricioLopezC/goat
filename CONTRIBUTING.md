@@ -43,7 +43,7 @@ Todos los usuarios tienen la contraseña `goat1234` (cambiable con `SEED_PASSWOR
 
 Además siembra:
 
-- **Catálogo:** 4 títulos, 10 especialidades y 13 servicios (de 30 y 60 min, con y sin orden médica). Hay un título, una especialidad y un servicio inactivos.
+- **Catálogo:** 4 títulos, 10 especialidades y 40 servicios (de 30 y 60 min, con y sin orden médica). Hay un título, una especialidad y un servicio inactivos.
 - **Profesionales:** 11, con títulos y servicios (el listado ocupa dos páginas). Uno con pasaporte, uno dado de baja, uno que estuvo de baja y volvió, y una recién incorporada sin franjas. El historial tiene una modificación, una baja y una reactivación.
 - **Obras sociales:** 9 con 22 planes. Una obra social y un plan están inactivos.
 - **Pacientes:** 35, particulares y con obra social. Incluye menores con tutor, uno de 16 años sin tutor, adultos mayores con LE, LC o CI, un extranjero con pasaporte y uno con género "Otro". Dos tienen modificaciones posteriores al alta.

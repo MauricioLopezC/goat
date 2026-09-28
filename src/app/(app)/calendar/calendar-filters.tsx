@@ -6,9 +6,11 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
+import { ServiceCombobox } from "@/components/service-combobox";
 import { calendarHref, type CalendarQuery } from "@/lib/calendar";
+import type { ServiceOption } from "@/lib/services";
 
-// Filtros por profesional y servicio del calendario del centro (HU-11). Al
+// Filtros por profesional y servicio del calendario del centro (HU-11, HU-13). Al
 // cambiar, navegan: el estado vive en la URL.
 
 export function CalendarFilters({
@@ -23,7 +25,7 @@ export function CalendarFilters({
     lastName: string;
     services: { id: number }[];
   }[];
-  services: { id: number; name: string }[];
+  services: ServiceOption[];
 }) {
   const router = useRouter();
   const offersService = (professional: (typeof professionals)[number]) =>
@@ -54,13 +56,16 @@ export function CalendarFilters({
           ))}
         </NativeSelect>
       </Field>
-      <Field className="w-auto">
+      <Field className="w-64">
         <FieldLabel htmlFor="calendar-service">Servicio</FieldLabel>
-        <NativeSelect
+        <ServiceCombobox
           id="calendar-service"
-          value={query.serviceId ?? ""}
-          onChange={(event) => {
-            const serviceId = Number(event.target.value) || undefined;
+          services={services}
+          value={query.serviceId ?? null}
+          allowAll
+          allLabel="Todos los servicios"
+          placeholder="Todos los servicios"
+          onChange={(serviceId) => {
             const professional = professionals.find(
               (item) => item.id === query.professionalId,
             );
@@ -78,14 +83,7 @@ export function CalendarFilters({
                 : undefined,
             });
           }}
-        >
-          <NativeSelectOption value="">Todos</NativeSelectOption>
-          {services.map((service) => (
-            <NativeSelectOption key={service.id} value={service.id}>
-              {service.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        />
       </Field>
     </div>
   );
