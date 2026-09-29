@@ -26,7 +26,7 @@ export default async function ServicesPage({
   const isManager = actor.role === "MANAGER";
 
   return (
-    <div className="flex flex-col gap-6">
+    <div data-layout="wide" className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
           Catálogo de servicios

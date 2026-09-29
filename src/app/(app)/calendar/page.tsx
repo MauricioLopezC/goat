@@ -36,6 +36,7 @@ import {
 } from "@/lib/schedule";
 import { WeeklyAgendaGrid } from "../agenda/weekly-agenda-grid";
 import { buildCalendarDay } from "./calendar-model";
+import { CenterClosureControls } from "./center-closure-controls";
 import { CalendarFilters } from "./calendar-filters";
 import { DayView } from "./day-view";
 import { MonthView } from "./month-view";
@@ -126,6 +127,10 @@ export default async function CalendarPage({
           now,
         ),
       );
+  // Cierre del día que se ve, para quitarlo desde la vista día (HU-14).
+  const closure = availability.holidays.find(
+    (holiday) => holiday.date === query.date,
+  );
 
   return (
     <div data-layout="wide" className="flex flex-col gap-6">
@@ -137,9 +142,18 @@ export default async function CalendarPage({
             Argentina.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/appointments/new">Nuevo turno</Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!isWeek && !isMonth && (
+            <CenterClosureControls
+              date={query.date}
+              holiday={closure ?? null}
+              canClose={query.date >= today}
+            />
+          )}
+          <Button asChild>
+            <Link href="/appointments/new">Nuevo turno</Link>
+          </Button>
+        </div>
       </header>
 
       <div className="bg-card flex flex-col gap-4 rounded-lg border p-3">

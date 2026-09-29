@@ -32,6 +32,7 @@ export function ConfirmDelete({
   title,
   description,
   trigger,
+  confirmLabel,
   onDeleted,
 }: {
   action: DeleteAction;
@@ -41,6 +42,8 @@ export function ConfirmDelete({
   description: ReactNode;
   /// Botón que abre la confirmación. Por defecto, "Eliminar".
   trigger?: ReactNode;
+  /// Texto del botón que confirma. Por defecto, "Eliminar".
+  confirmLabel?: string;
   onDeleted?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -63,6 +66,7 @@ export function ConfirmDelete({
           fields={fields}
           title={title}
           description={description}
+          confirmLabel={confirmLabel}
           onDeleted={() => {
             setOpen(false);
             onDeleted?.();
@@ -78,12 +82,14 @@ function DeleteForm({
   fields,
   title,
   description,
+  confirmLabel,
   onDeleted,
 }: {
   action: DeleteAction;
   fields: Record<string, string | number>;
   title: string;
   description: ReactNode;
+  confirmLabel?: string;
   onDeleted: () => void;
 }) {
   const [state, formAction, pending] = useActionState<DeleteState, FormData>(
@@ -108,7 +114,11 @@ function DeleteForm({
       <AlertDialogFooter>
         <AlertDialogCancel type="button">Volver</AlertDialogCancel>
         <Button type="submit" variant="destructive" disabled={pending}>
-          {pending ? "Eliminando…" : "Eliminar"}
+          {pending
+            ? confirmLabel
+              ? `${confirmLabel}…`
+              : "Eliminando…"
+            : (confirmLabel ?? "Eliminar")}
         </Button>
       </AlertDialogFooter>
     </form>

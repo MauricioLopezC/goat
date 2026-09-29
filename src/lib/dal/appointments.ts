@@ -623,7 +623,7 @@ export async function listAvailabilityWindows(
     }),
     prisma.holiday.findMany({
       where: { date: dateRange },
-      select: { date: true, description: true },
+      select: { id: true, date: true, description: true },
       orderBy: { date: "asc" },
     }),
   ]);
@@ -640,6 +640,8 @@ export async function listAvailabilityWindows(
       }),
     ),
     holidays: holidays.map((holiday) => ({
+      // El id permite quitar el cierre desde el calendario (HU-14).
+      id: holiday.id,
       date: dateFromDb(holiday.date),
       description: holiday.description,
     })),

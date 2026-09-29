@@ -40,6 +40,8 @@ export type AffectedAppointment = {
   /// ISO 8601.
   startsAt: string;
   patientName: string;
+  /// Para avisarle al paciente mientras el aviso por email sigue pendiente (HU-14).
+  patientPhone: string;
   serviceName: string;
   professionalName: string;
 };

@@ -9,13 +9,13 @@ import { HolidaysManager } from "./holidays-manager";
 
 export const metadata: Metadata = {
   title: "Feriados · GOAT",
-  description: "Días en que el centro permanece cerrado (HU-05).",
+  description: "Feriados y días excepcionales en que el centro cierra (HU-14).",
 };
 
 export default async function HolidaysPage({
   searchParams,
 }: PageProps<"/holidays">) {
-  // HU-05: MANAGER administra; RECEPTIONIST y PROFESSIONAL consultan.
+  // HU-14: MANAGER y RECEPTIONIST cargan y quitan cierres; PROFESSIONAL consulta.
   const actor = await requirePageRole(...STAFF_ROLES);
   const { page } = await searchParams;
   const holidaysPage = await listHolidays(parsePageParam(page), actor);
@@ -25,14 +25,14 @@ export default async function HolidaysPage({
       <div>
         <h1 className="text-headline-lg">Feriados</h1>
         <p className="text-muted-foreground">
-          Días en que el centro permanece cerrado: no se ofrecen turnos para
-          ningún profesional.
+          Feriados y días excepcionales en que el centro cierra el día completo:
+          no se ofrecen turnos para ningún profesional.
         </p>
       </div>
 
       <HolidaysManager
         holidays={holidaysPage.items}
-        canEdit={actor.role === "MANAGER"}
+        canEdit={actor.role === "MANAGER" || actor.role === "RECEPTIONIST"}
         pagination={
           <ListPagination
             page={holidaysPage}

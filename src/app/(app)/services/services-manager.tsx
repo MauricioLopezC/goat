@@ -38,8 +38,8 @@ export interface ServiceListItem {
   durationMinutes: number;
   requiresReferral: boolean;
   active: boolean;
-  /** Precio de la prestación. Prisma devuelve Decimal; se muestra con .toString(). */
-  price: { toString(): string } | null;
+  /** Precio de la prestación en pesos como string decimal o null si no tiene valor configurado. */
+  price: string | null;
   specialtyId: number | null;
   specialty: {
     id: number;
@@ -79,7 +79,7 @@ export function ServicesManager({
       requiresReferral: service.requiresReferral,
       description: service.description,
       specialtyId: service.specialtyId,
-      price: service.price !== null ? String(service.price) : null,
+      price: service.price,
     });
     setIsFormVisible(true);
     // Scroll suave hacia el formulario

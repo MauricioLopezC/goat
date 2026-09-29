@@ -37,7 +37,7 @@ export interface UpdateServiceInput {
 export async function listServices(page: number, actor: Actor) {
   assertRole(actor, ...STAFF_ROLES);
 
-  return paginate(
+  const result = await paginate(
     page,
     () => prisma.service.count(),
     (range) =>
@@ -63,6 +63,14 @@ export async function listServices(page: number, actor: Actor) {
         ...range,
       }),
   );
+
+  return {
+    ...result,
+    items: result.items.map((service) => ({
+      ...service,
+      price: service.price !== null ? service.price.toString() : null,
+    })),
+  };
 }
 
 /**
@@ -120,7 +128,7 @@ export async function createService(input: CreateServiceInput, actor: Actor) {
   }
 
   // 3. Crear el servicio
-  return prisma.service.create({
+  const service = await prisma.service.create({
     data: {
       name: input.name,
       durationMinutes: input.durationMinutes,
@@ -138,6 +146,11 @@ export async function createService(input: CreateServiceInput, actor: Actor) {
       price: true,
     },
   });
+
+  return {
+    ...service,
+    price: service.price !== null ? service.price.toString() : null,
+  };
 }
 
 /**
@@ -189,7 +202,7 @@ export async function updateService(input: UpdateServiceInput, actor: Actor) {
   }
 
   // 4. Actualizar el servicio
-  return prisma.service.update({
+  const service = await prisma.service.update({
     where: { id: input.id },
     data: {
       name: input.name,
@@ -207,6 +220,11 @@ export async function updateService(input: UpdateServiceInput, actor: Actor) {
       price: true,
     },
   });
+
+  return {
+    ...service,
+    price: service.price !== null ? service.price.toString() : null,
+  };
 }
 
 /**
