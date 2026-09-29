@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default async function HolidaysPage({
   searchParams,
 }: PageProps<"/holidays">) {
-  // HU-05: MANAGER administra; RECEPTIONIST y PROFESSIONAL consultan.
+  // HU-14: MANAGER y RECEPTIONIST cargan y quitan cierres; PROFESSIONAL consulta.
   const actor = await requirePageRole(...STAFF_ROLES);
   const { page } = await searchParams;
   const holidaysPage = await listHolidays(parsePageParam(page), actor);
@@ -32,7 +32,7 @@ export default async function HolidaysPage({
 
       <HolidaysManager
         holidays={holidaysPage.items}
-        canEdit={actor.role === "MANAGER"}
+        canEdit={actor.role === "MANAGER" || actor.role === "RECEPTIONIST"}
         pagination={
           <ListPagination
             page={holidaysPage}
