@@ -16,19 +16,24 @@ export function ListPagination({
   pathname,
   params = {},
   label,
+  hash,
 }: {
   page: Omit<Page<unknown>, "items">;
   pathname: string;
   params?: Record<string, string | undefined>;
   /// Qué se lista, para el lector de pantalla: "Páginas de pacientes".
   label: string;
+  /// Ancla a la que vuelve cada link, cuando el listado es una sección de una
+  /// página más larga (el historial en la ficha del paciente).
+  hash?: string;
 }) {
   // Con una sola página no hace falta: cada listado ya muestra su total.
   if (page.pageCount <= 1) return null;
 
   const first = (page.page - 1) * page.pageSize + 1;
   const last = Math.min(page.page * page.pageSize, page.total);
-  const href = (n: number) => pageHref(pathname, params, n);
+  const href = (n: number) =>
+    pageHref(pathname, params, n) + (hash ? `#${hash}` : "");
 
   return (
     <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">

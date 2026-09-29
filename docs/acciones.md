@@ -78,7 +78,7 @@ const users = await listUsers(page, actor)
 
 ## Listados paginados
 
-Los listados de entidades de una pantalla (`searchPatients`, `listProfessionalsPage`, `listUsers`, `listServices`, `listHolidays`) se paginan en la DAL con los helpers de `src/lib/pagination.ts`:
+Los listados de entidades de una pantalla (`searchPatients`, `listProfessionalsPage`, `listUsers`, `listServices`, `listHolidays`, `getPatientAppointmentHistory`) se paginan en la DAL con los helpers de `src/lib/pagination.ts`:
 
 - Reciben `page` antes del `actor` y devuelven `Page<T>`: `{ items, total, page, pageSize, pageCount }`, de a `PAGE_SIZE` (10) registros.
 - Cuentan el total con los mismos filtros y traen solo la página pedida. Una página fuera de rango devuelve la última; un valor inválido, la primera.
@@ -696,6 +696,21 @@ No es una Server Action: es una lectura que el Server Component de `/patients` l
 **Devuelve:** los datos completos del paciente para renderizar su ficha.
 
 No es una Server Action: es una lectura que el Server Component de `/patients/[id]` llama directo a la DAL (ADR 0001).
+
+### `getPatientAppointmentHistory`
+
+**Historia de usuario:** [HU-18 — Ver el historial de turnos del paciente](hu/HU-18-historial-de-turnos-del-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`
+**Entrada:** `input: { patientId: number, status?: AppointmentStatus, professionalId?: number, page?: number }` y el `actor`.
+**Precondiciones:**
+- El paciente existe.
+- Si `actor.role === Role.PROFESSIONAL`, la DAL limita la consulta a los turnos cuyo `professional.userId` es el del actor. Si pide el `professionalId` de otro profesional, se rechaza con `FORBIDDEN`.
+**Efectos:** ninguno. Es una lectura de los turnos del paciente, del más reciente al más antiguo (`startsAt` e `id` descendentes), filtrados por `status` y `professionalId` si vienen y paginados de a 10 ([listados paginados](#listados-paginados)). Cada turno trae servicio, profesional, estado, prioridad, observaciones, quién lo creó y sus eventos en orden cronológico (tipo, motivo, quién lo solicitó, autor, fecha y, en una reprogramación, horario y profesional de antes y después). Para `RECEPTIONIST` y `MANAGER` incluye el cobro vigente (`PAID`); al `PROFESSIONAL` el cobro no se le consulta.
+**Errores:** `FORBIDDEN` (rol no habilitado, o un `PROFESSIONAL` que filtra por otro profesional o no tiene perfil profesional), `NOT_FOUND` (el paciente no existe), `VALIDATION` (parámetros inválidos).
+**Revalida:** no aplica.
+**Devuelve:** `{ page: Page<HistoryItem>, attendance: { completed, expired }, professionals }`. `attendance` cuenta los turnos Completados y Vencidos con el mismo alcance de rol y el mismo filtro de profesional, sin aplicar el filtro de estado ni la página. `professionals` son las opciones del filtro: los profesionales con algún turno del paciente, vacío para el `PROFESSIONAL`.
+
+No es una Server Action: el Server Component de `/patients/[id]` la llama directo a la DAL (ADR 0001).
 
 ### `updatePatient`
 

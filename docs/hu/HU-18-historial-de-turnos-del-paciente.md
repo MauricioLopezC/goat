@@ -15,10 +15,11 @@
 
 ## Comportamiento
 
-- Se ve en la ficha del paciente ([HU-17](HU-17-ficha-completa-del-paciente.md)), del más reciente al más antiguo, con los próximos turnos separados de los pasados.
+- Se ve en la ficha del paciente ([HU-17](HU-17-ficha-completa-del-paciente.md)), del más reciente al más antiguo, con los próximos turnos separados de los pasados. Próximo es un turno Programado que todavía no empezó; el resto, incluido un Programado cuya hora ya pasó, va con los pasados.
 - Se llega desde el detalle de un turno, desde la agenda del profesional y desde la búsqueda de pacientes.
-- Filtro por estado; mesa de entradas y el gerente filtran además por profesional. Se recorre de a 10.
-- Muestra la asistencia del paciente: cantidad de turnos Completados y Vencidos.
+- Filtro por estado; mesa de entradas y el gerente filtran además por profesional, entre los que atendieron o tienen turno con el paciente. Se recorre de a 10: una sola lista paginada, y en cada página los próximos van bajo su encabezado y los pasados bajo el suyo.
+- Muestra la asistencia del paciente: cantidad de turnos Completados y Vencidos. Cuenta todos los turnos que el usuario puede ver, del profesional filtrado si lo hay; no cambia con el filtro de estado ni con la página.
+- Del cobro se muestra solo el vigente; los anulados no.
 
 ## Permisos
 
@@ -31,6 +32,7 @@
 
 ## A conversar
 
+- **Supuesto del equipo (29/09/2026):** la asistencia no depende del filtro de estado, porque con él dejaría de describir al paciente; sí respeta el filtro de profesional. A confirmar.
 - **Decisión del equipo:** en el Inc. 2 el historial es la cronología de turnos. La atención registrada (`Encounter`) y las prescripciones entran en el Inc. 3 y completan este historial con el contenido clínico.
 - ¿El profesional ve los turnos del paciente con otros profesionales?
   - **Decisión del equipo (28/09/2026):** no, para simplificar. Ve solo los turnos del paciente con él. Se puede ampliar en el Inc. 3, junto con la atención registrada.

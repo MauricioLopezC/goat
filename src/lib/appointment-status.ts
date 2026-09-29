@@ -1,4 +1,8 @@
-import { AppointmentStatus } from "@/generated/prisma/enums";
+import {
+  AppointmentEventType,
+  AppointmentPriority,
+  AppointmentStatus,
+} from "@/generated/prisma/enums";
 
 // Estado del turno en la interfaz: nombre y colores de docs/DESIGN.md
 // ("Estado del turno → color").
@@ -8,6 +12,22 @@ export const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
   COMPLETED: "Completado",
   CANCELLED: "Cancelado",
   EXPIRED: "Vencido",
+};
+
+/// Cambio registrado sobre un turno (trazabilidad), en el detalle del turno y
+/// en el historial del paciente (HU-18).
+export const APPOINTMENT_EVENT_LABEL: Record<AppointmentEventType, string> = {
+  UPDATED: "Modificado",
+  CANCELLED: "Cancelado",
+  COMPLETED: "Completado",
+  EXPIRED: "Vencido",
+  RESCHEDULED: "Reprogramado",
+  PRIORITY_CHANGED: "Prioridad cambiada",
+};
+
+export const APPOINTMENT_PRIORITY_LABEL: Record<AppointmentPriority, string> = {
+  NORMAL: "Normal",
+  URGENT: "Urgente",
 };
 
 /// Badge de estado: fondo suave, borde y texto del mismo tono.

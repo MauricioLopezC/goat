@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { patientHistoryHref } from "@/lib/patient-history";
 import {
   CalendarPlus,
   Edit,
   Eye,
+  History,
   Plus,
   Search,
   User,
@@ -263,6 +265,18 @@ export default async function PatientsPage({
                             <Link href={`/patients/${patient.id}`}>
                               <Eye className="size-3.5" />
                               Ficha
+                            </Link>
+                          </Button>
+
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs gap-1"
+                          >
+                            <Link href={patientHistoryHref(patient.id)}>
+                              <History className="size-3.5" />
+                              Historial
                             </Link>
                           </Button>
 
