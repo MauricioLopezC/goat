@@ -16,6 +16,7 @@
 ## Comportamiento
 
 - Se suma la vista **mes** al calendario del centro ([HU-11](HU-11-calendario-del-centro.md)) y a la agenda del profesional ([HU-12](HU-12-agenda-del-profesional.md)).
+- El intervalo de la vista es el mes calendario seleccionado (del primer al último día del mes, ej. del 1 al 31 de enero), fijo y sin divisiones a mitad de mes.
 - Respeta los filtros de profesional y servicio. Con filtro de servicio, los bloques libres se cuentan con la duración de ese servicio.
 - Los días cerrados ([HU-14](HU-14-cerrar-el-centro.md)) aparecen pintados.
 - Al hacer clic en un día se abre la vista día de esa fecha.

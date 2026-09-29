@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { Field, FieldLabel } from "@/components/ui/field";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -22,17 +23,16 @@ export function AgendaProfessionalSwitcher({
   currentProfessionalId: number;
   professionals: ProfessionalSummaryItem[];
   date: string;
-  view: "week" | "day";
+  view: "month" | "week" | "day";
   hideCancelled?: boolean;
 }) {
   const router = useRouter();
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-        Profesional:
-      </span>
+    <Field className="w-auto">
+      <FieldLabel htmlFor="agenda-professional">Profesional</FieldLabel>
       <NativeSelect
+        id="agenda-professional"
         value={currentProfessionalId}
         onChange={(event) => {
           const newId = event.target.value;
@@ -44,7 +44,6 @@ export function AgendaProfessionalSwitcher({
           if (hideCancelled) params.set("hideCancelled", "1");
           router.push(`/agenda?${params.toString()}`);
         }}
-        className="h-8 text-xs font-medium w-auto"
       >
         {professionals.map((p) => (
           <NativeSelectOption key={p.id} value={p.id}>
@@ -52,6 +51,6 @@ export function AgendaProfessionalSwitcher({
           </NativeSelectOption>
         ))}
       </NativeSelect>
-    </div>
+    </Field>
   );
 }

@@ -21,7 +21,7 @@ import {
 import { UserForm } from "./user-form";
 
 export const metadata: Metadata = {
-  title: "Usuarios · Goat",
+  title: "Usuarios · GOAT",
 };
 
 export default async function UsersPage({ searchParams }: PageProps<"/users">) {

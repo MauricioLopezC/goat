@@ -11,7 +11,7 @@ import {
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
-  title: "Ingresar · Goat",
+  title: "Ingresar · GOAT",
 };
 
 export default async function LoginPage() {
@@ -26,7 +26,7 @@ export default async function LoginPage() {
       <div className="w-full max-w-sm">
         <Card>
           <CardHeader className="gap-2">
-            <CardTitle className="text-headline-md">Goat</CardTitle>
+            <CardTitle className="text-headline-md">GOAT</CardTitle>
             <CardDescription>
               Ingresá con tu email y contraseña del centro.
             </CardDescription>

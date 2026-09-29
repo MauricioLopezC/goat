@@ -6,7 +6,7 @@ import { ListPagination } from "@/components/list-pagination";
 import { ServicesManager } from "./services-manager";
 
 export const metadata: Metadata = {
-  title: "Servicios · Goat",
+  title: "Servicios · GOAT",
   description:
     "Catálogo de prestaciones y servicios del centro de traumatología (HU-06).",
 };

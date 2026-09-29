@@ -24,7 +24,9 @@ vuelve a sus valores; lo cargado desde la UI no se toca) y se niega a correr con
 Los turnos se siembran desde la semana anterior a la corrida hasta tres semanas
 después, así el calendario y el horizonte para dar turnos siempre tienen datos.
 Hay turnos ya cerrados (Completado, Vencido, Cancelado) y turnos pasados que
-siguen Programados para probar "Marcar completado" y "Marcar vencido". Las
+siguen Programados para probar "Marcar completado" y "Marcar vencido". Entre
+los Completados hay uno cobrado, uno pendiente de cobro y uno con la
+autorización de la obra social registrada (HU-21). Las
 excepciones de agenda también son relativas a la corrida. Turnos y excepciones
 solo se agregan: si ya cerraste los pendientes, `npx prisma migrate reset` deja
 todo como al principio (borra también lo cargado desde la UI).

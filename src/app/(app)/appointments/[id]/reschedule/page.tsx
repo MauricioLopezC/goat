@@ -169,7 +169,7 @@ export default async function ReschedulePage({
       </header>
 
       <RescheduleForm
-        key={`${appointment.id}-${selectedProfessionalId}-${selectedDate}`}
+        key={appointment.id}
         appointmentId={appointment.id}
         patient={appointment.patient}
         service={appointment.service}

@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/native-select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   AlertDialog,
@@ -100,6 +100,23 @@ export function RescheduleForm({
   const [requestedBy, setRequestedBy] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [validationError, setValidationError] = useState("");
+
+  const [prevSelection, setPrevSelection] = useState({
+    date: selectedDate,
+    professionalId: selectedProfessionalId,
+  });
+
+  if (
+    prevSelection.date !== selectedDate ||
+    prevSelection.professionalId !== selectedProfessionalId
+  ) {
+    setPrevSelection({
+      date: selectedDate,
+      professionalId: selectedProfessionalId,
+    });
+    setStartTime("");
+    setValidationError("");
+  }
 
   const currentStartSlot = toLocalSlot(new Date(currentStartsAt));
   const currentEndSlot = toLocalSlot(new Date(currentEndsAt));
