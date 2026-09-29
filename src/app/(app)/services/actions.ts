@@ -74,8 +74,8 @@ export type ServiceFormState =
       name: string;
       durationMinutes: number;
       requiresReferral: boolean;
-      /** Precio de la prestación. Prisma devuelve Decimal; en la UI se muestra con .toString(). */
-      price: { toString(): string } | null;
+      /** Precio de la prestación en pesos o null si no tiene valor configurado. */
+      price: string | null;
     }> & {
       values?: SubmittedServiceValues;
     })
