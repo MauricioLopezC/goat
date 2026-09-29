@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { rescheduleAppointment } from "../actions";
@@ -16,7 +16,6 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -57,6 +56,12 @@ type ServiceInfo = {
   id: number;
   name: string;
 };
+
+const REQUESTED_BY_OPTIONS = [
+  "El paciente",
+  "El profesional",
+  "El centro",
+] as const;
 
 export function RescheduleForm({
   appointmentId,
@@ -452,15 +457,23 @@ export function RescheduleForm({
             <FieldLabel htmlFor="reschedule-requestedBy">
               Quién solicitó el cambio *
             </FieldLabel>
-            <Input
+            <NativeSelect
               id="reschedule-requestedBy"
               required
-              maxLength={100}
-              placeholder="Ej.: el paciente, el profesional, el centro"
               value={requestedBy}
               onChange={(e) => setRequestedBy(e.target.value)}
               disabled={pending}
-            />
+              className="w-full"
+            >
+              <NativeSelectOption value="">
+                Seleccioná quién solicitó el cambio…
+              </NativeSelectOption>
+              {REQUESTED_BY_OPTIONS.map((option) => (
+                <NativeSelectOption key={option} value={option}>
+                  {option}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
           </Field>
         </div>
 
@@ -538,8 +551,9 @@ export function RescheduleForm({
               type="button"
               disabled={pending}
               onClick={() => {
-                const formData = new FormData();
-                formAction(formData);
+                startTransition(() => {
+                  formAction(new FormData());
+                });
               }}
             >
               {pending ? "Reprogramando…" : "Confirmar reprogramación"}
