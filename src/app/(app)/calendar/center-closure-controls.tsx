@@ -60,7 +60,8 @@ export function CenterClosureControls({
         )
       )}
       <Dialog open={closing} onOpenChange={setClosing}>
-        <DialogContent>
+        {/* La lista de turnos afectados puede ser larga: el diálogo scrollea. */}
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Cerrar el centro</DialogTitle>
             <DialogDescription>
