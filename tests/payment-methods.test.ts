@@ -66,13 +66,14 @@ test("updatePaymentMethodSchema valida id, nombre y preprocesamiento de estado a
   assert.equal(res1.data.name, "Efectivo ARS");
   assert.equal(res1.data.active, false);
 
-  // Preprocesamiento de checkbox HTML ('on')
+  // Preprocesamiento de checkbox HTML ('on') y recorte de espacios
   const res2 = updatePaymentMethodSchema.safeParse({
     id: 2,
-    name: "Transferencia Bancaria",
+    name: "  Transferencia Bancaria  ",
     active: "on",
   });
   assert.ok(res2.success);
+  assert.equal(res2.data.name, "Transferencia Bancaria");
   assert.equal(res2.data.active, true);
 
   // ID inválido

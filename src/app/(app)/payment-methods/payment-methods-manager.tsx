@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle2, Edit2, Plus, PowerOff, RotateCcw } from "lucide-react";
-import { useActionState } from "react";
+import { useState, useEffect, useActionState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Edit2,
+  Plus,
+  PowerOff,
+  RotateCcw,
+} from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -42,17 +47,26 @@ interface PaymentMethodsManagerProps {
 
 // ─────────────── Botón de activar/desactivar ───────────────────────────
 
-function ToggleSubmitButton({ active }: { active: boolean }) {
+function ToggleSubmitButton({
+  active,
+  disabled,
+  title,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  title?: string;
+}) {
   const { pending } = useFormStatus();
   return (
     <Button
       type="submit"
       variant="outline"
       size="sm"
-      disabled={pending}
+      disabled={pending || disabled}
+      title={title}
       className={
         active
-          ? "text-destructive hover:bg-destructive-soft hover:text-destructive-soft-foreground"
+          ? "text-destructive hover:bg-destructive-soft hover:text-destructive-soft-foreground disabled:opacity-50"
           : "text-success hover:bg-success-soft hover:text-success-soft-foreground"
       }
     >
@@ -71,35 +85,55 @@ function ToggleSubmitButton({ active }: { active: boolean }) {
   );
 }
 
-function ToggleActiveButton({ method }: { method: PaymentMethodListItem }) {
+function ToggleActiveButton({
+  method,
+  isLastActive,
+  onError,
+  onSuccess,
+}: {
+  method: PaymentMethodListItem;
+  isLastActive: boolean;
+  onError: (message: string) => void;
+  onSuccess: (message: string) => void;
+}) {
   const [state, formAction] = useActionState<
     PaymentMethodResult | null,
     FormData
   >(updatePaymentMethodAction, null);
-  const error = state && !state.ok ? state.error : null;
+
+  useEffect(() => {
+    if (!state) return;
+    if (state.ok) {
+      onSuccess(
+        state.data.active
+          ? `Se activó el medio de pago "${state.data.name}".`
+          : `Se desactivó el medio de pago "${state.data.name}".`,
+      );
+    } else {
+      onError(state.error.message);
+    }
+  }, [state, onError, onSuccess]);
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <form action={formAction}>
-        <input type="hidden" name="id" value={method.id} />
-        <input type="hidden" name="name" value={method.name} />
-        {/* active se invierte: el botón actúa sobre el estado opuesto */}
-        <input
-          type="hidden"
-          name="active"
-          value={method.active ? "false" : "true"}
-        />
-        <ToggleSubmitButton active={method.active} />
-      </form>
-      {error && (
-        <Alert variant="destructive" className="py-1 px-2 text-xs">
-          <AlertCircle className="size-3 mr-1" />
-          <AlertDescription className="text-xs">
-            {error.message}
-          </AlertDescription>
-        </Alert>
-      )}
-    </div>
+    <form action={formAction}>
+      <input type="hidden" name="id" value={method.id} />
+      <input type="hidden" name="name" value={method.name} />
+      {/* active se invierte: el botón actúa sobre el estado opuesto */}
+      <input
+        type="hidden"
+        name="active"
+        value={method.active ? "false" : "true"}
+      />
+      <ToggleSubmitButton
+        active={method.active}
+        disabled={isLastActive}
+        title={
+          isLastActive
+            ? "No se puede desactivar el único medio de pago activo"
+            : undefined
+        }
+      />
+    </form>
   );
 }
 
@@ -113,9 +147,13 @@ export function PaymentMethodsManager({
     useState<EditingPaymentMethod | null>(null);
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const activeCount = methods.filter((m) => m.active).length;
 
   const handleEdit = (method: PaymentMethodListItem) => {
     setFeedback(null);
+    setErrorMessage(null);
     setEditingMethod({
       id: method.id,
       name: method.name,
@@ -133,11 +171,22 @@ export function PaymentMethodsManager({
   const handleSuccess = (item: { name: string; isEditing: boolean }) => {
     setEditingMethod(null);
     setIsFormVisible(false);
+    setErrorMessage(null);
     setFeedback(
       item.isEditing
         ? `Se actualizó el medio de pago "${item.name}".`
         : `Se agregó el medio de pago "${item.name}".`,
     );
+  };
+
+  const handleToggleError = (message: string) => {
+    setFeedback(null);
+    setErrorMessage(message);
+  };
+
+  const handleToggleSuccess = (message: string) => {
+    setErrorMessage(null);
+    setFeedback(message);
   };
 
   return (
@@ -163,6 +212,24 @@ export function PaymentMethodsManager({
         </Alert>
       )}
 
+      {/* Banner de error global */}
+      {errorMessage && (
+        <Alert variant="destructive" role="alert">
+          <AlertCircle className="size-5" />
+          <AlertDescription className="flex items-center justify-between gap-4">
+            <span>{errorMessage}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setErrorMessage(null)}
+              className="h-7 px-2 text-xs hover:bg-destructive/10"
+            >
+              Cerrar
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Panel de formulario (exclusivo para MANAGER) */}
       {isManager && (
         <Card className="rounded-xl border-border bg-card">
@@ -181,6 +248,7 @@ export function PaymentMethodsManager({
               <Button
                 onClick={() => {
                   setFeedback(null);
+                  setErrorMessage(null);
                   setEditingMethod(null);
                   setIsFormVisible(true);
                 }}
@@ -262,7 +330,12 @@ export function PaymentMethodsManager({
                           <Edit2 className="size-3.5 mr-1" />
                           Editar
                         </Button>
-                        <ToggleActiveButton method={method} />
+                        <ToggleActiveButton
+                          method={method}
+                          isLastActive={method.active && activeCount <= 1}
+                          onError={handleToggleError}
+                          onSuccess={handleToggleSuccess}
+                        />
                       </div>
                     </TableCell>
                   )}

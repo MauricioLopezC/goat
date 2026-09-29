@@ -71,8 +71,6 @@ export function PaymentMethodForm({
     }
   }, [created, onSuccess, isEditing]);
 
-  const attempt = state ? (created ? "ok" : "error") : "inicial";
-
   const defaultName = editingMethod?.name ?? "";
 
   return (
@@ -99,7 +97,7 @@ export function PaymentMethodForm({
       )}
 
       <div
-        key={`${attempt}-${editingMethod?.id ?? "new"}`}
+        key={`${created ? "ok" : "form"}-${editingMethod?.id ?? "new"}`}
         className="grid gap-5 sm:grid-cols-2"
       >
         {isEditing && (

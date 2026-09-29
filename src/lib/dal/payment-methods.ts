@@ -62,7 +62,8 @@ export async function createPaymentMethod(
   assertRole(actor, Role.MANAGER);
 
   // 1. Verificar unicidad del nombre (insensible a mayúsculas y acentos)
-  const normalizedInput = normalizeSearchText(input.name);
+  const trimmedName = input.name.trim();
+  const normalizedInput = normalizeSearchText(trimmedName);
   const existingMethods = await prisma.paymentMethod.findMany({
     select: { id: true, name: true },
   });
@@ -80,7 +81,7 @@ export async function createPaymentMethod(
   }
 
   return prisma.paymentMethod.create({
-    data: { name: input.name, active: true },
+    data: { name: trimmedName, active: true },
     select: { id: true, name: true, active: true },
   });
 }
@@ -109,7 +110,8 @@ export async function updatePaymentMethod(
   }
 
   // 2. Verificar unicidad del nombre (insensible a mayúsculas y acentos, excluyendo a sí mismo)
-  const normalizedInput = normalizeSearchText(input.name);
+  const trimmedName = input.name.trim();
+  const normalizedInput = normalizeSearchText(trimmedName);
   const otherMethods = await prisma.paymentMethod.findMany({
     where: { id: { not: input.id } },
     select: { id: true, name: true },
@@ -142,7 +144,7 @@ export async function updatePaymentMethod(
 
   return prisma.paymentMethod.update({
     where: { id: input.id },
-    data: { name: input.name, active: input.active },
+    data: { name: trimmedName, active: input.active },
     select: { id: true, name: true, active: true },
   });
 }
