@@ -631,6 +631,28 @@ async function seedAppointments(
       );
     }
     const cancelled = a.status === AppointmentStatus.CANCELLED;
+    // Cobro y autorización (HU-21), con las mismas reglas que la DAL.
+    const patientData = PATIENTS.find((p) => p.documentNumber === a.patient);
+    if (
+      a.payment &&
+      (a.status !== AppointmentStatus.COMPLETED ||
+        patientData?.coverage !== null ||
+        !PAYMENT_METHODS.some((m) => m.name === a.payment && m.active))
+    ) {
+      throw new Error(
+        `seed-data.ts: el turno ${label} no se puede cobrar (Completado, particular y medio activo).`,
+      );
+    }
+    if (
+      a.authorizationNumber &&
+      (a.status !== AppointmentStatus.COMPLETED ||
+        !patientData?.coverage ||
+        !service.requiresReferral)
+    ) {
+      throw new Error(
+        `seed-data.ts: el turno ${label} no admite autorización (Completado, obra social y servicio con orden).`,
+      );
+    }
     if (cancelled && (!a.reason || !a.requestedBy)) {
       throw new Error(
         `seed-data.ts: el turno cancelado ${label} necesita motivo y quién lo pidió.`,
@@ -711,6 +733,23 @@ async function seedAppointments(
         notes: a.notes ?? null,
         createdById: userId,
         createdAt,
+        ...(a.authorizationNumber
+          ? {
+              authorizationNumber: a.authorizationNumber,
+              authorizedAt: startsAt,
+              authorizedById: userId,
+            }
+          : {}),
+        payments: a.payment
+          ? {
+              create: {
+                paymentMethod: { connect: { name: a.payment } },
+                amount: service.price,
+                createdBy: { connect: { id: userId } },
+                createdAt: startsAt,
+              },
+            }
+          : undefined,
         updatedAt: eventType ? changedAt : createdAt,
         events: eventType
           ? {

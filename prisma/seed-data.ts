@@ -1640,6 +1640,12 @@ export type SeedAppointment = {
   createdBy: string;
   /// Observaciones que se cargan al dar el turno.
   notes?: string;
+  /// Medio de pago con que se cobró (HU-21). Solo pacientes particulares en
+  /// un turno Completado; el monto es el valor del servicio.
+  payment?: string;
+  /// Número de autorización de la obra social (HU-21). Solo con obra social,
+  /// un servicio que requiere orden y un turno Completado.
+  authorizationNumber?: string;
 };
 
 const { SCHEDULED, COMPLETED, CANCELLED, EXPIRED } = AppointmentStatus;
@@ -1659,6 +1665,28 @@ export const APPOINTMENTS: SeedAppointment[] = [
     startTime: "09:00",
     status: COMPLETED,
     createdBy: MESA,
+  },
+  // Cobro (HU-21): uno particular cobrado y otro atendido sin cobrar.
+  {
+    professional: "4521",
+    patient: "39456781",
+    service: "Consulta traumatológica general",
+    week: -1,
+    weekday: WEDNESDAY,
+    startTime: "09:30",
+    status: COMPLETED,
+    createdBy: MESA,
+    payment: "Efectivo",
+  },
+  {
+    professional: "4521",
+    patient: "44567812",
+    service: "Consulta de rodilla",
+    week: -1,
+    weekday: WEDNESDAY,
+    startTime: "10:00",
+    status: COMPLETED,
+    createdBy: MESA2,
   },
   {
     professional: "4521",
@@ -1700,6 +1728,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     startTime: "08:00",
     status: COMPLETED,
     createdBy: MESA,
+    authorizationNumber: "AUT-448120",
   },
   {
     professional: "5610",
