@@ -71,27 +71,15 @@ export function DayView({
             <Ban aria-hidden="true" className="size-6" />
           </div>
           <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-holiday/40 bg-holiday/25 px-3 py-1 text-xs font-bold uppercase tracking-wider text-holiday-muted-foreground">
-            Centro cerrado · Feriado nacional
+            Centro cerrado
           </span>
           <h2 className="text-2xl font-extrabold tracking-tight text-holiday-foreground sm:text-3xl">
             {day.holiday}
           </h2>
           <p className="mt-3 max-w-xl text-sm font-medium leading-relaxed text-holiday-muted-foreground/90 sm:text-base">
-            El policonsultorio permanece cerrado durante toda la jornada. Esta
-            disposición rige para todo el centro, incluyendo atención médica de
-            todas las especialidades, recepción / mesa de entradas y gerencia.
+            El centro permanece cerrado todo el día: no se ofrecen turnos para
+            ningún profesional.
           </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold text-holiday-muted-foreground">
-            <span className="rounded-md border border-holiday/30 bg-holiday/15 px-3 py-1.5">
-              Sin turnos ni atención médica
-            </span>
-            <span className="rounded-md border border-holiday/30 bg-holiday/15 px-3 py-1.5">
-              Mesa de entradas cerrada
-            </span>
-            <span className="rounded-md border border-holiday/30 bg-holiday/15 px-3 py-1.5">
-              Gerencia y administración sin atención
-            </span>
-          </div>
         </div>
         <Legend freeClickable />
       </div>
@@ -349,7 +337,7 @@ export function Legend({ freeClickable }: { freeClickable: boolean }) {
       </li>
       <li className="flex items-center gap-1.5">
         <span className="border-holiday/40 bg-holiday/25 size-3.5 rounded-sm border-2 border-dashed" />
-        Feriado (centro cerrado)
+        Centro cerrado (feriado o día excepcional)
       </li>
       {(["SCHEDULED", "COMPLETED", "EXPIRED", "CANCELLED"] as const).map(
         (status) => (

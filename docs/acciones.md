@@ -230,7 +230,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Efectos:** ninguno. Lista los profesionales activos, filtrados por `professionalId` y por los que prestan `serviceId`, con sus `AvailabilityWindow` (con `serviceId`, solo las que no restringen servicios o incluyen ese servicio) y sus `AvailabilityException` del rango, más los `Holiday` del rango. Si viene `serviceId`, incluye la duración del servicio. El cálculo de bloques libres se hace fuera de la DAL, con una función pura.
 **Errores:** `FORBIDDEN`, `VALIDATION`, `NOT_FOUND` (el servicio no existe o está inactivo).
 **Revalida:** no aplica; lectura desde Server Component.
-**Devuelve:** `{ professionals: { id, firstName, lastName, windows, exceptions }[], holidays, serviceDurationMinutes? }`.
+**Devuelve:** `{ professionals: { id, firstName, lastName, windows, exceptions }[], holidays: { id, date, description }[], serviceDurationMinutes? }`. El `id` del cierre permite quitarlo desde la vista día ([HU-14](hu/HU-14-cerrar-el-centro.md)).
 
 ### `getAppointment`
 

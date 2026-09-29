@@ -34,7 +34,7 @@ function freeLabel(day: ProfessionalDay, bySlot: boolean) {
 }
 
 function cellStatus(day: ProfessionalDay | undefined, holiday: string | null) {
-  if (holiday) return "Feriado";
+  if (holiday) return "Centro cerrado";
   if (!day || !day.windows.length) return "Sin atención";
   if (day.absence) return `Ausente: ${day.absence}`;
   return null;
@@ -125,9 +125,9 @@ export function WeekView({
                     {day.holiday && (
                       <span
                         className="mt-0.5 rounded bg-holiday/25 border border-holiday/40 px-1 py-0.5 text-[10px] font-bold text-holiday-foreground truncate max-w-[140px]"
-                        title={`Feriado: ${day.holiday}`}
+                        title={`Centro cerrado: ${day.holiday}`}
                       >
-                        Feriado: {day.holiday}
+                        Cerrado: {day.holiday}
                       </span>
                     )}
                   </Link>
@@ -155,7 +155,7 @@ export function WeekView({
                       >
                         <Link
                           href={calendarHref(dayQuery(day.date))}
-                          aria-label={`Ver feriado ${day.holiday}`}
+                          aria-label={`Ver cierre del centro: ${day.holiday}`}
                           className="focus-visible:ring-ring flex h-full min-h-36 flex-col items-center justify-center gap-2 rounded-lg p-2 text-center outline-none transition-colors hover:bg-holiday/20 focus-visible:ring-2"
                         >
                           <span className="rounded-full bg-holiday/25 border border-holiday/40 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-holiday-foreground">
@@ -165,7 +165,7 @@ export function WeekView({
                             {day.holiday}
                           </span>
                           <span className="text-xs text-holiday-muted-foreground/80 max-w-[160px] leading-tight font-medium">
-                            Cerrado para atención médica, recepción y gerencia
+                            Sin turnos para ningún profesional
                           </span>
                         </Link>
                       </td>

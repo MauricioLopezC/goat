@@ -115,13 +115,13 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                     )}
                   </div>
 
-                  {/* Feriado en la cabecera (sin pisar las franjas) */}
+                  {/* Cierre del centro en la cabecera (sin pisar las franjas) */}
                   {holiday && (
                     <span
                       className="mt-1 w-full max-w-[130px] truncate rounded bg-holiday/15 border border-holiday/30 px-1 py-0.5 text-[10px] font-semibold text-holiday-muted-foreground"
-                      title={`Feriado: ${holiday.description}`}
+                      title={`Centro cerrado: ${holiday.description}`}
                     >
-                      Feriado: {holiday.description}
+                      Cerrado: {holiday.description}
                     </span>
                   )}
 
@@ -185,7 +185,7 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                         {holiday.description}
                       </span>
                       <span className="text-[10px] text-holiday-muted-foreground/80 mt-1 max-w-[120px] leading-tight font-medium">
-                        Cerrado para atención médica, recepción y gerencia
+                        Sin turnos para ningún profesional
                       </span>
                     </div>
                   </div>

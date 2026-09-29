@@ -9,7 +9,7 @@ import { HolidaysManager } from "./holidays-manager";
 
 export const metadata: Metadata = {
   title: "Feriados · Goat",
-  description: "Días en que el centro permanece cerrado (HU-05).",
+  description: "Feriados y días excepcionales en que el centro cierra (HU-14).",
 };
 
 export default async function HolidaysPage({
@@ -25,8 +25,8 @@ export default async function HolidaysPage({
       <div>
         <h1 className="text-headline-lg">Feriados</h1>
         <p className="text-muted-foreground">
-          Días en que el centro permanece cerrado: no se ofrecen turnos para
-          ningún profesional.
+          Feriados y días excepcionales en que el centro cierra el día completo:
+          no se ofrecen turnos para ningún profesional.
         </p>
       </div>
 
