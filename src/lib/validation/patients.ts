@@ -97,9 +97,12 @@ export const patientBaseFields = {
     .transform((val) => val || undefined),
 };
 
-type PatientDataForRefine = {
+type PatientDocumentForRefine = {
   documentType: (typeof DOCUMENT_TYPES)[number];
   documentNumber: string;
+};
+
+type PatientDataForRefine = {
   birthDate: string;
   guardianName?: string;
   guardianPhone?: string;
@@ -109,8 +112,10 @@ type PatientDataForRefine = {
   memberNumber?: string;
 };
 
-export const refinePatient = (
-  data: PatientDataForRefine,
+/// Formato del documento. Solo aplica al alta: una vez creado el paciente, el
+/// documento no se modifica (HU-08).
+export const refinePatientDocument = (
+  data: PatientDocumentForRefine,
   ctx: z.RefinementCtx,
 ) => {
   if (data.documentType === "DNI") {
@@ -141,7 +146,12 @@ export const refinePatient = (
       });
     }
   }
+};
 
+export const refinePatient = (
+  data: PatientDataForRefine,
+  ctx: z.RefinementCtx,
+) => {
   if (data.birthDate) {
     const birth = new Date(`${data.birthDate}T00:00:00`);
     const now = new Date();
@@ -229,14 +239,26 @@ export const refinePatient = (
 
 export const createPatientSchema = z
   .object(patientBaseFields)
-  .superRefine(refinePatient);
+  .superRefine((data, ctx) => {
+    refinePatientDocument(data, ctx);
+    refinePatient(data, ctx);
+  });
 
 export type CreatePatientInput = z.infer<typeof createPatientSchema>;
 
+/// El documento no es editable (HU-08). Se acepta opcional solo para que la DAL
+/// rechace un intento de cambiarlo en vez de que Zod lo descarte sin avisar.
 export const updatePatientSchema = z
-  .object({
+  .object(patientBaseFields)
+  .omit({ documentType: true, documentNumber: true })
+  .extend({
     id: z.number().int().positive("ID de paciente inválido"),
-    ...patientBaseFields,
+    documentType: z
+      .enum(DOCUMENT_TYPES, {
+        message: "Seleccioná un tipo de documento válido",
+      })
+      .optional(),
+    documentNumber: z.string().trim().optional(),
   })
   .superRefine(refinePatient);
 

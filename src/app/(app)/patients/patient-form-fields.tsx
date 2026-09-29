@@ -68,6 +68,8 @@ export interface PatientFormFieldsProps {
   markTouched: (field: string) => void;
   getFieldError: (field: string) => string | null;
   getFieldBorderClass: (field: string) => string;
+  /// En la edición el documento no se modifica (HU-08): se muestra como dato fijo.
+  documentLocked?: boolean;
 }
 
 export function PatientFormFields({
@@ -104,6 +106,7 @@ export function PatientFormFields({
   markTouched,
   getFieldError,
   getFieldBorderClass,
+  documentLocked = false,
 }: PatientFormFieldsProps) {
   const selectedInsurer = healthInsurers.find(
     (ins) => String(ins.id) === healthInsurerId,
@@ -166,62 +169,78 @@ export function PatientFormFields({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Tipo de Documento */}
-            <div className="space-y-1.5">
-              <Label htmlFor="documentType">
-                Tipo de documento <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={documentType}
-                onValueChange={(val: DocumentType) => {
-                  setDocumentType(val);
-                  markTouched("documentType");
-                }}
-              >
-                <SelectTrigger
-                  id="documentType"
-                  className={getFieldBorderClass("documentType")}
-                >
-                  <SelectValue placeholder="Seleccioná un tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DOCUMENT_TYPES.map((dt) => (
-                    <SelectItem key={dt} value={dt}>
-                      {DOCUMENT_TYPE_LABEL[dt]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {getFieldError("documentType") && (
-                <p className="text-xs text-destructive mt-1">
-                  {getFieldError("documentType")}
+            {documentLocked ? (
+              <div className="space-y-1.5 md:col-span-2">
+                <p className="text-sm leading-none font-medium">Documento</p>
+                <p className="flex h-9.5 items-center rounded-lg bg-muted px-2.5 font-mono text-sm text-foreground">
+                  {DOCUMENT_TYPE_LABEL[documentType]} {documentNumber}
                 </p>
-              )}
-            </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  El documento no se modifica una vez registrado el paciente.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Tipo de Documento */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="documentType">
+                    Tipo de documento{" "}
+                    <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={documentType}
+                    onValueChange={(val: DocumentType) => {
+                      setDocumentType(val);
+                      markTouched("documentType");
+                    }}
+                  >
+                    <SelectTrigger
+                      id="documentType"
+                      className={getFieldBorderClass("documentType")}
+                    >
+                      <SelectValue placeholder="Seleccioná un tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DOCUMENT_TYPES.map((dt) => (
+                        <SelectItem key={dt} value={dt}>
+                          {DOCUMENT_TYPE_LABEL[dt]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {getFieldError("documentType") && (
+                    <p className="text-xs text-destructive mt-1">
+                      {getFieldError("documentType")}
+                    </p>
+                  )}
+                </div>
 
-            {/* Número de Documento */}
-            <div className="space-y-1.5">
-              <Label htmlFor="documentNumber">
-                Número de documento <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="documentNumber"
-                value={documentNumber}
-                onChange={(e) => setDocumentNumber(e.target.value)}
-                onBlur={() => markTouched("documentNumber")}
-                className={cn(
-                  "font-mono",
-                  getFieldBorderClass("documentNumber"),
-                )}
-                placeholder="Ej: 35123456"
-                maxLength={20}
-              />
-              {getFieldError("documentNumber") && (
-                <p className="text-xs text-destructive mt-1">
-                  {getFieldError("documentNumber")}
-                </p>
-              )}
-            </div>
+                {/* Número de Documento */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="documentNumber">
+                    Número de documento{" "}
+                    <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="documentNumber"
+                    value={documentNumber}
+                    onChange={(e) => setDocumentNumber(e.target.value)}
+                    onBlur={() => markTouched("documentNumber")}
+                    className={cn(
+                      "font-mono",
+                      getFieldBorderClass("documentNumber"),
+                    )}
+                    placeholder="Ej: 35123456"
+                    maxLength={20}
+                  />
+                  {getFieldError("documentNumber") && (
+                    <p className="text-xs text-destructive mt-1">
+                      {getFieldError("documentNumber")}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Género */}
             <div className="space-y-1.5">

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
 import { assertRole, type Actor } from "@/lib/dal/auth";
 import { paginate } from "@/lib/pagination";
+import { isPatientDocumentChange } from "@/lib/patients";
 import type {
   CreatePatientInput,
   UpdatePatientInput,
@@ -316,37 +317,14 @@ export async function updatePatient(
     throw new DomainError("NOT_FOUND", "El paciente no existe.");
   }
 
-  // Revalidar unicidad si el documento cambió o para asegurar que ningún otro lo tenga
-  const duplicate = await prisma.patient.findUnique({
-    where: {
-      documentType_documentNumber: {
-        documentType: input.documentType,
-        documentNumber: input.documentNumber,
-      },
-    },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      documentType: true,
-      documentNumber: true,
-    },
-  });
-
-  if (duplicate && duplicate.id !== input.id) {
+  if (isPatientDocumentChange(existing, input)) {
     throw new DomainError(
-      "DUPLICATE_PATIENT",
-      `Ya existe un paciente registrado con ${duplicate.documentType} ${duplicate.documentNumber}: ${duplicate.lastName}, ${duplicate.firstName}.`,
+      "VALIDATION",
+      "El documento de un paciente no se puede modificar.",
       {
         documentNumber: [
-          `Ya existe un paciente con ${duplicate.documentType} ${duplicate.documentNumber}.`,
+          "El tipo y el número de documento no se modifican una vez creado el paciente.",
         ],
-      },
-      {
-        existingPatientId: duplicate.id,
-        existingPatientName: `${duplicate.lastName}, ${duplicate.firstName}`,
-        documentType: duplicate.documentType,
-        documentNumber: duplicate.documentNumber,
       },
     );
   }
@@ -376,110 +354,59 @@ export async function updatePatient(
 
   const birthDate = new Date(`${input.birthDate}T00:00:00.000Z`);
 
-  try {
-    const updated = await prisma.$transaction(async (tx) => {
-      // Si la cobertura pasa a PRIVATE pero antes tenía HEALTH_INSURANCE, remover Coverage
-      if (input.coverageType === "PRIVATE" && existing.coverage) {
-        await tx.coverage.delete({
-          where: { patientId: input.id },
-        });
-      }
+  const updated = await prisma.$transaction(async (tx) => {
+    // Si la cobertura pasa a PRIVATE pero antes tenía HEALTH_INSURANCE, remover Coverage
+    if (input.coverageType === "PRIVATE" && existing.coverage) {
+      await tx.coverage.delete({
+        where: { patientId: input.id },
+      });
+    }
 
-      return tx.patient.update({
-        where: { id: input.id },
-        data: {
-          lastName: input.lastName,
-          firstName: input.firstName,
-          gender: input.gender,
-          documentType: input.documentType,
-          documentNumber: input.documentNumber,
-          birthDate,
-          phone: input.phone,
-          email: input.email,
-          coverageType: input.coverageType,
-          guardianName: input.guardianName,
-          guardianPhone: input.guardianPhone,
-          updatedById: actor.id,
-          ...(input.coverageType === "HEALTH_INSURANCE" && input.insurancePlanId
-            ? {
-                coverage: {
-                  upsert: {
-                    create: {
-                      insurancePlanId: input.insurancePlanId,
-                      memberNumber: input.memberNumber ?? "",
-                    },
-                    update: {
-                      insurancePlanId: input.insurancePlanId,
-                      memberNumber: input.memberNumber ?? "",
-                    },
+    return tx.patient.update({
+      where: { id: input.id },
+      data: {
+        lastName: input.lastName,
+        firstName: input.firstName,
+        gender: input.gender,
+        birthDate,
+        phone: input.phone,
+        email: input.email,
+        coverageType: input.coverageType,
+        guardianName: input.guardianName,
+        guardianPhone: input.guardianPhone,
+        updatedById: actor.id,
+        ...(input.coverageType === "HEALTH_INSURANCE" && input.insurancePlanId
+          ? {
+              coverage: {
+                upsert: {
+                  create: {
+                    insurancePlanId: input.insurancePlanId,
+                    memberNumber: input.memberNumber ?? "",
+                  },
+                  update: {
+                    insurancePlanId: input.insurancePlanId,
+                    memberNumber: input.memberNumber ?? "",
                   },
                 },
-              }
-            : {}),
-        },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          documentType: true,
-          documentNumber: true,
-        },
-      });
-    });
-
-    return {
-      id: updated.id,
-      firstName: updated.firstName,
-      lastName: updated.lastName,
-      documentType: updated.documentType,
-      documentNumber: updated.documentNumber,
-    };
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      const duplicatePatient = await prisma.patient.findUnique({
-        where: {
-          documentType_documentNumber: {
-            documentType: input.documentType,
-            documentNumber: input.documentNumber,
-          },
-        },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          documentType: true,
-          documentNumber: true,
-        },
-      });
-
-      throw new DomainError(
-        "DUPLICATE_PATIENT",
-        `Ya existe un paciente registrado con ${input.documentType} ${input.documentNumber}${
-          duplicatePatient
-            ? `: ${duplicatePatient.lastName}, ${duplicatePatient.firstName}.`
-            : "."
-        }`,
-        {
-          documentNumber: [
-            `Ya existe un paciente con ${input.documentType} ${input.documentNumber}.`,
-          ],
-        },
-        duplicatePatient
-          ? {
-              existingPatientId: duplicatePatient.id,
-              existingPatientName: `${duplicatePatient.lastName}, ${duplicatePatient.firstName}`,
-              documentType: duplicatePatient.documentType,
-              documentNumber: duplicatePatient.documentNumber,
+              },
             }
-          : {
-              documentType: input.documentType,
-              documentNumber: input.documentNumber,
-            },
-      );
-    }
-    throw error;
-  }
+          : {}),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        documentType: true,
+        documentNumber: true,
+      },
+    });
+  });
+
+  return {
+    id: updated.id,
+    firstName: updated.firstName,
+    lastName: updated.lastName,
+    documentType: updated.documentType,
+    documentNumber: updated.documentNumber,
+  };
 }
