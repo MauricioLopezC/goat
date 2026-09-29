@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
 import { Role } from "@/generated/prisma/enums";
 import { assertRole, type Actor } from "@/lib/dal/auth";
+import { normalizeSearchText } from "@/lib/services";
 
 // ─────────────────────── Tipos de entrada ────────────────────────────
 
@@ -60,12 +61,17 @@ export async function createPaymentMethod(
 ) {
   assertRole(actor, Role.MANAGER);
 
-  const existing = await prisma.paymentMethod.findUnique({
-    where: { name: input.name },
-    select: { id: true },
+  // 1. Verificar unicidad del nombre (insensible a mayúsculas y acentos)
+  const normalizedInput = normalizeSearchText(input.name);
+  const existingMethods = await prisma.paymentMethod.findMany({
+    select: { id: true, name: true },
   });
 
-  if (existing) {
+  const duplicate = existingMethods.find(
+    (m) => normalizeSearchText(m.name) === normalizedInput,
+  );
+
+  if (duplicate) {
     throw new DomainError(
       "DUPLICATE",
       "Ya existe un medio de pago con ese nombre.",
@@ -102,19 +108,23 @@ export async function updatePaymentMethod(
     throw new DomainError("NOT_FOUND", "El medio de pago no existe.");
   }
 
-  // 2. Verificar unicidad del nombre (solo si cambió)
-  if (current.name !== input.name) {
-    const dup = await prisma.paymentMethod.findUnique({
-      where: { name: input.name },
-      select: { id: true },
-    });
-    if (dup) {
-      throw new DomainError(
-        "DUPLICATE",
-        "Ya existe un medio de pago con ese nombre.",
-        { name: ["Ya existe un medio de pago con ese nombre"] },
-      );
-    }
+  // 2. Verificar unicidad del nombre (insensible a mayúsculas y acentos, excluyendo a sí mismo)
+  const normalizedInput = normalizeSearchText(input.name);
+  const otherMethods = await prisma.paymentMethod.findMany({
+    where: { id: { not: input.id } },
+    select: { id: true, name: true },
+  });
+
+  const duplicate = otherMethods.find(
+    (m) => normalizeSearchText(m.name) === normalizedInput,
+  );
+
+  if (duplicate) {
+    throw new DomainError(
+      "DUPLICATE",
+      "Ya existe un medio de pago con ese nombre.",
+      { name: ["Ya existe un medio de pago con ese nombre"] },
+    );
   }
 
   // 3. Verificar que no sea el último activo si se intenta desactivar

@@ -6,6 +6,7 @@ import {
   updatePaymentMethodSchema,
 } from "../src/lib/validation/payment-method";
 import { createServiceSchema } from "../src/lib/validation/service";
+import { normalizeSearchText } from "../src/lib/services";
 
 test("Invariantes del seed de medios de pago: 4 medios iniciales y todos activos (HU-20)", () => {
   assert.equal(
@@ -134,4 +135,38 @@ test("createServiceSchema valida el campo price de HU-20", () => {
     price: "10.555",
   });
   assert.equal(threeDecimals.success, false);
+});
+
+test("La comparación de medios de pago es insensible a mayúsculas, minúsculas y acentos", () => {
+  // Efectivo vs efectivo vs EFECTIVO
+  assert.equal(
+    normalizeSearchText("efectivo"),
+    normalizeSearchText("Efectivo"),
+  );
+  assert.equal(
+    normalizeSearchText("EFECTIVO"),
+    normalizeSearchText("Efectivo"),
+  );
+
+  // Tarjeta de debito vs Tarjeta de débito
+  assert.equal(
+    normalizeSearchText("tarjeta de debito"),
+    normalizeSearchText("Tarjeta de débito"),
+  );
+  assert.equal(
+    normalizeSearchText("TARJETA DE DEBITO"),
+    normalizeSearchText("Tarjeta de débito"),
+  );
+
+  // Tarjeta de credito vs Tarjeta de crédito
+  assert.equal(
+    normalizeSearchText("Tarjeta de credito"),
+    normalizeSearchText("Tarjeta de crédito"),
+  );
+
+  // Nombres distintos no deben coincidir
+  assert.notEqual(
+    normalizeSearchText("Transferencia bancaria"),
+    normalizeSearchText("Transferencia"),
+  );
 });
