@@ -29,7 +29,7 @@ import type {
 } from "@/lib/validation/availability";
 
 // Agenda de un profesional (HU-05): franjas del patrón semanal, excepciones y
-// feriados. Fichas en docs/acciones.md.
+// cierres del centro (HU-14). Fichas en docs/acciones.md.
 //
 // Las escrituras corren en una transacción `Serializable`: el control de turnos
 // afectados lee los turnos y escribe la agenda, y no puede intercalarse con el
@@ -67,7 +67,7 @@ const appointmentSelect = {
   startsAt: true,
   endsAt: true,
   serviceId: true,
-  patient: { select: { firstName: true, lastName: true } },
+  patient: { select: { firstName: true, lastName: true, phone: true } },
   service: { select: { name: true } },
   professional: { select: { firstName: true, lastName: true } },
 } satisfies Prisma.AppointmentSelect;
@@ -106,12 +106,17 @@ function toAffected(appointment: ScheduledAppointment): AffectedAppointment {
     id: appointment.id,
     startsAt: appointment.startsAt.toISOString(),
     patientName: `${appointment.patient.lastName}, ${appointment.patient.firstName}`,
+    patientPhone: appointment.patient.phone,
     serviceName: appointment.service.name,
     professionalName: `${appointment.professional.lastName}, ${appointment.professional.firstName}`,
   };
 }
 
-function rejectAffected(appointments: ScheduledAppointment[], cause: string) {
+function rejectAffected(
+  appointments: ScheduledAppointment[],
+  cause: string,
+  nextStep = "Cancelalos antes de continuar.",
+) {
   if (appointments.length === 0) return;
   const detail = appointments
     .map(
@@ -121,7 +126,7 @@ function rejectAffected(appointments: ScheduledAppointment[], cause: string) {
     .join(", ");
   throw new DomainError(
     "FUTURE_APPOINTMENTS",
-    `${cause} ${appointments.length === 1 ? "el turno programado" : `${appointments.length} turnos programados`}: ${detail}. Cancelalos antes de continuar.`,
+    `${cause} ${appointments.length === 1 ? "el turno programado" : `${appointments.length} turnos programados`}: ${detail}. ${nextStep}`,
     undefined,
     { appointments: appointments.map(toAffected) },
   );
@@ -535,7 +540,7 @@ export async function getOwnProfessionalId(actor: Actor) {
 
 // ─────────────────────────── Feriados ──────────────────────────────────
 
-/// Feriados de hoy en adelante, paginados y ordenados por fecha (HU-05).
+/// Cierres de hoy en adelante, paginados y ordenados por fecha (HU-05, HU-14).
 export async function listHolidays(page: number, actor: Actor) {
   assertRole(actor, ...STAFF_ROLES);
   const where = { date: { gte: dateToDb(getTodayDateString()) } };
@@ -560,8 +565,11 @@ export async function listHolidays(page: number, actor: Actor) {
   };
 }
 
+/// Cierra el centro el día completo, por feriado o día excepcional (HU-14).
+/// No se carga sobre un día con turnos programados que todavía no comenzaron:
+/// se listan para cancelarlos o reprogramarlos antes.
 export async function createHoliday(input: HolidayInput, actor: Actor) {
-  assertRole(actor, Role.MANAGER);
+  assertRole(actor, Role.MANAGER, Role.RECEPTIONIST);
   assertNotPast(input.date);
   return prisma.$transaction(async (tx) => {
     const existing = await tx.holiday.findUnique({
@@ -569,13 +577,14 @@ export async function createHoliday(input: HolidayInput, actor: Actor) {
       select: { id: true },
     });
     if (existing)
-      throw new DomainError("DUPLICATE", "Ya hay un feriado cargado ese día.", {
-        date: ["Ya hay un feriado ese día"],
+      throw new DomainError("DUPLICATE", "El centro ya está cerrado ese día.", {
+        date: ["Ya hay un cierre cargado ese día"],
       });
 
     rejectAffected(
       await scheduledOnDate(tx, input.date),
-      "El feriado cae sobre",
+      "El cierre cae sobre",
+      "Cancelalos o reprogramalos antes de cerrar el centro.",
     );
 
     const holiday = await tx.holiday.create({
@@ -590,13 +599,14 @@ export async function createHoliday(input: HolidayInput, actor: Actor) {
   }, SERIALIZABLE);
 }
 
+/// Quita un cierre: el día vuelve a ofrecer turnos según las franjas (HU-14).
 export async function deleteHoliday(input: { id: number }, actor: Actor) {
-  assertRole(actor, Role.MANAGER);
+  assertRole(actor, Role.MANAGER, Role.RECEPTIONIST);
   const holiday = await prisma.holiday.findUnique({
     where: { id: input.id },
     select: { id: true },
   });
-  if (!holiday) throw new DomainError("NOT_FOUND", "El feriado no existe.");
+  if (!holiday) throw new DomainError("NOT_FOUND", "El cierre no existe.");
   await prisma.holiday.delete({ where: { id: input.id } });
   return { id: input.id };
 }

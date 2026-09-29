@@ -8,17 +8,19 @@ import {
 } from "@/lib/validation/availability";
 import { defineAction, type ActionResult } from "@/lib/actions";
 
-// Feriados del centro (HU-05). Fichas en docs/acciones.md.
+// Cierres del centro por feriado o día excepcional (HU-05, HU-14). Fichas en
+// docs/acciones.md.
 
 function revalidateHolidays() {
   revalidatePath("/holidays");
   revalidatePath("/calendar");
+  revalidatePath("/agenda");
 }
 
 export type HolidayMutationState = ActionResult<{ id: number }> | null;
 
 const create = defineAction({
-  roles: ["MANAGER"],
+  roles: ["MANAGER", "RECEPTIONIST"],
   input: createHolidaySchema,
   handler: async (input, actor) => {
     const result = await dal.createHoliday(input, actor);
@@ -28,7 +30,7 @@ const create = defineAction({
 });
 
 const remove = defineAction({
-  roles: ["MANAGER"],
+  roles: ["MANAGER", "RECEPTIONIST"],
   input: deleteHolidaySchema,
   handler: async (input, actor) => {
     const result = await dal.deleteHoliday(input, actor);

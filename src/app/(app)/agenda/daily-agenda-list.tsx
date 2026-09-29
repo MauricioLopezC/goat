@@ -66,7 +66,7 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
 
         {holiday && (
           <div className="bg-holiday/15 border-holiday/30 text-holiday-muted-foreground mb-3 rounded-lg border p-2 text-xs font-medium">
-            Feriado: {holiday.description}
+            Centro cerrado: {holiday.description}
           </div>
         )}
 
@@ -115,8 +115,7 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                   {holiday.description}
                 </span>
                 <p className="text-xs text-holiday-muted-foreground/80 mt-1 max-w-[200px] leading-tight font-medium">
-                  Cerrado durante toda la jornada para atención médica,
-                  recepción y gerencia.
+                  Cerrado todo el día, sin turnos para ningún profesional.
                 </p>
               </div>
             ) : (
@@ -205,15 +204,14 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
         {holiday ? (
           <div className="bg-holiday/10 border-holiday/30 text-holiday-foreground flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center shadow-xs">
             <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-holiday/40 bg-holiday/25 px-3 py-1 text-xs font-bold uppercase tracking-wider text-holiday-muted-foreground">
-              Centro cerrado · Feriado nacional
+              Centro cerrado
             </span>
             <h4 className="text-xl font-bold text-holiday-foreground sm:text-2xl">
               {holiday.description}
             </h4>
             <p className="mt-2 max-w-md text-sm font-medium text-holiday-muted-foreground/80">
-              El policonsultorio permanece cerrado durante toda la jornada para
-              todas las áreas (atención médica, recepción y gerencia). No se
-              brindan turnos en este día.
+              El centro permanece cerrado todo el día: no se ofrecen turnos para
+              ningún profesional.
             </p>
           </div>
         ) : dayAppointments.length === 0 ? (
