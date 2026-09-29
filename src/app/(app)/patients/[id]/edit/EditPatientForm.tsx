@@ -3,13 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  AlertCircle,
-  CheckCircle2,
-  ExternalLink,
-  Loader2,
-  Save,
-} from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Save } from "lucide-react";
 import type { ActionResult } from "@/lib/actions";
 import type { UpdatedPatientSummary } from "@/lib/dal/patients";
 import { validatePatientClientForm } from "@/lib/patients";
@@ -58,12 +52,6 @@ export function EditPatientForm({
   const [lastName, setLastName] = useState(initialPatient.lastName);
   const [firstName, setFirstName] = useState(initialPatient.firstName);
   const [gender, setGender] = useState<Gender>(initialPatient.gender);
-  const [documentType, setDocumentType] = useState<DocumentType>(
-    initialPatient.documentType,
-  );
-  const [documentNumber, setDocumentNumber] = useState(
-    initialPatient.documentNumber,
-  );
   const [birthDate, setBirthDate] = useState(initialPatient.birthDate);
   const [phone, setPhone] = useState(initialPatient.phone);
   const [email, setEmail] = useState(initialPatient.email);
@@ -108,8 +96,6 @@ export function EditPatientForm({
   } = validatePatientClientForm({
     lastName,
     firstName,
-    documentType,
-    documentNumber,
     birthDate,
     phone,
     email,
@@ -126,18 +112,6 @@ export function EditPatientForm({
       ? state.error.fieldErrors
       : undefined;
 
-  const isDuplicate =
-    state?.ok === false && state.error.code === "DUPLICATE_PATIENT";
-  const duplicateMeta =
-    isDuplicate && state?.ok === false && state.error.meta
-      ? (state.error.meta as {
-          existingPatientId?: number;
-          existingPatientName?: string;
-          documentType?: string;
-          documentNumber?: string;
-        })
-      : undefined;
-
   const getFieldError = (fieldName: string) => {
     if (serverFieldErrors?.[fieldName]?.[0]) {
       return serverFieldErrors[fieldName][0];
@@ -150,7 +124,7 @@ export function EditPatientForm({
 
   const getFieldBorderClass = (fieldName: string) => {
     const errorMsg = getFieldError(fieldName);
-    if (errorMsg || (fieldName === "documentNumber" && isDuplicate)) {
+    if (errorMsg) {
       return "border-destructive ring-1 ring-destructive focus-visible:ring-destructive";
     }
     return "";
@@ -164,8 +138,6 @@ export function EditPatientForm({
       setTouched({
         lastName: true,
         firstName: true,
-        documentType: true,
-        documentNumber: true,
         birthDate: true,
         phone: true,
         email: true,
@@ -185,8 +157,6 @@ export function EditPatientForm({
         lastName: lastName.trim(),
         firstName: firstName.trim(),
         gender,
-        documentType,
-        documentNumber: documentNumber.trim(),
         birthDate,
         phone: phone.trim(),
         email: email.trim(),
@@ -243,54 +213,14 @@ export function EditPatientForm({
         </Alert>
       )}
 
-      {/* Alerta de duplicado */}
-      {isDuplicate && (
-        <Alert
-          variant="destructive"
-          className="border-destructive-soft-border bg-destructive-soft text-destructive-soft-foreground rounded-xl"
-        >
-          <AlertCircle className="size-5 text-destructive" />
-          <div className="flex-1">
-            <AlertTitle className="text-title-md font-semibold text-destructive-soft-foreground">
-              Documento ya registrado
-            </AlertTitle>
-            <AlertDescription className="text-body-sm text-destructive-soft-foreground mt-1">
-              {state?.ok === false && state.error.message}
-            </AlertDescription>
-            {duplicateMeta?.existingPatientId && (
-              <div className="mt-3">
-                <Button
-                  asChild
-                  size="sm"
-                  variant="outline"
-                  className="bg-card text-foreground border-destructive-soft-border hover:bg-tray gap-1.5"
-                >
-                  <Link
-                    href={`/patients/${duplicateMeta.existingPatientId}`}
-                    target="_blank"
-                  >
-                    <span>Ver ficha del paciente existente</span>
-                    <ExternalLink className="size-3.5" />
-                  </Link>
-                </Button>
-              </div>
-            )}
-          </div>
+      {/* Error general */}
+      {state?.ok === false && state.error.code !== "VALIDATION" && (
+        <Alert variant="destructive" className="rounded-xl">
+          <AlertCircle className="size-5" />
+          <AlertTitle className="font-semibold">Error al actualizar</AlertTitle>
+          <AlertDescription>{state.error.message}</AlertDescription>
         </Alert>
       )}
-
-      {/* Error general */}
-      {state?.ok === false &&
-        state.error.code !== "VALIDATION" &&
-        state.error.code !== "DUPLICATE_PATIENT" && (
-          <Alert variant="destructive" className="rounded-xl">
-            <AlertCircle className="size-5" />
-            <AlertTitle className="font-semibold">
-              Error al actualizar
-            </AlertTitle>
-            <AlertDescription>{state.error.message}</AlertDescription>
-          </Alert>
-        )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <PatientFormFields
@@ -298,10 +228,11 @@ export function EditPatientForm({
           setLastName={setLastName}
           firstName={firstName}
           setFirstName={setFirstName}
-          documentType={documentType}
-          setDocumentType={setDocumentType}
-          documentNumber={documentNumber}
-          setDocumentNumber={setDocumentNumber}
+          documentType={initialPatient.documentType}
+          setDocumentType={() => {}}
+          documentNumber={initialPatient.documentNumber}
+          setDocumentNumber={() => {}}
+          documentLocked
           gender={gender}
           setGender={setGender}
           birthDate={birthDate}

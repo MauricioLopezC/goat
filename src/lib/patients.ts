@@ -52,11 +52,26 @@ export function calculateAge(date: Date | string): number {
   return age;
 }
 
+/// El documento de un paciente no se modifica una vez creado (HU-08). Indica si
+/// la entrada de una modificación intenta cambiarlo; lo que no viene no cuenta.
+export function isPatientDocumentChange(
+  stored: { documentType: DocumentType; documentNumber: string },
+  input: { documentType?: DocumentType; documentNumber?: string },
+): boolean {
+  return (
+    (input.documentType !== undefined &&
+      input.documentType !== stored.documentType) ||
+    (input.documentNumber !== undefined &&
+      input.documentNumber.trim() !== stored.documentNumber)
+  );
+}
+
 export type PatientFormValidationInput = {
   lastName: string;
   firstName: string;
-  documentType: DocumentType;
-  documentNumber: string;
+  /// Solo en el alta: en la edición el documento no se modifica (HU-08).
+  documentType?: DocumentType;
+  documentNumber?: string;
   birthDate: string;
   phone: string;
   email: string;
@@ -92,22 +107,25 @@ export function validatePatientClientForm(data: PatientFormValidationInput) {
     errors.firstName = "Solo se permiten letras, espacios, tildes y apóstrofes";
   }
 
-  if (!data.documentNumber.trim()) {
-    errors.documentNumber = "El número de documento es obligatorio";
-  } else if (data.documentType === DocumentType.DNI) {
-    if (!DNI_REGEX.test(data.documentNumber.trim())) {
-      errors.documentNumber =
-        "El DNI debe tener exactamente 7 u 8 dígitos numéricos sin puntos ni espacios";
-    }
-  } else if (data.documentType === DocumentType.PASSPORT) {
-    if (!/^[a-zA-Z0-9]{3,20}$/.test(data.documentNumber.trim())) {
-      errors.documentNumber =
-        "El pasaporte debe tener entre 3 y 20 caracteres alfanuméricos";
-    }
-  } else {
-    if (!/^\d{4,10}$/.test(data.documentNumber.trim())) {
-      errors.documentNumber =
-        "El número de documento debe tener entre 4 y 10 dígitos numéricos";
+  const { documentNumber } = data;
+  if (documentNumber !== undefined) {
+    if (!documentNumber.trim()) {
+      errors.documentNumber = "El número de documento es obligatorio";
+    } else if (data.documentType === DocumentType.DNI) {
+      if (!DNI_REGEX.test(documentNumber.trim())) {
+        errors.documentNumber =
+          "El DNI debe tener exactamente 7 u 8 dígitos numéricos sin puntos ni espacios";
+      }
+    } else if (data.documentType === DocumentType.PASSPORT) {
+      if (!/^[a-zA-Z0-9]{3,20}$/.test(documentNumber.trim())) {
+        errors.documentNumber =
+          "El pasaporte debe tener entre 3 y 20 caracteres alfanuméricos";
+      }
+    } else {
+      if (!/^\d{4,10}$/.test(documentNumber.trim())) {
+        errors.documentNumber =
+          "El número de documento debe tener entre 4 y 10 dígitos numéricos";
+      }
     }
   }
 

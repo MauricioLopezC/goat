@@ -12,8 +12,8 @@
 ## Validaciones
 
 - Menos de 3 caracteres no dispara la búsqueda.
-- Al modificar el documento se revalida la unicidad.
-- Las mismas validaciones de formato que en el alta ([HU-07](HU-07-registrar-paciente.md)).
+- El tipo y el número de documento no se modifican una vez creado el paciente. En la edición se muestran como dato fijo, y `updatePatient` rechaza un cambio de documento aunque llegue en una llamada directa a la acción.
+- El resto de los datos lleva las mismas validaciones de formato que en el alta ([HU-07](HU-07-registrar-paciente.md)).
 
 ## Comportamiento
 
@@ -29,7 +29,7 @@
 
 ## Operaciones
 
-- `updatePatient` — modificación de datos y cobertura.
+- `updatePatient` — modificación de datos y cobertura (sin el documento).
 - Búsqueda y ficha son lecturas: `searchPatients(query, page)`, `getPatient(id)` en `src/lib/dal/patients.ts`, llamadas desde Server Components.
 
 ## Nota de alcance
