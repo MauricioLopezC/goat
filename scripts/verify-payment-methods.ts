@@ -8,6 +8,11 @@ import {
   listPaymentMethods,
   listActivePaymentMethods,
 } from "../src/lib/dal/payment-methods";
+import {
+  createService,
+  updateService,
+  listServices,
+} from "../src/lib/dal/services";
 import { DomainError } from "../src/lib/actions";
 import { Role } from "../src/generated/prisma/enums";
 import type { Actor } from "../src/lib/dal/auth";
@@ -23,6 +28,7 @@ async function main() {
   const tag = `HU20-${randomUUID()}`;
   const users: number[] = [];
   const paymentMethods: number[] = [];
+  const services: number[] = [];
   let passed = 0;
 
   async function verify(label: string, run: () => Promise<void>) {
@@ -267,10 +273,73 @@ async function main() {
       }
     });
 
+    // 9. Valores de prestaciones (HU-20): serialización de Decimal a string para RSC
+    await verify(
+      "valores de prestaciones se serializan como string o null (sin objetos Decimal)",
+      async () => {
+        // Alta con precio
+        const created = await createService(
+          {
+            name: `Servicio con precio ${tag}`,
+            durationMinutes: 30,
+            requiresReferral: false,
+            price: 12500.5,
+          },
+          managerActor,
+        );
+        services.push(created.id);
+
+        assert.equal(typeof created.price, "string");
+        assert.equal(Number(created.price), 12500.5);
+
+        // Edición con nuevo precio
+        const updated = await updateService(
+          {
+            id: created.id,
+            name: `Servicio con precio modificado ${tag}`,
+            durationMinutes: 30,
+            requiresReferral: false,
+            price: 18000,
+          },
+          managerActor,
+        );
+        assert.equal(typeof updated.price, "string");
+        assert.equal(Number(updated.price), 18000);
+
+        // Edición quitando precio (null)
+        const updatedNull = await updateService(
+          {
+            id: created.id,
+            name: `Servicio sin precio ${tag}`,
+            durationMinutes: 30,
+            requiresReferral: false,
+            price: null,
+          },
+          managerActor,
+        );
+        assert.equal(updatedNull.price, null);
+
+        // Listado: ningún price debe ser un objeto Decimal ni tener constructor distinto de String
+        const page = await listServices(1, managerActor);
+        for (const item of page.items) {
+          if (item.price !== null) {
+            assert.equal(typeof item.price, "string");
+            assert.equal(item.price.constructor, String);
+            assert.doesNotThrow(() => JSON.stringify(item));
+          }
+        }
+      },
+    );
+
     console.log(
       `${passed} grupos de verificaciones HU-20 PostgreSQL correctos.`,
     );
   } finally {
+    if (services.length) {
+      await prisma.service.deleteMany({
+        where: { id: { in: services } },
+      });
+    }
     if (paymentMethods.length) {
       await prisma.paymentMethod.deleteMany({
         where: { id: { in: paymentMethods } },
