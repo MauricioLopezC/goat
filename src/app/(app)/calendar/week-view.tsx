@@ -6,6 +6,8 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { APPOINTMENT_STATUS_BORDER_CLASS } from "@/lib/appointment-status";
+import type { PaymentState } from "@/lib/payments";
+import { PaymentStateIcon } from "@/components/payment-state-icon";
 import { calendarHref, type CalendarQuery } from "@/lib/calendar";
 import {
   dateToDb,
@@ -44,10 +46,12 @@ export function WeekView({
   days,
   query,
   today,
+  paymentStates,
 }: {
   days: CalendarDay[];
   query: CalendarQuery;
   today: string;
+  paymentStates: Record<number, PaymentState>;
 }) {
   const rows = new Map<number, ProfessionalDay["professional"]>();
   for (const day of days)
@@ -216,6 +220,12 @@ export function WeekView({
                               )}
                             </span>{" "}
                             {appointment.patient.lastName}
+                            {paymentStates[appointment.id] && (
+                              <PaymentStateIcon
+                                state={paymentStates[appointment.id]}
+                                className="ml-1 inline align-[-2px]"
+                              />
+                            )}
                           </span>
                         ))}
                         {hasFreeBlocks ? (

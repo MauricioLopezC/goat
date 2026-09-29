@@ -23,12 +23,22 @@ import {
   WEEKDAY_LABEL,
 } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
+import type { PaymentState } from "@/lib/payments";
+import { PaymentStateIcon } from "@/components/payment-state-icon";
 import type { AgendaAppointment, AgendaData } from "./agenda-types";
 
 // Altura por hora compacta para que entre el día completo sin scroll con ruedita
 const HOUR_HEIGHT = 48;
 
-export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
+export function WeeklyAgendaGrid({
+  data,
+  paymentStates = {},
+}: {
+  data: AgendaData;
+  /// Marca de cobro (HU-21). Solo la pasa el calendario del centro: el
+  /// profesional no ve cobros.
+  paymentStates?: Record<number, PaymentState>;
+}) {
   const [selectedAppointment, setSelectedAppointment] =
     useState<AgendaAppointment | null>(null);
 
@@ -336,6 +346,11 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                             {appointment.patient.lastName},{" "}
                             {appointment.patient.firstName}
                           </span>
+                          {paymentStates[appointment.id] && (
+                            <PaymentStateIcon
+                              state={paymentStates[appointment.id]}
+                            />
+                          )}
                         </div>
                         <span
                           className={`size-1.5 rounded-full shrink-0 ml-1 ${

@@ -32,7 +32,7 @@ import { ListPagination } from "@/components/list-pagination";
 import { PatientSearchBar } from "./PatientSearchBar";
 
 export const metadata: Metadata = {
-  title: "Pacientes · Goat",
+  title: "Pacientes · GOAT",
   description: "Listado, búsqueda y gestión de pacientes del centro.",
 };
 

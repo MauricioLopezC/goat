@@ -9,7 +9,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 <!-- END:nextjs-agent-rules -->
 
 
-# Goat — gestión de turnos para un policonsultorio de traumatología
+# GOAT — gestión de turnos para un policonsultorio de traumatología
 
 Sistema de turnos y atención ambulatoria: pacientes, agenda de profesionales, turnos por prestación, registro de la atención, cobros e indicadores. Es un proyecto académico; el profesor actúa como cliente del centro y evalúa la demo funcional y la documentación.
 
@@ -37,7 +37,7 @@ Antes de dar por terminado un feature, arreglo o cambio de código, correr `npm 
 - Si falla lint o tipos: arreglar la causa. No silenciar con `eslint-disable`, `@ts-ignore`, `@ts-expect-error` ni `any` para que pase; si de verdad no hay otra salida, decirlo explícitamente en el resumen.
 - `typecheck` necesita el cliente de Prisma generado: tras clonar o cambiar `schema.prisma`, correr `npm run db:generate` primero.
 - Si `check` pasa en local pero falla en el CI, sospechar de estado viejo: `tsc` es incremental y reutiliza `tsconfig.tsbuildinfo`, y los tipos de Next viven en `.next/`. Para reproducir el CI, borrar `.next/`, `tsconfig.tsbuildinfo` y `next-env.d.ts` y volver a correr `check`.
-- `npm test` ejecuta las pruebas de disponibilidad de HU-09 y forma parte de `check`. `npm run test:appointments:db` verifica además la DAL, concurrencia y permisos en PostgreSQL local con datos temporales; requiere `.env` y la base migrada.
+- `npm test` ejecuta las pruebas unitarias (disponibilidad de HU-09, cobro de HU-21, etc.) y forma parte de `check`. `npm run test:appointments:db` verifica además la DAL, concurrencia y permisos en PostgreSQL local con datos temporales; requiere `.env` y la base migrada. `npm run test:payments:db` hace lo mismo para el cobro y la autorización (HU-21).
 - Al reportar el resultado, decir qué comandos se corrieron y cuál fue el resultado real; no afirmar que pasó sin haberlo corrido.
 
 ## Ramas y Pull Requests

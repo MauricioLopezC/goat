@@ -3,6 +3,8 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
 import { assertRole, type Actor } from "@/lib/dal/auth";
+import { assertNoActivePayment } from "@/lib/dal/payments";
+import { serializableTransaction } from "@/lib/dal/transactions";
 import {
   AppointmentEventType,
   AppointmentStatus,
@@ -18,6 +20,7 @@ import {
 import {
   dateFromDb,
   dateToDb,
+  getMonthRange,
   getWeekDays,
   parseTime,
   toLocalSlot,
@@ -32,6 +35,7 @@ import {
   cancelAppointmentSchema,
   createAppointmentSchema,
   professionalAgendaSchema,
+  rescheduleAppointmentSchema,
   type AppointmentStatusChangeInput,
   type AvailableSlotsInput,
   type CalendarAppointmentsInput,
@@ -39,6 +43,7 @@ import {
   type CancelAppointmentInput,
   type CreateAppointmentInput,
   type ProfessionalAgendaInput,
+  type RescheduleAppointmentInput,
 } from "@/lib/validation/appointments";
 
 const occupiedStatuses = [
@@ -74,6 +79,12 @@ const appointmentDetailSelect = {
       requestedBy: true,
       createdAt: true,
       user: { select: personSelect },
+      previousStartsAt: true,
+      previousEndsAt: true,
+      previousProfessional: { select: personSelect },
+      newStartsAt: true,
+      newEndsAt: true,
+      newProfessional: { select: personSelect },
     },
     orderBy: { createdAt: "desc" as const },
     take: 5,
@@ -145,7 +156,8 @@ export async function getAppointmentOptions(
     patientId
       ? prisma.patient.findFirst({
           where: { id: patientId, active: true },
-          select: patientSelect,
+          // La cobertura decide el aviso de la orden médica (HU-21).
+          select: { ...patientSelect, coverageType: true },
         })
       : null,
     prisma.service.findMany({
@@ -154,6 +166,7 @@ export async function getAppointmentOptions(
         id: true,
         name: true,
         durationMinutes: true,
+        requiresReferral: true,
         specialty: { select: { id: true, name: true } },
       },
       orderBy: { name: "asc" },
@@ -189,7 +202,7 @@ export async function getAppointmentOptions(
 export async function listAvailableDates(
   input: Pick<
     AvailableSlotsInput,
-    "patientId" | "serviceId" | "professionalId"
+    "patientId" | "serviceId" | "professionalId" | "excludeAppointmentId"
   >,
   actor: Actor,
 ) {
@@ -200,7 +213,8 @@ export async function listAvailableDates(
       "VALIDATION",
       "Revisá los datos para consultar disponibilidad.",
     );
-  const { patientId, serviceId, professionalId } = parsed.data;
+  const { patientId, serviceId, professionalId, excludeAppointmentId } =
+    parsed.data;
   const now = new Date();
   const bounds = appointmentDateBounds(now);
   const rangeEnd = appointmentInstant(bounds.max, 1440);
@@ -261,6 +275,9 @@ export async function listAvailableDates(
             startsAt: { lt: rangeEnd },
             endsAt: { gt: rangeStart },
             OR: [{ professionalId }, { patientId }],
+            ...(excludeAppointmentId
+              ? { id: { not: excludeAppointmentId } }
+              : {}),
           },
           select: { startsAt: true, endsAt: true },
         }),
@@ -366,6 +383,9 @@ async function loadAvailability(
           { professionalId: input.professionalId },
           { patientId: input.patientId },
         ],
+        ...(input.excludeAppointmentId
+          ? { id: { not: input.excludeAppointmentId } }
+          : {}),
       },
       select: {
         patientId: true,
@@ -676,47 +696,45 @@ export async function cancelProfessionalAppointment(
   actor: Actor,
 ) {
   assertRole(actor, Role.MANAGER);
-  return prisma.$transaction(
-    async (tx) => {
-      const appointment = await tx.appointment.findUnique({
-        where: { id: input.appointmentId },
-        select: {
-          id: true,
-          professionalId: true,
-          status: true,
-          startsAt: true,
-        },
-      });
-      if (!appointment || appointment.professionalId !== input.professionalId)
-        throw new DomainError(
-          "NOT_FOUND",
-          "El turno no existe en la ficha de este profesional.",
-        );
-      if (
-        appointment.status !== AppointmentStatus.SCHEDULED ||
-        appointment.startsAt <= new Date()
-      )
-        throw new DomainError(
-          "INVALID_STATUS_TRANSITION",
-          "Solo se puede cancelar un turno programado que aún no comenzó.",
-        );
-      await tx.appointment.update({
-        where: { id: appointment.id },
-        data: { status: AppointmentStatus.CANCELLED },
-      });
-      await tx.appointmentEvent.create({
-        data: {
-          appointmentId: appointment.id,
-          type: AppointmentEventType.CANCELLED,
-          reason: input.reason,
-          requestedBy: input.requestedBy,
-          userId: actor.id,
-        },
-      });
-      return { id: appointment.id };
-    },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-  );
+  return serializableTransaction(async (tx) => {
+    const appointment = await tx.appointment.findUnique({
+      where: { id: input.appointmentId },
+      select: {
+        id: true,
+        professionalId: true,
+        status: true,
+        startsAt: true,
+      },
+    });
+    if (!appointment || appointment.professionalId !== input.professionalId)
+      throw new DomainError(
+        "NOT_FOUND",
+        "El turno no existe en la ficha de este profesional.",
+      );
+    if (
+      appointment.status !== AppointmentStatus.SCHEDULED ||
+      appointment.startsAt <= new Date()
+    )
+      throw new DomainError(
+        "INVALID_STATUS_TRANSITION",
+        "Solo se puede cancelar un turno programado que aún no comenzó.",
+      );
+    await assertNoActivePayment(tx, appointment.id, "cancelarlo");
+    await tx.appointment.update({
+      where: { id: appointment.id },
+      data: { status: AppointmentStatus.CANCELLED },
+    });
+    await tx.appointmentEvent.create({
+      data: {
+        appointmentId: appointment.id,
+        type: AppointmentEventType.CANCELLED,
+        reason: input.reason,
+        requestedBy: input.requestedBy,
+        userId: actor.id,
+      },
+    });
+    return { id: appointment.id };
+  });
 }
 
 export async function getProfessionalAgenda(
@@ -799,18 +817,20 @@ export async function getProfessionalAgenda(
 
   const selectedDate = date ?? toLocalSlot(new Date()).date;
   const week = getWeekDays(selectedDate);
+  const month = getMonthRange(selectedDate);
 
-  const rangeStart =
-    view === "week"
-      ? appointmentInstant(week.monday, 0)
-      : appointmentInstant(selectedDate, 0);
-  const rangeEnd =
-    view === "week"
-      ? appointmentInstant(week.sunday, 1440)
-      : appointmentInstant(selectedDate, 1440);
+  let fromDateStr = selectedDate;
+  let toDateStr = selectedDate;
+  if (view === "week") {
+    fromDateStr = week.monday;
+    toDateStr = week.sunday;
+  } else if (view === "month") {
+    fromDateStr = month.from;
+    toDateStr = month.to;
+  }
 
-  const fromDateStr = view === "week" ? week.monday : selectedDate;
-  const toDateStr = view === "week" ? week.sunday : selectedDate;
+  const rangeStart = appointmentInstant(fromDateStr, 0);
+  const rangeEnd = appointmentInstant(toDateStr, 1440);
 
   const [appointments, holidays, exceptions] = await Promise.all([
     prisma.appointment.findMany({
@@ -908,6 +928,7 @@ export async function getProfessionalAgenda(
     view,
     hideCancelled,
     week,
+    month,
     windows: professional.availabilityWindows,
     appointments: displayedAppointments,
     summary,
@@ -941,36 +962,197 @@ export async function cancelAppointment(
       "El motivo de cancelación es obligatorio.",
     );
   }
-  return prisma.$transaction(
-    async (tx) => {
-      const appointment = await tx.appointment.findUnique({
-        where: { id: data.appointmentId },
-        select: { id: true, status: true },
-      });
-      if (!appointment)
-        throw new DomainError("NOT_FOUND", "El turno no existe.");
-      if (appointment.status !== AppointmentStatus.SCHEDULED)
-        throw new DomainError(
-          "INVALID_STATUS_TRANSITION",
-          "Solo se puede cancelar un turno en estado Programado.",
-        );
-      await tx.appointment.update({
-        where: { id: appointment.id },
-        data: { status: AppointmentStatus.CANCELLED },
-      });
-      await tx.appointmentEvent.create({
-        data: {
-          appointmentId: appointment.id,
-          type: AppointmentEventType.CANCELLED,
-          reason: data.reason,
-          requestedBy: data.requestedBy,
-          userId: actor.id,
+  return serializableTransaction(async (tx) => {
+    const appointment = await tx.appointment.findUnique({
+      where: { id: data.appointmentId },
+      select: { id: true, status: true },
+    });
+    if (!appointment) throw new DomainError("NOT_FOUND", "El turno no existe.");
+    if (appointment.status !== AppointmentStatus.SCHEDULED)
+      throw new DomainError(
+        "INVALID_STATUS_TRANSITION",
+        "Solo se puede cancelar un turno en estado Programado.",
+      );
+    await assertNoActivePayment(tx, appointment.id, "cancelarlo");
+    await tx.appointment.update({
+      where: { id: appointment.id },
+      data: { status: AppointmentStatus.CANCELLED },
+    });
+    await tx.appointmentEvent.create({
+      data: {
+        appointmentId: appointment.id,
+        type: AppointmentEventType.CANCELLED,
+        reason: data.reason,
+        requestedBy: data.requestedBy,
+        userId: actor.id,
+      },
+    });
+    return { id: appointment.id };
+  });
+}
+
+export async function rescheduleAppointment(
+  input: RescheduleAppointmentInput,
+  actor: Actor,
+) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  const parsed = rescheduleAppointmentSchema.safeParse(input);
+  if (!parsed.success)
+    throw new DomainError("VALIDATION", "Revisá los datos ingresados.");
+  const data = parsed.data;
+  if (!data.reason || data.reason.trim().length === 0) {
+    throw new DomainError(
+      "REASON_REQUIRED",
+      "El motivo de reprogramación es obligatorio.",
+    );
+  }
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          const now = new Date();
+          const appointment = await tx.appointment.findUnique({
+            where: { id: data.appointmentId },
+            select: {
+              id: true,
+              patientId: true,
+              serviceId: true,
+              professionalId: true,
+              startsAt: true,
+              endsAt: true,
+              status: true,
+            },
+          });
+          if (!appointment)
+            throw new DomainError("NOT_FOUND", "El turno no existe.");
+          if (appointment.status !== AppointmentStatus.SCHEDULED)
+            throw new DomainError(
+              "INVALID_STATUS_TRANSITION",
+              "Solo se puede reprogramar un turno en estado Programado.",
+            );
+          if (appointment.startsAt <= now)
+            throw new DomainError(
+              "INVALID_STATUS_TRANSITION",
+              "Solo se puede reprogramar un turno programado que aún no comenzó.",
+            );
+
+          const targetProfessionalId =
+            data.newProfessionalId ?? appointment.professionalId;
+
+          const availability = await loadAvailability(
+            tx,
+            {
+              patientId: appointment.patientId,
+              serviceId: appointment.serviceId,
+              professionalId: targetProfessionalId,
+              date: data.date,
+              excludeAppointmentId: appointment.id,
+            },
+            actor,
+            now,
+          );
+
+          const startsAt = appointmentInstant(
+            data.date,
+            parseTime(data.startTime),
+          );
+          const endsAt = new Date(
+            startsAt.getTime() + availability.durationMinutes * 60_000,
+          );
+
+          if (startsAt <= now)
+            throw new DomainError(
+              "VALIDATION",
+              "No se puede asignar un turno en el pasado.",
+            );
+
+          const overlaps = availability.appointments.filter((a) =>
+            rangesOverlap(
+              startsAt.getTime(),
+              endsAt.getTime(),
+              a.startsAt.getTime(),
+              a.endsAt.getTime(),
+            ),
+          );
+          if (overlaps.some((a) => a.professionalId === targetProfessionalId))
+            throw overlapError();
+          if (overlaps.some((a) => a.patientId === appointment.patientId))
+            throw overlapError(true);
+
+          if (
+            !calculateAvailableSlots(availability).some(
+              (slot) => slot.startTime === data.startTime,
+            )
+          )
+            throw new DomainError(
+              "OUTSIDE_AVAILABILITY_WINDOW",
+              "El horario no está disponible dentro de las franjas habilitadas. Actualizamos la grilla.",
+            );
+
+          if (startsAt <= new Date())
+            throw new DomainError(
+              "VALIDATION",
+              "El horario elegido ya pasó. Elegí otro.",
+            );
+
+          if (
+            targetProfessionalId === appointment.professionalId &&
+            startsAt.getTime() === appointment.startsAt.getTime()
+          ) {
+            throw new DomainError(
+              "VALIDATION",
+              "El nuevo horario o profesional debe ser diferente al actual.",
+            );
+          }
+
+          await tx.appointment.update({
+            where: { id: appointment.id },
+            data: {
+              professionalId: targetProfessionalId,
+              startsAt,
+              endsAt,
+            },
+          });
+
+          await tx.appointmentEvent.create({
+            data: {
+              appointmentId: appointment.id,
+              type: AppointmentEventType.RESCHEDULED,
+              reason: data.reason,
+              requestedBy: data.requestedBy,
+              previousStartsAt: appointment.startsAt,
+              previousEndsAt: appointment.endsAt,
+              previousProfessionalId: appointment.professionalId,
+              newStartsAt: startsAt,
+              newEndsAt: endsAt,
+              newProfessionalId: targetProfessionalId,
+              userId: actor.id,
+            },
+          });
+
+          return { id: appointment.id };
         },
-      });
-      return { id: appointment.id };
-    },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-  );
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.message.includes("Appointment_professional_no_overlap"))
+          throw overlapError();
+        if (error.message.includes("Appointment_patient_no_overlap"))
+          throw overlapError(true);
+        if (error.code === "P2034") {
+          if (attempt < 3) continue;
+          throw new DomainError(
+            "VALIDATION",
+            "La agenda cambió mientras confirmabas. Actualizamos los horarios; volvé a elegir.",
+          );
+        }
+      }
+      throw error;
+    }
+  }
+  throw new Error("Unreachable appointment retry state");
 }
 
 /// Completar o marcar Vencido un turno Programado (HU-11). La condición de
@@ -987,7 +1169,11 @@ async function closeAppointment(
     throw new DomainError("VALIDATION", "Revisá los datos ingresados.");
   const { appointmentId, reason } = parsed.data;
   const completing = target === AppointmentStatus.COMPLETED;
-  return prisma.$transaction(async (tx) => {
+  // Serializable: vencer compite con cobrar (HU-21); si los dos llegan a la
+  // vez, uno se reintenta y ve el estado del otro.
+  return serializableTransaction(async (tx) => {
+    if (!completing)
+      await assertNoActivePayment(tx, appointmentId, "marcarlo como vencido");
     const now = new Date();
     const { count } = await tx.appointment.updateMany({
       where: {

@@ -8,7 +8,7 @@ import { ListPagination } from "@/components/list-pagination";
 import { HolidaysManager } from "./holidays-manager";
 
 export const metadata: Metadata = {
-  title: "Feriados · Goat",
+  title: "Feriados · GOAT",
   description: "Feriados y días excepcionales en que el centro cierra (HU-14).",
 };
 

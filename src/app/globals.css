@@ -3,7 +3,7 @@
 @import "shadcn/tailwind.css";
 
 /*
- * Tema de Goat. Fuente de verdad del diseño: docs/DESIGN.md (mantener sincronizados).
+ * Tema de GOAT. Fuente de verdad del diseño: docs/DESIGN.md (mantener sincronizados).
  * Solo tema claro: `dark:` queda atado a la clase .dark, que no se usa.
  */
 @custom-variant dark (&:is(.dark *));

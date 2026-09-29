@@ -47,7 +47,7 @@ export async function generateMetadata({
 }: PatientDetailPageProps): Promise<Metadata> {
   const { id } = await params;
   return {
-    title: `Ficha de paciente #${id} · Goat`,
+    title: `Ficha de paciente #${id} · GOAT`,
   };
 }
 

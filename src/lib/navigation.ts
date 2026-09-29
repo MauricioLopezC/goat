@@ -7,6 +7,7 @@ import {
   Clock,
   CreditCard,
   Stethoscope,
+  Wallet,
   UserCog,
   Users,
   type LucideIcon,
@@ -43,6 +44,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/appointments/new",
         label: "Nuevo turno",
         icon: CalendarPlus,
+        roles: FRONT_DESK,
+      },
+      {
+        href: "/payments",
+        label: "Cobros del día",
+        icon: Wallet,
         roles: FRONT_DESK,
       },
       // Misma pantalla: el profesional ve la suya y el resto elige de quién

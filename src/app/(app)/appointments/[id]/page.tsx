@@ -3,6 +3,13 @@ import { patientHistoryHref } from "@/lib/patient-history";
 import { notFound } from "next/navigation";
 import { requirePageRole } from "@/lib/dal/auth";
 import { getAppointment } from "@/lib/dal/appointments";
+import { getAppointmentBilling } from "@/lib/dal/payments";
+import { listActivePaymentMethods } from "@/lib/dal/payment-methods";
+import {
+  PAYMENT_STATE_BADGE_CLASS,
+  PAYMENT_STATE_LABEL,
+  formatAmount,
+} from "@/lib/payments";
 import { DomainError } from "@/lib/actions";
 import {
   formatDate,
@@ -26,6 +33,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CancelAppointmentDialog } from "./cancel-dialog";
 import { StatusChangeDialog } from "./status-dialog";
+import { PaymentDialog } from "./payment-dialog";
+import { VoidPaymentDialog } from "./void-payment-dialog";
+import { AuthorizationDialog } from "./authorization-dialog";
 
 export default async function AppointmentPage({
   params,
@@ -38,7 +48,13 @@ export default async function AppointmentPage({
   );
   const { id } = await params;
   const query = await searchParams;
-  const { created, cancelled, changed } = query;
+  const {
+    created,
+    cancelled,
+    changed,
+    rescheduled,
+    billing: billingNotice,
+  } = query;
   let appointment;
   try {
     appointment = await getAppointment(Number(id), actor);
@@ -49,17 +65,38 @@ export default async function AppointmentPage({
   const start = toLocalSlot(appointment.startsAt);
   const end = toLocalSlot(appointment.endsAt);
   const own = actor.role === "PROFESSIONAL";
+  // El profesional no ve cobros ni autorizaciones (HU-21).
+  const billing = own
+    ? null
+    : await getAppointmentBilling(appointment.id, actor);
+  const canCharge =
+    billing?.chargeable === true &&
+    billing.state === "PENDING_PAYMENT" &&
+    billing.price !== null;
+  const canAuthorize =
+    billing?.chargeable === true &&
+    (billing.state === "PENDING_AUTHORIZATION" ||
+      billing.state === "AUTHORIZED");
+  const paymentMethods = canCharge ? await listActivePaymentMethods(actor) : [];
+  // Con cobro vigente no se cancela ni se vence: primero se anula (HU-21).
+  const paid = billing?.activePayment !== undefined;
   const scheduled = appointment.status === "SCHEDULED";
   const canChangeStatus = !own && scheduled;
   const now = new Date();
+  const canReschedule = canChangeStatus && appointment.startsAt > now;
   const canComplete = canChangeStatus && appointment.startsAt <= now;
-  const canExpire = canChangeStatus && appointment.endsAt <= now;
+  const canExpire = canChangeStatus && !paid && appointment.endsAt <= now;
 
   const summary = `${appointment.patient.lastName}, ${appointment.patient.firstName} · ${appointment.professional.lastName}, ${appointment.professional.firstName} · ${appointment.service.name} · ${formatDate(start.date)}, ${formatMinute(start.minute)}–${formatMinute(end.minute)}`;
   // Se vuelve al mismo calendario (vista, fecha y filtros) desde el que se
   // abrió el turno; sin parámetros, al día del turno.
   const calendarQuery = parseCalendarQuery(query, start.date);
   const returnSearch = calendarSearch(calendarQuery);
+  const billingHref = (notice: "paid" | "authorized") => {
+    const search = new URLSearchParams(returnSearch);
+    search.set("billing", notice);
+    return `/appointments/${appointment.id}?${search}`;
+  };
 
   return (
     <>
@@ -70,6 +107,17 @@ export default async function AppointmentPage({
           <AlertDescription className="text-success-soft-foreground">
             El horario quedó reservado y ya aparece en el calendario y en la
             agenda del profesional.
+          </AlertDescription>
+        </Alert>
+      )}
+      {rescheduled === "1" && !own && (
+        <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
+          <AlertTitle>Turno reprogramado exitosamente</AlertTitle>
+          <AlertDescription className="text-success-soft-foreground">
+            El nuevo horario es el {formatDate(start.date)}, de{" "}
+            {formatMinute(start.minute)} a {formatMinute(end.minute)} con{" "}
+            {appointment.professional.lastName},{" "}
+            {appointment.professional.firstName}.
           </AlertDescription>
         </Alert>
       )}
@@ -97,6 +145,33 @@ export default async function AppointmentPage({
           </AlertTitle>
           <AlertDescription className="text-success-soft-foreground">
             El cambio quedó registrado en el historial del turno.
+          </AlertDescription>
+        </Alert>
+      )}
+      {billingNotice === "paid" && billing?.activePayment && (
+        <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
+          <AlertTitle>
+            Cobro registrado: {formatAmount(billing.activePayment.amount)}
+          </AlertTitle>
+          <AlertDescription className="text-success-soft-foreground">
+            Se cobró con {billing.activePayment.paymentMethod}.
+          </AlertDescription>
+        </Alert>
+      )}
+      {billingNotice === "voided" && (
+        <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
+          <AlertTitle>Cobro anulado</AlertTitle>
+          <AlertDescription className="text-success-soft-foreground">
+            El cobro quedó registrado como anulado y el turno se puede volver a
+            cobrar.
+          </AlertDescription>
+        </Alert>
+      )}
+      {billingNotice === "authorized" && billing?.authorization && (
+        <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
+          <AlertTitle>Autorización registrada</AlertTitle>
+          <AlertDescription className="text-success-soft-foreground">
+            Número de autorización: {billing.authorization.number}.
           </AlertDescription>
         </Alert>
       )}
@@ -171,6 +246,156 @@ export default async function AppointmentPage({
           </dl>
         </CardContent>
       </Card>
+      {billing?.state && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex flex-wrap items-center gap-2">
+              {billing.state === "PENDING_PAYMENT" || billing.state === "PAID"
+                ? "Cobro"
+                : "Autorización de la obra social"}
+              <Badge
+                variant="outline"
+                className={PAYMENT_STATE_BADGE_CLASS[billing.state]}
+              >
+                {PAYMENT_STATE_LABEL[billing.state]}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {billing.activePayment && (
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt className="text-muted-foreground">Monto</dt>
+                  <dd className="tabular-nums">
+                    {formatAmount(billing.activePayment.amount)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Medio de pago</dt>
+                  <dd>{billing.activePayment.paymentMethod}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Cobrado por</dt>
+                  <dd>
+                    {billing.activePayment.createdBy.lastName},{" "}
+                    {billing.activePayment.createdBy.firstName} ·{" "}
+                    {formatInstant(billing.activePayment.createdAt)}
+                  </dd>
+                </div>
+              </dl>
+            )}
+            {billing.authorization && (
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt className="text-muted-foreground">
+                    Número de autorización
+                  </dt>
+                  <dd className="break-words">
+                    {billing.authorization.number}
+                  </dd>
+                </div>
+                {billing.authorization.by && billing.authorization.at && (
+                  <div>
+                    <dt className="text-muted-foreground">Registrada por</dt>
+                    <dd>
+                      {billing.authorization.by.lastName},{" "}
+                      {billing.authorization.by.firstName} ·{" "}
+                      {formatInstant(billing.authorization.at)}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            )}
+            {billing.state === "PENDING_PAYMENT" &&
+              (billing.price === null ? (
+                <Alert className="bg-warning-soft text-warning-soft-foreground border-warning-soft-border">
+                  <AlertTitle>El servicio no tiene valor cargado</AlertTitle>
+                  <AlertDescription className="text-warning-soft-foreground">
+                    No se puede cobrar hasta que el gerente cargue el valor de{" "}
+                    {appointment.service.name} en Servicios.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <p className="text-muted-foreground">
+                  Valor del servicio:{" "}
+                  <span className="text-foreground tabular-nums">
+                    {formatAmount(billing.price)}
+                  </span>
+                  {!billing.chargeable &&
+                    ". Se cobra el día del turno o cuando esté completado."}
+                </p>
+              ))}
+            {billing.state === "PENDING_AUTHORIZATION" &&
+              !billing.chargeable && (
+                <p className="text-muted-foreground">
+                  El servicio requiere orden médica. La autorización se registra
+                  el día del turno, cuando llega el paciente.
+                </p>
+              )}
+            {(canCharge || paid || canAuthorize) && (
+              <div className="flex flex-wrap gap-3">
+                {canCharge && billing.price !== null && (
+                  <PaymentDialog
+                    appointmentId={appointment.id}
+                    successHref={billingHref("paid")}
+                    summary={summary}
+                    price={billing.price}
+                    paymentMethods={paymentMethods}
+                  />
+                )}
+                {billing.activePayment && (
+                  <VoidPaymentDialog
+                    paymentId={billing.activePayment.id}
+                    appointmentId={appointment.id}
+                    returnSearch={returnSearch}
+                    description={`${formatAmount(billing.activePayment.amount)} con ${billing.activePayment.paymentMethod}`}
+                  />
+                )}
+                {canAuthorize && (
+                  <AuthorizationDialog
+                    appointmentId={appointment.id}
+                    successHref={billingHref("authorized")}
+                    summary={summary}
+                    currentNumber={billing.authorization?.number ?? null}
+                  />
+                )}
+              </div>
+            )}
+            {billing.voidedPayments.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="font-medium">Cobros anulados</p>
+                <ul className="flex flex-col gap-3">
+                  {billing.voidedPayments.map((payment) => (
+                    <li
+                      key={payment.id}
+                      className="flex flex-col gap-0.5 text-sm"
+                    >
+                      <p className="tabular-nums">
+                        {formatAmount(payment.amount)} · {payment.paymentMethod}{" "}
+                        · cobrado por {payment.createdBy.lastName},{" "}
+                        {payment.createdBy.firstName} ·{" "}
+                        {formatInstant(payment.createdAt)}
+                      </p>
+                      {payment.voidedBy && payment.voidedAt && (
+                        <p className="text-muted-foreground">
+                          Anulado por {payment.voidedBy.lastName},{" "}
+                          {payment.voidedBy.firstName} ·{" "}
+                          {formatInstant(payment.voidedAt)}
+                        </p>
+                      )}
+                      {payment.voidReason && (
+                        <p className="text-muted-foreground">
+                          Motivo: {payment.voidReason}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
       {appointment.events.length > 0 && (
         <Card>
           <CardHeader>
@@ -187,6 +412,34 @@ export default async function AppointmentPage({
                   <p className="text-muted-foreground">
                     Por: {event.user.lastName}, {event.user.firstName}
                   </p>
+                  {event.type === "RESCHEDULED" &&
+                    event.previousStartsAt &&
+                    event.newStartsAt && (
+                      <div className="text-muted-foreground flex flex-col gap-0.5">
+                        <p>
+                          Horario anterior:{" "}
+                          {formatDate(toLocalSlot(event.previousStartsAt).date)}
+                          ,{" "}
+                          {formatMinute(
+                            toLocalSlot(event.previousStartsAt).minute,
+                          )}
+                          –
+                          {formatMinute(
+                            toLocalSlot(event.previousEndsAt!).minute,
+                          )}
+                          {event.previousProfessional &&
+                            ` · ${event.previousProfessional.lastName}, ${event.previousProfessional.firstName}`}
+                        </p>
+                        <p>
+                          Nuevo horario:{" "}
+                          {formatDate(toLocalSlot(event.newStartsAt).date)},{" "}
+                          {formatMinute(toLocalSlot(event.newStartsAt).minute)}–
+                          {formatMinute(toLocalSlot(event.newEndsAt!).minute)}
+                          {event.newProfessional &&
+                            ` · ${event.newProfessional.lastName}, ${event.newProfessional.firstName}`}
+                        </p>
+                      </div>
+                    )}
                   {event.reason && (
                     <p className="text-muted-foreground">
                       Motivo: {event.reason}
@@ -230,6 +483,15 @@ export default async function AppointmentPage({
             <Link href="/appointments/new">Dar otro turno</Link>
           </Button>
         )}
+        {canReschedule && (
+          <Button asChild variant="outline">
+            <Link
+              href={`/appointments/${appointment.id}/reschedule${returnSearch ? `?${returnSearch}` : ""}`}
+            >
+              Reprogramar turno
+            </Link>
+          </Button>
+        )}
         {canComplete && (
           <StatusChangeDialog
             appointmentId={appointment.id}
@@ -246,7 +508,7 @@ export default async function AppointmentPage({
             returnSearch={returnSearch}
           />
         )}
-        {canChangeStatus && (
+        {canChangeStatus && !paid && (
           <CancelAppointmentDialog
             appointmentId={appointment.id}
             summary={summary}
@@ -254,7 +516,13 @@ export default async function AppointmentPage({
           />
         )}
       </div>
-      {canChangeStatus && !canExpire && (
+      {canChangeStatus && paid && (
+        <p className="text-muted-foreground">
+          El turno tiene un cobro registrado. Para cancelarlo o marcarlo como
+          vencido, primero anulá el cobro.
+        </p>
+      )}
+      {canChangeStatus && !paid && !canExpire && (
         <p className="text-muted-foreground">
           {canComplete
             ? "Podrás marcarlo como vencido cuando termine su horario."
