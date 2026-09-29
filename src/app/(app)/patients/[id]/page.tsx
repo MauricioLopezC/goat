@@ -97,7 +97,14 @@ export default async function PatientDetailPage({
     notFound();
   }
 
-  const historyQuery = parseHistoryQuery(await searchParams);
+  const parsedHistoryQuery = parseHistoryQuery(await searchParams);
+  // El profesional no filtra por profesional: la DAL ya limita el historial a
+  // sus turnos y rechaza el de otro, así que un `professionalId` en la URL se
+  // ignora en vez de mostrar un error.
+  const historyQuery =
+    actor.role === "PROFESSIONAL"
+      ? { ...parsedHistoryQuery, professionalId: undefined }
+      : parsedHistoryQuery;
   const history = await getPatientAppointmentHistory(
     { patientId, ...historyQuery },
     actor,
