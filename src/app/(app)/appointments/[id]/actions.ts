@@ -5,10 +5,12 @@ import {
   cancelAppointment as cancelInDal,
   completeAppointment as completeInDal,
   expireAppointment as expireInDal,
+  rescheduleAppointment as rescheduleInDal,
 } from "@/lib/dal/appointments";
 import {
   appointmentStatusChangeSchema,
   cancelAppointmentSchema,
+  rescheduleAppointmentSchema,
 } from "@/lib/validation/appointments";
 
 function revalidateAppointment(appointmentId: number) {
@@ -16,6 +18,16 @@ function revalidateAppointment(appointmentId: number) {
   revalidatePath("/agenda");
   revalidatePath(`/appointments/${appointmentId}`);
 }
+
+export const rescheduleAppointment = defineAction({
+  roles: ["RECEPTIONIST", "MANAGER"],
+  input: rescheduleAppointmentSchema,
+  handler: async (input, actor) => {
+    const result = await rescheduleInDal(input, actor);
+    revalidateAppointment(input.appointmentId);
+    return result;
+  },
+});
 
 export const cancelAppointment = defineAction({
   roles: ["RECEPTIONIST", "MANAGER"],

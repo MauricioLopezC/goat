@@ -106,4 +106,7 @@ test("canAccess replica los permisos de las páginas", () => {
   assert.equal(canAccess("/payment-methods", "PROFESSIONAL"), false);
   assert.equal(canAccess("/payment-methods", "RECEPTIONIST"), true);
   assert.equal(canAccess("/payment-methods", "MANAGER"), true);
+  assert.equal(canAccess("/appointments/4/reschedule", "PROFESSIONAL"), false);
+  assert.equal(canAccess("/appointments/4/reschedule", "RECEPTIONIST"), true);
+  assert.equal(canAccess("/appointments/4/reschedule", "MANAGER"), true);
 });

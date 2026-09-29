@@ -190,22 +190,22 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 ### `listAvailableDates`
 
-**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md).
+**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), [HU-16](hu/HU-16-reprogramar-turno.md).
 **Roles:** `RECEPTIONIST`, `MANAGER`.
-**Entrada:** `professionalId`, `serviceId`, `patientId`.
+**Entrada:** `professionalId`, `serviceId`, `patientId`, `excludeAppointmentId?` (ID del turno que se reprograma, opcional).
 **Precondiciones:** entidades activas y relacionadas.
-**Efectos:** ninguno. Calcula en una lectura consistente las fechas con al menos un bloque libre entre hoy y dos meses, aplicando las mismas reglas de `listAvailableSlots` para el servicio y el paciente elegidos.
+**Efectos:** ninguno. Calcula en una lectura consistente las fechas con al menos un bloque libre entre hoy y dos meses, aplicando las mismas reglas de `listAvailableSlots` para el servicio y el paciente elegidos. Si se pasa `excludeAppointmentId`, no cuenta ese turno como ocupado.
 **Errores:** `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`.
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** fechas disponibles `AAAA-MM-DD[]` en orden ascendente.
 
 ### `listAvailableSlots`
 
-**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md).
+**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), [HU-16](hu/HU-16-reprogramar-turno.md).
 **Roles:** `RECEPTIONIST`, `MANAGER`.
-**Entrada:** `professionalId`, `serviceId`, `patientId`, `date`.
+**Entrada:** `professionalId`, `serviceId`, `patientId`, `date`, `excludeAppointmentId?` (ID del turno que se reprograma, opcional).
 **Precondiciones:** entidades activas y relacionadas, fecha válida en el horizonte permitido.
-**Efectos:** ninguno. Calcula bloques según duración del servicio desde el inicio de cada franja; descarta pasado, feriados, ausencias y ambos solapamientos.
+**Efectos:** ninguno. Calcula bloques según duración del servicio desde el inicio de cada franja; descarta pasado, feriados, ausencias y ambos solapamientos. Si se pasa `excludeAppointmentId`, no cuenta ese turno como ocupado para permitir moverlo dentro del mismo día.
 **Errores:** `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`.
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** `{ startTime, endTime }[]` en hora del centro.
@@ -273,6 +273,17 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya terminó (`endsAt` no es posterior a ahora). La restricción de exclusión no cubre `EXPIRED`: vencer un turno futuro liberaría su horario, por eso la DAL lo impide.
 **Efectos:** en una transacción, actualiza `Appointment.status` a `EXPIRED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya terminado, y crea un `AppointmentEvent` de tipo `EXPIRED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Igual que al completar, un cambio concurrente no se pisa.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no terminó).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
+**Devuelve:** `{ id }`.
+
+### `rescheduleAppointment`
+
+**Historia de usuario:** [HU-16 — Reprogramar un turno](hu/HU-16-reprogramar-turno.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `appointmentId` (entero positivo), `newProfessionalId?` (entero positivo, opcional), `date` (AAAA-MM-DD), `startTime` (HH:MM), `reason` (1–500 caracteres, obligatorio), `requestedBy` (1–100 caracteres, obligatorio).
+**Precondiciones:** el turno existe, está en estado `SCHEDULED` y todavía no comenzó (`startsAt` posterior a ahora). El profesional elegido (el actual o el nuevo) está activo y habilitado para el servicio del turno. La fecha y hora cumplen las reglas de [HU-09](hu/HU-09-asignar-turno.md) (dentro de una franja habilitada, sin feriados ni ausencias, no pasada y dentro de los dos meses). El nuevo horario no se superpone con otros turnos del profesional ni del paciente (el horario ocupado por el mismo turno no cuenta como ocupado). Al menos la fecha, la hora o el profesional deben diferir del turno actual.
+**Efectos:** transacción `Serializable` que actualiza `Appointment` (`startsAt`, `endsAt`, `professionalId`) y crea un `AppointmentEvent` de tipo `RESCHEDULED` con `previousStartsAt`, `previousEndsAt`, `previousProfessionalId`, `newStartsAt`, `newEndsAt`, `newProfessionalId`, `reason`, `requestedBy`, `userId` (actor) y `createdAt` (ahora). El turno conserva su ID, autor original y fecha de creación. El horario anterior queda libre y el nuevo ocupado. Se reintenta ante conflictos de serialización. Restricciones de exclusión de PostgreSQL respaldan la no superposición concurrente.
+**Errores:** `VALIDATION` (datos inválidos o fecha/hora/profesional idéntico al actual), `FORBIDDEN`, `NOT_FOUND` (turno o profesional no encontrado), `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o ya comenzó), `REASON_REQUIRED` (motivo vacío), `OUTSIDE_AVAILABILITY_WINDOW`, `APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`.
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
 **Devuelve:** `{ id }`.
 

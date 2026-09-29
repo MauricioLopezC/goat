@@ -32,6 +32,7 @@ import {
   cancelAppointmentSchema,
   createAppointmentSchema,
   professionalAgendaSchema,
+  rescheduleAppointmentSchema,
   type AppointmentStatusChangeInput,
   type AvailableSlotsInput,
   type CalendarAppointmentsInput,
@@ -39,6 +40,7 @@ import {
   type CancelAppointmentInput,
   type CreateAppointmentInput,
   type ProfessionalAgendaInput,
+  type RescheduleAppointmentInput,
 } from "@/lib/validation/appointments";
 
 const occupiedStatuses = [
@@ -74,6 +76,12 @@ const appointmentDetailSelect = {
       requestedBy: true,
       createdAt: true,
       user: { select: personSelect },
+      previousStartsAt: true,
+      previousEndsAt: true,
+      previousProfessional: { select: personSelect },
+      newStartsAt: true,
+      newEndsAt: true,
+      newProfessional: { select: personSelect },
     },
     orderBy: { createdAt: "desc" as const },
     take: 5,
@@ -189,7 +197,7 @@ export async function getAppointmentOptions(
 export async function listAvailableDates(
   input: Pick<
     AvailableSlotsInput,
-    "patientId" | "serviceId" | "professionalId"
+    "patientId" | "serviceId" | "professionalId" | "excludeAppointmentId"
   >,
   actor: Actor,
 ) {
@@ -200,7 +208,8 @@ export async function listAvailableDates(
       "VALIDATION",
       "Revisá los datos para consultar disponibilidad.",
     );
-  const { patientId, serviceId, professionalId } = parsed.data;
+  const { patientId, serviceId, professionalId, excludeAppointmentId } =
+    parsed.data;
   const now = new Date();
   const bounds = appointmentDateBounds(now);
   const rangeEnd = appointmentInstant(bounds.max, 1440);
@@ -261,6 +270,9 @@ export async function listAvailableDates(
             startsAt: { lt: rangeEnd },
             endsAt: { gt: rangeStart },
             OR: [{ professionalId }, { patientId }],
+            ...(excludeAppointmentId
+              ? { id: { not: excludeAppointmentId } }
+              : {}),
           },
           select: { startsAt: true, endsAt: true },
         }),
@@ -366,6 +378,9 @@ async function loadAvailability(
           { professionalId: input.professionalId },
           { patientId: input.patientId },
         ],
+        ...(input.excludeAppointmentId
+          ? { id: { not: input.excludeAppointmentId } }
+          : {}),
       },
       select: {
         patientId: true,
@@ -971,6 +986,170 @@ export async function cancelAppointment(
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
   );
+}
+
+export async function rescheduleAppointment(
+  input: RescheduleAppointmentInput,
+  actor: Actor,
+) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  const parsed = rescheduleAppointmentSchema.safeParse(input);
+  if (!parsed.success)
+    throw new DomainError("VALIDATION", "Revisá los datos ingresados.");
+  const data = parsed.data;
+  if (!data.reason || data.reason.trim().length === 0) {
+    throw new DomainError(
+      "REASON_REQUIRED",
+      "El motivo de reprogramación es obligatorio.",
+    );
+  }
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          const now = new Date();
+          const appointment = await tx.appointment.findUnique({
+            where: { id: data.appointmentId },
+            select: {
+              id: true,
+              patientId: true,
+              serviceId: true,
+              professionalId: true,
+              startsAt: true,
+              endsAt: true,
+              status: true,
+            },
+          });
+          if (!appointment)
+            throw new DomainError("NOT_FOUND", "El turno no existe.");
+          if (appointment.status !== AppointmentStatus.SCHEDULED)
+            throw new DomainError(
+              "INVALID_STATUS_TRANSITION",
+              "Solo se puede reprogramar un turno en estado Programado.",
+            );
+          if (appointment.startsAt <= now)
+            throw new DomainError(
+              "INVALID_STATUS_TRANSITION",
+              "Solo se puede reprogramar un turno programado que aún no comenzó.",
+            );
+
+          const targetProfessionalId =
+            data.newProfessionalId ?? appointment.professionalId;
+
+          const availability = await loadAvailability(
+            tx,
+            {
+              patientId: appointment.patientId,
+              serviceId: appointment.serviceId,
+              professionalId: targetProfessionalId,
+              date: data.date,
+              excludeAppointmentId: appointment.id,
+            },
+            actor,
+            now,
+          );
+
+          const startsAt = appointmentInstant(
+            data.date,
+            parseTime(data.startTime),
+          );
+          const endsAt = new Date(
+            startsAt.getTime() + availability.durationMinutes * 60_000,
+          );
+
+          if (startsAt <= now)
+            throw new DomainError(
+              "VALIDATION",
+              "No se puede asignar un turno en el pasado.",
+            );
+
+          const overlaps = availability.appointments.filter((a) =>
+            rangesOverlap(
+              startsAt.getTime(),
+              endsAt.getTime(),
+              a.startsAt.getTime(),
+              a.endsAt.getTime(),
+            ),
+          );
+          if (overlaps.some((a) => a.professionalId === targetProfessionalId))
+            throw overlapError();
+          if (overlaps.some((a) => a.patientId === appointment.patientId))
+            throw overlapError(true);
+
+          if (
+            !calculateAvailableSlots(availability).some(
+              (slot) => slot.startTime === data.startTime,
+            )
+          )
+            throw new DomainError(
+              "OUTSIDE_AVAILABILITY_WINDOW",
+              "El horario no está disponible dentro de las franjas habilitadas. Actualizamos la grilla.",
+            );
+
+          if (startsAt <= new Date())
+            throw new DomainError(
+              "VALIDATION",
+              "El horario elegido ya pasó. Elegí otro.",
+            );
+
+          if (
+            targetProfessionalId === appointment.professionalId &&
+            startsAt.getTime() === appointment.startsAt.getTime()
+          ) {
+            throw new DomainError(
+              "VALIDATION",
+              "El nuevo horario o profesional debe ser diferente al actual.",
+            );
+          }
+
+          await tx.appointment.update({
+            where: { id: appointment.id },
+            data: {
+              professionalId: targetProfessionalId,
+              startsAt,
+              endsAt,
+            },
+          });
+
+          await tx.appointmentEvent.create({
+            data: {
+              appointmentId: appointment.id,
+              type: AppointmentEventType.RESCHEDULED,
+              reason: data.reason,
+              requestedBy: data.requestedBy,
+              previousStartsAt: appointment.startsAt,
+              previousEndsAt: appointment.endsAt,
+              previousProfessionalId: appointment.professionalId,
+              newStartsAt: startsAt,
+              newEndsAt: endsAt,
+              newProfessionalId: targetProfessionalId,
+              userId: actor.id,
+            },
+          });
+
+          return { id: appointment.id };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.message.includes("Appointment_professional_no_overlap"))
+          throw overlapError();
+        if (error.message.includes("Appointment_patient_no_overlap"))
+          throw overlapError(true);
+        if (error.code === "P2034") {
+          if (attempt < 3) continue;
+          throw new DomainError(
+            "VALIDATION",
+            "La agenda cambió mientras confirmabas. Actualizamos los horarios; volvé a elegir.",
+          );
+        }
+      }
+      throw error;
+    }
+  }
+  throw new Error("Unreachable appointment retry state");
 }
 
 /// Completar o marcar Vencido un turno Programado (HU-11). La condición de
