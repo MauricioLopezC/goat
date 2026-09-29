@@ -18,6 +18,7 @@ import {
   listAvailabilityWindows,
 } from "@/lib/dal/appointments";
 import { listActiveServices, listProfessionals } from "@/lib/dal/professionals";
+import { getPaymentStates } from "@/lib/dal/payments";
 import {
   calendarHref,
   calendarRange,
@@ -105,6 +106,12 @@ export default async function CalendarPage({
         throw error;
     }
   }
+
+  // Marca de cobro o autorización de los turnos de hoy y completados (HU-21).
+  const paymentStates = await getPaymentStates(
+    [...appointments, ...(agenda?.appointments ?? [])].map((a) => a.id),
+    actor,
+  );
 
   const days = Array.from({ length: query.view === "week" ? 7 : 1 }, (_, i) =>
     buildCalendarDay(addDays(range.from, i), availability, appointments, now),
@@ -260,12 +267,17 @@ export default async function CalendarPage({
             {agenda.professional.firstName}. Para dar un turno desde un bloque
             libre, abrí la vista día.
           </p>
-          <WeeklyAgendaGrid data={agenda} />
+          <WeeklyAgendaGrid data={agenda} paymentStates={paymentStates} />
         </>
       ) : isWeek ? (
-        <WeekView days={days} query={query} today={today} />
+        <WeekView
+          days={days}
+          query={query}
+          today={today}
+          paymentStates={paymentStates}
+        />
       ) : (
-        <DayView day={days[0]} query={query} />
+        <DayView day={days[0]} query={query} paymentStates={paymentStates} />
       )}
     </div>
   );
