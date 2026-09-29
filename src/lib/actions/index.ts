@@ -22,7 +22,8 @@ export type ErrorCode =
   | "REASON_REQUIRED"
   | "FUTURE_APPOINTMENTS"
   | "UNMET_DEPENDENCY"
-  | "DUPLICATE_PATIENT";
+  | "DUPLICATE_PATIENT"
+  | "LAST_ACTIVE_PAYMENT_METHOD";
 
 export type ActionError = {
   code: ErrorCode;

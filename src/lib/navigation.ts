@@ -5,6 +5,7 @@ import {
   CalendarPlus,
   ClipboardList,
   Clock,
+  CreditCard,
   Stethoscope,
   UserCog,
   Users,
@@ -86,6 +87,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Servicios",
         icon: ClipboardList,
         roles: STAFF,
+      },
+      {
+        href: "/payment-methods",
+        label: "Medios de pago",
+        icon: CreditCard,
+        roles: FRONT_DESK,
       },
       {
         href: "/holidays",

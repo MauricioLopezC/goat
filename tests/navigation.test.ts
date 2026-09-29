@@ -33,6 +33,7 @@ test("cada rol ve exactamente sus links", () => {
     "Pacientes",
     "Profesionales",
     "Servicios",
+    "Medios de pago",
     "Feriados",
   ]);
   assert.deepEqual(labels("PROFESSIONAL"), [
@@ -49,6 +50,7 @@ test("cada rol ve exactamente sus links", () => {
     "Pacientes",
     "Profesionales",
     "Servicios",
+    "Medios de pago",
     "Feriados",
     "Usuarios",
   ]);
@@ -101,4 +103,7 @@ test("canAccess replica los permisos de las páginas", () => {
   assert.equal(canAccess("/my-schedule", "MANAGER"), false);
   assert.equal(canAccess("/users", "RECEPTIONIST"), false);
   assert.equal(canAccess("/calendar", "PROFESSIONAL"), false);
+  assert.equal(canAccess("/payment-methods", "PROFESSIONAL"), false);
+  assert.equal(canAccess("/payment-methods", "RECEPTIONIST"), true);
+  assert.equal(canAccess("/payment-methods", "MANAGER"), true);
 });

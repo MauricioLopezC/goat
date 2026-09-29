@@ -119,7 +119,7 @@ export function ServiceCombobox({
       onInputValueChange={handleInputValueChange}
       open={open}
       onOpenChange={handleOpenChange}
-      itemToStringLabel={(val) => {
+      itemToStringLabel={(val: number | null) => {
         if (allowAll && val === 0) return allLabel;
         return services.find((s) => s.id === val)?.name ?? "";
       }}

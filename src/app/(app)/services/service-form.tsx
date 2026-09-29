@@ -32,6 +32,7 @@ export interface EditingService {
   requiresReferral: boolean;
   description: string | null;
   specialtyId: number | null;
+  price: string | null;
 }
 
 interface ServiceFormProps {
@@ -107,6 +108,7 @@ export function ServiceForm({
   const defaultSpecialty =
     values?.specialtyId ??
     (editingService?.specialtyId ? String(editingService.specialtyId) : "none");
+  const defaultPrice = values?.price ?? editingService?.price ?? "";
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
@@ -199,6 +201,34 @@ export function ServiceForm({
             id="durationMinutes-error"
             errors={fields?.durationMinutes}
           />
+        </div>
+
+        {/* Valor de la prestación */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="price">Valor de la prestación</Label>
+            <span className="text-label-sm text-muted-foreground">
+              En pesos · opcional
+            </span>
+          </div>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-body-sm pointer-events-none">
+              $
+            </span>
+            <Input
+              id="price"
+              name="price"
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue={defaultPrice}
+              placeholder="0.00"
+              className="pl-7"
+              aria-invalid={Boolean(fields?.price)}
+              aria-describedby={fields?.price ? "price-error" : undefined}
+            />
+          </div>
+          <FieldError id="price-error" errors={fields?.price} />
         </div>
 
         {/* Requiere derivación u orden médica */}
