@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { patientHistoryHref } from "@/lib/patient-history";
 import { Calendar, Clock, FileText, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -438,8 +439,10 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                     </p>
                   </div>
                   <Button asChild variant="ghost" size="sm">
-                    <Link href={`/patients/${selectedAppointment.patient.id}`}>
-                      Ver paciente
+                    <Link
+                      href={patientHistoryHref(selectedAppointment.patient.id)}
+                    >
+                      Historial del paciente
                     </Link>
                   </Button>
                 </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { patientHistoryHref } from "@/lib/patient-history";
 import { notFound } from "next/navigation";
 import { requirePageRole } from "@/lib/dal/auth";
 import { getAppointment } from "@/lib/dal/appointments";
@@ -10,6 +11,7 @@ import {
   toLocalSlot,
 } from "@/lib/schedule";
 import {
+  APPOINTMENT_EVENT_LABEL,
   APPOINTMENT_STATUS_BADGE_CLASS,
   APPOINTMENT_STATUS_LABEL,
 } from "@/lib/appointment-status";
@@ -24,16 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CancelAppointmentDialog } from "./cancel-dialog";
 import { StatusChangeDialog } from "./status-dialog";
-import type { AppointmentEventType } from "@/generated/prisma/enums";
-
-const EVENT_TYPE_LABEL: Record<AppointmentEventType, string> = {
-  UPDATED: "Modificado",
-  CANCELLED: "Cancelado",
-  COMPLETED: "Completado",
-  EXPIRED: "Vencido",
-  RESCHEDULED: "Reprogramado",
-  PRIORITY_CHANGED: "Prioridad cambiada",
-};
 
 export default async function AppointmentPage({
   params,
@@ -189,7 +181,7 @@ export default async function AppointmentPage({
               {appointment.events.map((event) => (
                 <li key={event.id} className="flex flex-col gap-0.5 text-sm">
                   <p className="font-medium">
-                    {EVENT_TYPE_LABEL[event.type]} ·{" "}
+                    {APPOINTMENT_EVENT_LABEL[event.type]} ·{" "}
                     {formatInstant(event.createdAt)}
                   </p>
                   <p className="text-muted-foreground">
@@ -226,6 +218,11 @@ export default async function AppointmentPage({
             }
           >
             {own ? "Volver a mi agenda" : "Volver al calendario"}
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href={patientHistoryHref(appointment.patient.id)}>
+            Historial del paciente
           </Link>
         </Button>
         {!own && (

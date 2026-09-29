@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { patientHistoryHref } from "@/lib/patient-history";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -301,8 +302,8 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                         </Link>
                       </Button>
                       <Button asChild variant="ghost" size="sm">
-                        <Link href={`/patients/${appointment.patient.id}`}>
-                          Ver paciente
+                        <Link href={patientHistoryHref(appointment.patient.id)}>
+                          Historial del paciente
                         </Link>
                       </Button>
                     </div>
