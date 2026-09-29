@@ -7,14 +7,25 @@ import {
   expireAppointment as expireInDal,
 } from "@/lib/dal/appointments";
 import {
+  registerAuthorization as registerAuthorizationInDal,
+  registerPayment as registerPaymentInDal,
+  voidPayment as voidPaymentInDal,
+} from "@/lib/dal/payments";
+import {
   appointmentStatusChangeSchema,
   cancelAppointmentSchema,
 } from "@/lib/validation/appointments";
+import {
+  registerAuthorizationSchema,
+  registerPaymentSchema,
+  voidPaymentSchema,
+} from "@/lib/validation/payments";
 
 function revalidateAppointment(appointmentId: number) {
   revalidatePath("/calendar");
   revalidatePath("/agenda");
   revalidatePath(`/appointments/${appointmentId}`);
+  revalidatePath("/payments");
 }
 
 export const cancelAppointment = defineAction({
@@ -42,6 +53,36 @@ export const expireAppointment = defineAction({
   input: appointmentStatusChangeSchema,
   handler: async (input, actor) => {
     const result = await expireInDal(input, actor);
+    revalidateAppointment(input.appointmentId);
+    return result;
+  },
+});
+
+export const registerPayment = defineAction({
+  roles: ["RECEPTIONIST", "MANAGER"],
+  input: registerPaymentSchema,
+  handler: async (input, actor) => {
+    const result = await registerPaymentInDal(input, actor);
+    revalidateAppointment(input.appointmentId);
+    return result;
+  },
+});
+
+export const voidPayment = defineAction({
+  roles: ["RECEPTIONIST", "MANAGER"],
+  input: voidPaymentSchema,
+  handler: async (input, actor) => {
+    const result = await voidPaymentInDal(input, actor);
+    revalidateAppointment(result.appointmentId);
+    return result;
+  },
+});
+
+export const registerAuthorization = defineAction({
+  roles: ["RECEPTIONIST", "MANAGER"],
+  input: registerAuthorizationSchema,
+  handler: async (input, actor) => {
+    const result = await registerAuthorizationInDal(input, actor);
     revalidateAppointment(input.appointmentId);
     return result;
   },

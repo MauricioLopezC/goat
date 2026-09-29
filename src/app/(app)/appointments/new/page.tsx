@@ -275,6 +275,15 @@ export default async function NewAppointmentPage({
               services={serviceOptions}
               preset={Object.fromEntries(preset.entries())}
             />
+            {service?.requiresReferral &&
+              patient.coverageType === "HEALTH_INSURANCE" && (
+                <Alert className="bg-info-soft text-info-soft-foreground border-info-soft-border mt-4">
+                  <AlertDescription className="text-info-soft-foreground">
+                    {service.name} requiere orden médica. Recordale al paciente
+                    traer la orden.
+                  </AlertDescription>
+                </Alert>
+              )}
           </CardContent>
         </Card>
       )}

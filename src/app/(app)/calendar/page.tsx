@@ -19,6 +19,7 @@ import {
   listAvailabilityWindows,
 } from "@/lib/dal/appointments";
 import { listActiveServices, listProfessionals } from "@/lib/dal/professionals";
+import { getPaymentStates } from "@/lib/dal/payments";
 import {
   calendarHref,
   calendarRange,
@@ -111,6 +112,15 @@ export default async function CalendarPage({
   }
 
   const isMonth = query.view === "month";
+
+  // Marca de cobro o autorización de los turnos de hoy y completados (HU-21).
+  // La vista mes no la muestra.
+  const paymentStates = isMonth
+    ? {}
+    : await getPaymentStates(
+        [...appointments, ...(agenda?.appointments ?? [])].map((a) => a.id),
+        actor,
+      );
   const isWeek = query.view === "week";
   const unit = isMonth ? "Mes" : isWeek ? "Semana" : "Día";
 
@@ -293,7 +303,7 @@ export default async function CalendarPage({
             {agenda.professional.firstName}. Para dar un turno desde un bloque
             libre, abrí la vista día.
           </p>
-          <WeeklyAgendaGrid data={agenda} />
+          <WeeklyAgendaGrid data={agenda} paymentStates={paymentStates} />
         </>
       ) : isMonth && monthInfo ? (
         <MonthView
@@ -305,9 +315,14 @@ export default async function CalendarPage({
           now={now}
         />
       ) : isWeek ? (
-        <WeekView days={days} query={query} today={today} />
+        <WeekView
+          days={days}
+          query={query}
+          today={today}
+          paymentStates={paymentStates}
+        />
       ) : (
-        <DayView day={days[0]} query={query} />
+        <DayView day={days[0]} query={query} paymentStates={paymentStates} />
       )}
     </div>
   );
