@@ -476,7 +476,8 @@ async function main() {
           "FORBIDDEN",
         );
         await rejects(
-          () => listAppointments({ from: date, to: addDays(date, 7) }, manager),
+          () =>
+            listAppointments({ from: date, to: addDays(date, 32) }, manager),
           "VALIDATION",
         );
         await rejects(

@@ -9,6 +9,7 @@ import {
 import {
   calculateFreeBlocks,
   pastUntilMinute,
+  type DaySummary,
   type FreeBlock,
 } from "@/lib/calendar";
 import { toLocalSlot, weekdayOf } from "@/lib/schedule";
@@ -156,5 +157,28 @@ export function hourRange(days: ProfessionalDay[]) {
   return {
     firstHour: starts.length ? Math.floor(Math.min(...starts) / 60) : 8,
     lastHour: ends.length ? Math.ceil(Math.max(...ends) / 60) : 18,
+  };
+}
+
+/// Resume turnos y bloques libres de un CalendarDay para la vista mensual (HU-15).
+export function summarizeCalendarDay(day: CalendarDay): DaySummary {
+  let scheduledCount = 0;
+  let completedCount = 0;
+  let freeBlocksCount = 0;
+
+  for (const prof of day.professionals) {
+    freeBlocksCount += prof.freeBlocks.length;
+    for (const app of prof.appointments) {
+      if (app.status === "SCHEDULED") scheduledCount++;
+      else if (app.status === "COMPLETED") completedCount++;
+    }
+  }
+
+  return {
+    date: day.date,
+    holiday: day.holiday,
+    scheduledCount,
+    completedCount,
+    freeBlocksCount,
   };
 }

@@ -5,15 +5,18 @@ import {
 } from "@/lib/appointment-slots";
 import {
   addDays,
+  getMonthRange,
   getWeekDays,
   isCalendarDate,
   parseTime,
+  shiftMonth,
+  toLocalSlot,
 } from "@/lib/schedule";
 
-// Calendario del centro (HU-11). Sin `server-only`: lo usan la página, los
+// Calendario del centro (HU-11, HU-15). Sin `server-only`: lo usan la página, los
 // componentes cliente y los tests. El estado vive en la URL.
 
-export type CalendarView = "day" | "week";
+export type CalendarView = "day" | "week" | "month";
 
 export type CalendarQuery = {
   view: CalendarView;
@@ -38,7 +41,7 @@ export function parseCalendarQuery(
 ): CalendarQuery {
   const { view, date, hideCancelled } = params;
   return {
-    view: view === "week" ? "week" : "day",
+    view: view === "month" ? "month" : view === "week" ? "week" : "day",
     date:
       typeof date === "string" && isCalendarDate(date) ? date : fallbackDate,
     professionalId: positiveId(params.professionalId),
@@ -63,11 +66,15 @@ export function calendarHref(query: CalendarQuery): string {
   return `/calendar?${calendarSearch(query)}`;
 }
 
-/// Días que abarca la vista: el día elegido, o su semana de lunes a domingo.
+/// Días que abarca la vista: el día elegido, su semana de lunes a domingo,
+/// o el mes calendario completo (del 1 al último día).
 export function calendarRange(query: Pick<CalendarQuery, "view" | "date">) {
   if (query.view === "day") return { from: query.date, to: query.date };
-  const week = getWeekDays(query.date);
-  return { from: week.monday, to: week.sunday };
+  if (query.view === "week") {
+    const week = getWeekDays(query.date);
+    return { from: week.monday, to: week.sunday };
+  }
+  return getMonthRange(query.date);
 }
 
 /// Fecha de la vista anterior (`-1`) o siguiente (`1`).
@@ -75,7 +82,79 @@ export function shiftCalendarDate(
   query: Pick<CalendarQuery, "view" | "date">,
   direction: -1 | 1,
 ): string {
+  if (query.view === "month") return shiftMonth(query.date, direction);
   return addDays(query.date, direction * (query.view === "week" ? 7 : 1));
+}
+
+/// Resumen de actividad y disponibilidad de un día (HU-15).
+export type DaySummary = {
+  date: string;
+  holiday: string | null;
+  scheduledCount: number;
+  completedCount: number;
+  freeBlocksCount: number;
+};
+
+export type DaySummaryInput = {
+  date: string;
+  holiday: string | null;
+  appointments: { startsAt: Date | string; status: string }[];
+  professionals: Array<{
+    windows: MinuteRange[];
+    exceptions: { startMinute: number | null; endMinute: number | null }[];
+    busy: { startsAt: Date; endsAt: Date }[];
+  }>;
+  serviceDurationMinutes?: number;
+  now: Date;
+  today: string;
+  maxDate: string;
+};
+
+/// Calcula de forma pura el resumen de un día para la vista mensual (HU-15).
+export function calculateDaySummary(input: DaySummaryInput): DaySummary {
+  const isPast = input.date < input.today;
+  const isOutside = input.date > input.maxDate;
+  const isClosed = Boolean(input.holiday);
+
+  let scheduledCount = 0;
+  let completedCount = 0;
+
+  for (const app of input.appointments) {
+    const appDate =
+      typeof app.startsAt === "string"
+        ? app.startsAt.slice(0, 10)
+        : toLocalSlot(app.startsAt).date;
+    if (appDate === input.date) {
+      if (app.status === "SCHEDULED") scheduledCount++;
+      else if (app.status === "COMPLETED") completedCount++;
+    }
+  }
+
+  let freeBlocksCount = 0;
+  if (!isClosed && !isPast && !isOutside) {
+    for (const prof of input.professionals) {
+      const blocks = calculateFreeBlocks({
+        date: input.date,
+        windows: prof.windows,
+        exceptions: prof.exceptions,
+        busy: prof.busy,
+        holiday: isClosed,
+        now: input.now,
+        today: input.today,
+        maxDate: input.maxDate,
+        durationMinutes: input.serviceDurationMinutes,
+      });
+      freeBlocksCount += blocks.length;
+    }
+  }
+
+  return {
+    date: input.date,
+    holiday: input.holiday,
+    scheduledCount,
+    completedCount,
+    freeBlocksCount,
+  };
 }
 
 /// Bloque libre (`FreeBlock`, ver glosario), en minutos del día en hora del centro.
@@ -95,11 +174,17 @@ function subtract(ranges: MinuteRange[], cut: MinuteRange): MinuteRange[] {
   });
 }
 
-const FREE_BLOCK_STEP = 5;
+/// Duración mínima de un bloque libre e intervalo de grilla del centro (30 min, HU-06, HU-11).
+/// Los tramos menores a este umbral no son asignables a ningún turno, y el tiempo
+/// transcurrido hoy se redondea hacia arriba a este intervalo para no ofrecer horarios
+/// fraccionados o no válidos para el alta de turnos.
+export const MIN_FREE_BLOCK_MINUTES = 30;
+
+export const FREE_BLOCK_STEP = MIN_FREE_BLOCK_MINUTES;
 
 /// Hasta qué minuto del día ya pasó: todo si es un día anterior, nada si es
-/// uno posterior y, hoy, la hora actual redondeada hacia arriba a 5 minutos
-/// (desde ahí se ofrecen los bloques libres).
+/// uno posterior y, hoy, la hora actual redondeada hacia arriba al intervalo
+/// de grilla del centro (30 min, desde donde se pueden ofrecer bloques libres asignables).
 export function pastUntilMinute(date: string, today: string, now: Date) {
   if (date < today) return 1440;
   if (date > today) return 0;
@@ -164,6 +249,8 @@ export function calculateFreeBlocks(input: {
   if (past) cuts.push({ startMinute: 0, endMinute: past });
   return cuts
     .reduce<MinuteRange[]>(subtract, [...input.windows])
-    .filter((block) => block.endMinute - block.startMinute >= FREE_BLOCK_STEP)
+    .filter(
+      (block) => block.endMinute - block.startMinute >= MIN_FREE_BLOCK_MINUTES,
+    )
     .sort((a, b) => a.startMinute - b.startMinute);
 }

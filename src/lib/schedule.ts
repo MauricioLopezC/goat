@@ -1,5 +1,7 @@
 import { Weekday } from "@/generated/prisma/enums";
 
+export { Weekday };
+
 // Horarios de la agenda (HU-05). No lleva `server-only` a propósito: lo usan
 // la DAL, los schemas de Zod y los componentes cliente.
 //
@@ -197,4 +199,92 @@ export function formatWeekRange(monday: string, sunday: string): string {
     return `${m.getUTCDate()} al ${s.getUTCDate()} de ${sMonth} de ${sYear}`;
   }
   return `${m.getUTCDate()} de ${mMonth} – ${s.getUTCDate()} de ${sMonth} de ${sYear}`;
+}
+
+/// Formatea el mes y año (ej: "Septiembre - 2026").
+export function formatMonth(dateStr: string): string {
+  const d = dateToDb(dateStr);
+  const rawMonth = new Intl.DateTimeFormat("es-AR", {
+    timeZone: "UTC",
+    month: "long",
+  }).format(d);
+  const month = rawMonth.charAt(0).toUpperCase() + rawMonth.slice(1);
+  return `${month} - ${d.getUTCFullYear()}`;
+}
+
+/// Rango fijo del mes calendario completo (del primer al último día del mes).
+export function getMonthRange(dateStr: string): { from: string; to: string } {
+  const d = dateToDb(dateStr);
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth();
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const monthPad = String(month + 1).padStart(2, "0");
+  return {
+    from: `${year}-${monthPad}-01`,
+    to: `${year}-${monthPad}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
+/// Desplaza una fecha al mes anterior o siguiente, preservando el día ajustado
+/// a la cantidad de días del mes destino.
+export function shiftMonth(dateStr: string, direction: -1 | 1): string {
+  const d = dateToDb(dateStr);
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth();
+  const day = d.getUTCDate();
+  const targetRef = new Date(Date.UTC(year, month + direction, 1));
+  const targetYear = targetRef.getUTCFullYear();
+  const targetMonth = targetRef.getUTCMonth();
+  const daysInTarget = new Date(
+    Date.UTC(targetYear, targetMonth + 1, 0),
+  ).getUTCDate();
+  const targetDay = Math.min(day, daysInTarget);
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-${String(targetDay).padStart(2, "0")}`;
+}
+
+/// Devuelve los días del mes calendario (del 1 al último día) y los espacios en blanco
+/// para armar la grilla de lunes a domingo.
+export function getMonthDays(dateStr: string): {
+  from: string;
+  to: string;
+  year: number;
+  month: number;
+  leadingBlankDays: number;
+  trailingBlankDays: number;
+  days: Array<{
+    date: string;
+    dayNumber: number;
+    weekday: Weekday;
+  }>;
+} {
+  const range = getMonthRange(dateStr);
+  const d = dateToDb(range.from);
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth() + 1;
+  const lastDayNumber = dateToDb(range.to).getUTCDate();
+
+  const days: Array<{ date: string; dayNumber: number; weekday: Weekday }> = [];
+  const monthPad = String(month).padStart(2, "0");
+
+  for (let dayNum = 1; dayNum <= lastDayNumber; dayNum++) {
+    const curDate = `${year}-${monthPad}-${String(dayNum).padStart(2, "0")}`;
+    days.push({
+      date: curDate,
+      dayNumber: dayNum,
+      weekday: weekdayOf(curDate),
+    });
+  }
+
+  const leadingBlankDays = WEEKDAYS.indexOf(days[0].weekday);
+  const trailingBlankDays = (7 - ((leadingBlankDays + days.length) % 7)) % 7;
+
+  return {
+    from: range.from,
+    to: range.to,
+    year,
+    month,
+    leadingBlankDays,
+    trailingBlankDays,
+    days,
+  };
 }

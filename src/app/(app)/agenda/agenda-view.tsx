@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  Calendar as CalendarIcon,
   CalendarDays,
   CalendarRange,
   ChevronLeft,
@@ -12,9 +13,16 @@ import { Input } from "@/components/ui/input";
 import {
   addDays,
   formatDate,
+  formatMonth,
   formatWeekRange,
+  getMonthDays,
+  shiftMonth,
   toLocalSlot,
 } from "@/lib/schedule";
+import { appointmentDateBounds } from "@/lib/appointment-slots";
+import { calculateFreeBlocks } from "@/lib/calendar";
+import { MonthGrid, type MonthGridDay } from "../calendar/month-view";
+import { Legend } from "../calendar/day-view";
 import type { AgendaData } from "./agenda-types";
 import {
   AgendaProfessionalSwitcher,
@@ -32,15 +40,25 @@ export function AgendaView({
   professionals?: ProfessionalSummaryItem[];
   isStaff?: boolean;
 }) {
+  const isMonth = data.view === "month";
   const isWeek = data.view === "week";
+  const unit = isMonth ? "Mes" : isWeek ? "Semana" : "Día";
   const todayDate = toLocalSlot(new Date()).date;
 
-  const prevDate = isWeek ? addDays(data.date, -7) : addDays(data.date, -1);
-  const nextDate = isWeek ? addDays(data.date, 7) : addDays(data.date, 1);
+  const prevDate = isMonth
+    ? shiftMonth(data.date, -1)
+    : isWeek
+      ? addDays(data.date, -7)
+      : addDays(data.date, -1);
+  const nextDate = isMonth
+    ? shiftMonth(data.date, 1)
+    : isWeek
+      ? addDays(data.date, 7)
+      : addDays(data.date, 1);
 
   const buildUrl = (
     newDate: string,
-    newView: "week" | "day",
+    newView: "month" | "week" | "day",
     hide?: boolean,
   ) => {
     const params = new URLSearchParams();
@@ -52,6 +70,60 @@ export function AgendaView({
     if (hide ?? data.hideCancelled) params.set("hideCancelled", "1");
     return `/agenda?${params.toString()}`;
   };
+
+  const monthInfo = isMonth ? getMonthDays(data.date) : null;
+  const now = new Date();
+  const bounds = appointmentDateBounds(now);
+
+  const monthGridDays: MonthGridDay[] = monthInfo
+    ? monthInfo.days.map((d) => {
+        const holiday =
+          data.holidays.find((h) => h.date === d.date)?.description ?? null;
+        const dayAppointments = data.appointments.filter(
+          (a) => toLocalSlot(a.startsAt).date === d.date,
+        );
+        const scheduledCount = dayAppointments.filter(
+          (a) => a.status === "SCHEDULED",
+        ).length;
+        const completedCount = dayAppointments.filter(
+          (a) => a.status === "COMPLETED",
+        ).length;
+
+        const dayWindows = data.windows
+          .filter((w) => w.weekday === d.weekday)
+          .map((w) => ({
+            startMinute: w.startMinute,
+            endMinute: w.endMinute,
+          }));
+
+        const dayExceptions = data.exceptions.filter((e) => e.date === d.date);
+
+        const freeBlocks = calculateFreeBlocks({
+          date: d.date,
+          windows: dayWindows,
+          exceptions: dayExceptions,
+          busy: data.appointments,
+          holiday: Boolean(holiday),
+          now,
+          today: todayDate,
+          maxDate: bounds.max,
+        });
+
+        return {
+          date: d.date,
+          dayNumber: d.dayNumber,
+          weekday: d.weekday,
+          isToday: d.date === todayDate,
+          isPast: d.date < todayDate,
+          isOutsideHorizon: d.date > bounds.max,
+          holiday,
+          scheduledCount,
+          completedCount,
+          freeBlocksCount: freeBlocks.length,
+          href: buildUrl(d.date, "day"),
+        };
+      })
+    : [];
 
   return (
     <div data-layout="wide" className="flex flex-col gap-6">
@@ -72,8 +144,9 @@ export function AgendaView({
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-1">
               <span className="font-medium text-foreground">
                 {data.summary.total}{" "}
-                {data.summary.total === 1 ? "turno" : "turnos"} en esta{" "}
-                {isWeek ? "semana" : "jornada"}:
+                {data.summary.total === 1 ? "turno" : "turnos"} en{" "}
+                {isMonth ? "este mes" : isWeek ? "esta semana" : "esta jornada"}
+                :
               </span>
               <span className="text-primary font-medium">
                 {data.summary.scheduled}{" "}
@@ -103,8 +176,102 @@ export function AgendaView({
           )}
         </div>
         {isStaff && (
-          <div className="flex items-center gap-2">
-            {professionals && professionals.length > 0 && (
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/professionals/${data.professional.id}`}>
+              Volver a la ficha
+            </Link>
+          </Button>
+        )}
+      </header>
+
+      {/* Barra de navegación temporal y controles */}
+      <div className="bg-card flex flex-col gap-4 rounded-lg border p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <nav
+            aria-label="Navegación de la agenda"
+            className="flex flex-wrap items-center gap-2"
+          >
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={buildUrl(prevDate, data.view)}
+                aria-label={`${unit} anterior`}
+              >
+                <ChevronLeft data-icon="inline-start" />
+                {unit} anterior
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={buildUrl(todayDate, data.view)}>Hoy</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={buildUrl(nextDate, data.view)}
+                aria-label={`${unit} siguiente`}
+              >
+                {unit} siguiente
+                <ChevronRight data-icon="inline-end" />
+              </Link>
+            </Button>
+            <h2 className="text-title-lg px-2 first-letter:uppercase">
+              {isMonth
+                ? formatMonth(data.date)
+                : isWeek
+                  ? formatWeekRange(data.week.monday, data.week.sunday)
+                  : formatDate(data.date)}
+            </h2>
+          </nav>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="bg-muted inline-flex rounded-md border p-0.5">
+              <Button asChild size="sm" variant={isMonth ? "default" : "ghost"}>
+                <Link
+                  href={buildUrl(data.date, "month")}
+                  aria-current={isMonth ? "page" : undefined}
+                >
+                  <CalendarIcon data-icon="inline-start" />
+                  Mes
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant={isWeek ? "default" : "ghost"}>
+                <Link
+                  href={buildUrl(data.date, "week")}
+                  aria-current={isWeek ? "page" : undefined}
+                >
+                  <CalendarRange data-icon="inline-start" />
+                  Semana
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant={!isMonth && !isWeek ? "default" : "ghost"}
+              >
+                <Link
+                  href={buildUrl(data.date, "day")}
+                  aria-current={!isMonth && !isWeek ? "page" : undefined}
+                >
+                  <CalendarDays data-icon="inline-start" />
+                  Día
+                </Link>
+              </Button>
+            </div>
+            <Button asChild variant="ghost" size="sm">
+              <Link href={buildUrl(data.date, data.view, !data.hideCancelled)}>
+                {data.hideCancelled ? (
+                  <Eye data-icon="inline-start" />
+                ) : (
+                  <EyeOff data-icon="inline-start" />
+                )}
+                {data.hideCancelled
+                  ? "Mostrar cancelados"
+                  : "Ocultar cancelados"}
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end gap-3">
+            {isStaff && professionals && professionals.length > 0 && (
               <AgendaProfessionalSwitcher
                 currentProfessionalId={data.professional.id}
                 professionals={professionals}
@@ -113,64 +280,8 @@ export function AgendaView({
                 hideCancelled={data.hideCancelled}
               />
             )}
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/professionals/${data.professional.id}`}>
-                Volver a la ficha
-              </Link>
-            </Button>
           </div>
-        )}
-      </header>
-
-      {/* Barra de navegación temporal y controles */}
-      <div className="bg-card border-border flex flex-wrap items-center justify-between gap-4 rounded-xl border p-3 shadow-2xs">
-        {/* Navegación Anterior / Hoy / Siguiente */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
-            <Button asChild variant="outline" size="sm">
-              <Link
-                href={buildUrl(prevDate, data.view)}
-                title={isWeek ? "Semana anterior" : "Día anterior"}
-              >
-                <ChevronLeft className="size-4" />
-                <span className="hidden sm:inline">
-                  {isWeek ? "Semana anterior" : "Día anterior"}
-                </span>
-              </Link>
-            </Button>
-
-            <Button asChild variant="outline" size="sm">
-              <Link href={buildUrl(todayDate, data.view)}>Hoy</Link>
-            </Button>
-
-            <Button asChild variant="outline" size="sm">
-              <Link
-                href={buildUrl(nextDate, data.view)}
-                title={isWeek ? "Semana siguiente" : "Día siguiente"}
-              >
-                <span className="hidden sm:inline">
-                  {isWeek ? "Semana siguiente" : "Día siguiente"}
-                </span>
-                <ChevronRight className="size-4" />
-              </Link>
-            </Button>
-          </div>
-
-          <span className="text-body-sm font-semibold capitalize px-2">
-            {isWeek
-              ? formatWeekRange(data.week.monday, data.week.sunday)
-              : formatDate(data.date)}
-          </span>
-        </div>
-
-        {/* Controles de vista, filtro y selector de fecha */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Selector de fecha directo (con w-44 para no colapsar) */}
-          <form
-            action="/agenda"
-            method="GET"
-            className="flex items-center gap-2"
-          >
+          <form action="/agenda" method="GET" className="flex items-end gap-2">
             {isStaff && (
               <input
                 type="hidden"
@@ -178,74 +289,38 @@ export function AgendaView({
                 value={data.professional.id}
               />
             )}
-            <input type="hidden" name="view" value={data.view} />
+            {data.view !== "week" && (
+              <input type="hidden" name="view" value={data.view} />
+            )}
             {data.hideCancelled && (
               <input type="hidden" name="hideCancelled" value="1" />
             )}
             <Input
               type="date"
               name="date"
+              aria-label="Ir a la fecha"
               defaultValue={data.date}
-              className="w-44 tabular-nums"
               required
+              className="w-44 tabular-nums"
             />
-            <Button type="submit" variant="outline" size="sm">
-              Ver fecha
+            <Button type="submit" variant="outline">
+              Ir a la fecha
             </Button>
           </form>
-
-          {/* Toggle de vista: Semana vs Día */}
-          <div className="bg-muted inline-flex rounded-lg p-0.5 border border-border">
-            <Button
-              asChild
-              variant={isWeek ? "default" : "ghost"}
-              size="sm"
-              className="h-7 px-3 text-xs"
-            >
-              <Link href={buildUrl(data.date, "week")}>
-                <CalendarRange className="size-3.5 mr-1.5" />
-                Semana
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={!isWeek ? "default" : "ghost"}
-              size="sm"
-              className="h-7 px-3 text-xs"
-            >
-              <Link href={buildUrl(data.date, "day")}>
-                <CalendarDays className="size-3.5 mr-1.5" />
-                Día
-              </Link>
-            </Button>
-          </div>
-
-          {/* Toggle Ocultar / Mostrar cancelados */}
-          {data.hideCancelled ? (
-            <Button asChild variant="outline" size="sm" className="h-8 text-xs">
-              <Link href={buildUrl(data.date, data.view, false)}>
-                <Eye className="size-3.5 mr-1.5" />
-                Mostrar cancelados
-              </Link>
-            </Button>
-          ) : (
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <Link href={buildUrl(data.date, data.view, true)}>
-                <EyeOff className="size-3.5 mr-1.5" />
-                Ocultar cancelados
-              </Link>
-            </Button>
-          )}
         </div>
       </div>
 
       {/* Contenido principal según vista elegida */}
-      {isWeek ? (
+      {isMonth && monthInfo ? (
+        <div className="flex flex-col gap-4">
+          <MonthGrid
+            days={monthGridDays}
+            leadingBlankDays={monthInfo.leadingBlankDays}
+            trailingBlankDays={monthInfo.trailingBlankDays}
+          />
+          <Legend freeClickable={false} />
+        </div>
+      ) : isWeek ? (
         <WeeklyAgendaGrid data={data} />
       ) : (
         <DailyAgendaList data={data} />
