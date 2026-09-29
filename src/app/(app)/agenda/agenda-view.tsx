@@ -98,11 +98,15 @@ export function AgendaView({
 
         const dayExceptions = data.exceptions.filter((e) => e.date === d.date);
 
+        const busyAppointments = dayAppointments.filter(
+          (a) => a.status === "SCHEDULED" || a.status === "COMPLETED",
+        );
+
         const freeBlocks = calculateFreeBlocks({
           date: d.date,
           windows: dayWindows,
           exceptions: dayExceptions,
-          busy: data.appointments,
+          busy: busyAppointments,
           holiday: Boolean(holiday),
           now,
           today: todayDate,
