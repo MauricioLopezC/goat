@@ -511,8 +511,9 @@ export function RescheduleForm({
                       Nuevo horario:
                     </span>
                     <p className="font-semibold text-primary">
-                      {formatDate(selectedDate)}, de {startTime} a{" "}
-                      {chosenSlot?.endTime} con {chosenProfessional.lastName},{" "}
+                      {selectedDate ? formatDate(selectedDate) : ""}, de{" "}
+                      {startTime} a {chosenSlot?.endTime} con{" "}
+                      {chosenProfessional.lastName},{" "}
                       {chosenProfessional.firstName}
                     </p>
                   </div>

@@ -8,7 +8,7 @@ import {
 } from "@/lib/dal/appointments";
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
-import { isCalendarDate } from "@/lib/schedule";
+import { isCalendarDate, toLocalSlot } from "@/lib/schedule";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RescheduleForm } from "./reschedule-form";
@@ -94,15 +94,15 @@ export default async function ReschedulePage({
       ? queryProfessionalId
       : appointment.professional.id;
 
-  const datePage = Math.min(positiveId(query.datePage) ?? 1, 10);
-  const selectedDate =
+  const requestedDate =
     typeof query.date === "string" && isCalendarDate(query.date)
       ? query.date
-      : "";
+      : undefined;
 
   let availableDates: string[] = [];
   let slots: AvailableSlot[] = [];
   let availabilityError = "";
+  let selectedDate = requestedDate ?? "";
 
   try {
     availableDates = await listAvailableDates(
@@ -114,6 +114,15 @@ export default async function ReschedulePage({
       },
       actor,
     );
+
+    const currentSlotDate = toLocalSlot(appointment.startsAt).date;
+    if (
+      requestedDate === undefined &&
+      selectedProfessionalId === appointment.professional.id &&
+      availableDates.includes(currentSlotDate)
+    ) {
+      selectedDate = currentSlotDate;
+    }
 
     if (selectedDate) {
       slots = await listAvailableSlots(
@@ -135,6 +144,9 @@ export default async function ReschedulePage({
     }
   }
 
+  const dateIndex = selectedDate ? availableDates.indexOf(selectedDate) : -1;
+  const initialPage = dateIndex >= 0 ? Math.floor(dateIndex / 14) + 1 : 1;
+  const datePage = Math.min(positiveId(query.datePage) ?? initialPage, 10);
   const visibleDatePage = Math.min(
     datePage,
     Math.max(1, Math.ceil(availableDates.length / 14)),
