@@ -14,6 +14,7 @@ import {
   toLocalSlot,
   WEEKDAY_LABEL,
 } from "@/lib/schedule";
+import { cn } from "@/lib/utils";
 import type { AgendaData } from "./agenda-types";
 
 const HOUR_HEIGHT = 64;
@@ -64,7 +65,7 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
         </p>
 
         {holiday && (
-          <div className="bg-amber-500/15 border-amber-500/30 text-amber-900 dark:text-amber-200 mb-3 rounded-lg border p-2 text-xs font-medium">
+          <div className="bg-holiday/15 border-holiday/30 text-holiday-muted-foreground mb-3 rounded-lg border p-2 text-xs font-medium">
             Feriado: {holiday.description}
           </div>
         )}
@@ -97,75 +98,98 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
 
           {/* Columna del día */}
           <div
-            className="bg-muted/30 border-border relative rounded-lg border"
+            className={cn(
+              "relative rounded-lg border transition-colors",
+              holiday
+                ? "bg-holiday/10 border-holiday/30"
+                : "bg-muted/30 border-border",
+            )}
             style={{ height }}
           >
-            {hours.map((hour) => (
-              <div
-                key={hour}
-                className="border-border/40 pointer-events-none absolute inset-x-0 border-t"
-                style={{ top: offset(hour * 60) }}
-              />
-            ))}
-
-            {/* Franjas del profesional */}
-            {dayWindows.map((window) => (
-              <div
-                key={window.id}
-                className="border-primary/40 bg-primary-soft/35 text-primary-soft-foreground absolute inset-x-1 flex flex-col justify-between overflow-hidden rounded-lg border-2 border-dashed p-1.5"
-                style={{
-                  top: offset(window.startMinute),
-                  height: offset(window.endMinute) - offset(window.startMinute),
-                }}
-              >
-                <p className="font-semibold text-primary tabular-nums text-xs">
-                  {window.room ? `${window.room.name} · ` : ""}
-                  {formatMinute(window.startMinute)}–
-                  {formatMinute(window.endMinute)}
-                </p>
-                <p className="text-muted-foreground text-[10px] truncate">
-                  {window.services.length
-                    ? window.services.map((s) => s.name).join(", ")
-                    : "Todos sus servicios"}
+            {holiday ? (
+              <div className="absolute inset-1 flex flex-col items-center justify-center rounded-md border-2 border-dashed border-holiday/40 bg-holiday/15 p-4 text-center">
+                <span className="rounded-full bg-holiday/25 border border-holiday/40 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-holiday-foreground">
+                  Centro cerrado
+                </span>
+                <span className="text-sm font-bold text-holiday-foreground mt-2">
+                  {holiday.description}
+                </span>
+                <p className="text-xs text-holiday-muted-foreground/80 mt-1 max-w-[200px] leading-tight font-medium">
+                  Cerrado durante toda la jornada para atención médica,
+                  recepción y gerencia.
                 </p>
               </div>
-            ))}
+            ) : (
+              <>
+                {hours.map((hour) => (
+                  <div
+                    key={hour}
+                    className="border-border/40 pointer-events-none absolute inset-x-0 border-t"
+                    style={{ top: offset(hour * 60) }}
+                  />
+                ))}
 
-            {/* Turnos en el timeline */}
-            {dayAppointments.map((appointment) => {
-              const startMinute = toLocalSlot(appointment.startsAt).minute;
-              const endMinute = toLocalSlot(appointment.endsAt).minute;
-              const top = offset(startMinute);
-              const cardHeight = Math.max(
-                offset(endMinute) - offset(startMinute) - 2,
-                48,
-              );
-              const isCancelled = appointment.status === "CANCELLED";
-              const isCompleted = appointment.status === "COMPLETED";
-
-              return (
-                <div
-                  key={appointment.id}
-                  className={`absolute inset-x-1 z-25 flex flex-col justify-between rounded-md border p-1.5 text-xs shadow-xs ${
-                    isCancelled
-                      ? "bg-card/90 text-muted-foreground border-border border-l-destructive line-through opacity-75 border-l-4"
-                      : isCompleted
-                        ? "bg-card text-foreground border-border border-l-emerald-600 border-l-4"
-                        : "bg-card text-foreground border-border border-l-primary border-l-4"
-                  }`}
-                  style={{ top, height: cardHeight }}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-semibold tabular-nums text-[11px]">
-                      {formatMinute(startMinute)}–{formatMinute(endMinute)}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground truncate">
-                      {appointment.patient.lastName}
-                    </span>
+                {/* Franjas del profesional */}
+                {dayWindows.map((window) => (
+                  <div
+                    key={window.id}
+                    className="border-primary/70 bg-primary-soft text-primary absolute inset-x-1 flex flex-col justify-between overflow-hidden rounded-lg border-2 border-dashed p-1.5 shadow-xs"
+                    style={{
+                      top: offset(window.startMinute),
+                      height:
+                        offset(window.endMinute) - offset(window.startMinute),
+                    }}
+                  >
+                    <p className="text-primary font-bold tabular-nums text-xs">
+                      {window.room ? `${window.room.name} · ` : ""}
+                      {formatMinute(window.startMinute)}–
+                      {formatMinute(window.endMinute)}
+                    </p>
+                    <p className="text-primary/90 text-[10px] truncate font-medium">
+                      {window.services.length
+                        ? window.services.map((s) => s.name).join(", ")
+                        : "Todos sus servicios"}
+                    </p>
                   </div>
-                </div>
-              );
-            })}
+                ))}
+
+                {/* Turnos en el timeline */}
+                {dayAppointments.map((appointment) => {
+                  const startMinute = toLocalSlot(appointment.startsAt).minute;
+                  const endMinute = toLocalSlot(appointment.endsAt).minute;
+                  const top = offset(startMinute);
+                  const cardHeight = Math.max(
+                    offset(endMinute) - offset(startMinute) - 2,
+                    48,
+                  );
+                  const isCancelled = appointment.status === "CANCELLED";
+                  const isCompleted = appointment.status === "COMPLETED";
+
+                  return (
+                    <div
+                      key={appointment.id}
+                      className={`absolute inset-x-1 z-25 flex flex-col justify-between rounded-md border p-1.5 text-xs shadow-xs ${
+                        isCancelled
+                          ? "bg-card/90 text-muted-foreground border-border border-l-destructive line-through opacity-75 border-l-4"
+                          : isCompleted
+                            ? "bg-card text-foreground border-border border-l-emerald-600 border-l-4"
+                            : "bg-card text-foreground border-border border-l-primary border-l-4"
+                      }`}
+                      style={{ top, height: cardHeight }}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-semibold tabular-nums text-[11px]">
+                          {formatMinute(startMinute)}–{formatMinute(endMinute)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground truncate">
+                          {appointment.patient.lastName}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -178,7 +202,21 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
           </h3>
         </div>
 
-        {dayAppointments.length === 0 ? (
+        {holiday ? (
+          <div className="bg-holiday/10 border-holiday/30 text-holiday-foreground flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center shadow-xs">
+            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-holiday/40 bg-holiday/25 px-3 py-1 text-xs font-bold uppercase tracking-wider text-holiday-muted-foreground">
+              Centro cerrado · Feriado nacional
+            </span>
+            <h4 className="text-xl font-bold text-holiday-foreground sm:text-2xl">
+              {holiday.description}
+            </h4>
+            <p className="mt-2 max-w-md text-sm font-medium text-holiday-muted-foreground/80">
+              El policonsultorio permanece cerrado durante toda la jornada para
+              todas las áreas (atención médica, recepción y gerencia). No se
+              brindan turnos en este día.
+            </p>
+          </div>
+        ) : dayAppointments.length === 0 ? (
           <Empty className="bg-card border-border rounded-xl border p-8">
             <EmptyHeader>
               <EmptyTitle>No hay turnos registrados para este día</EmptyTitle>

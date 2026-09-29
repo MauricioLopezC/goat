@@ -97,6 +97,20 @@ function subtract(ranges: MinuteRange[], cut: MinuteRange): MinuteRange[] {
 
 const FREE_BLOCK_STEP = 5;
 
+/// Hasta qué minuto del día ya pasó: todo si es un día anterior, nada si es
+/// uno posterior y, hoy, la hora actual redondeada hacia arriba a 5 minutos
+/// (desde ahí se ofrecen los bloques libres).
+export function pastUntilMinute(date: string, today: string, now: Date) {
+  if (date < today) return 1440;
+  if (date > today) return 0;
+  const elapsed =
+    (now.getTime() - appointmentInstant(date, 0).getTime()) / 60_000;
+  return Math.min(
+    1440,
+    Math.max(0, Math.ceil(elapsed / FREE_BLOCK_STEP) * FREE_BLOCK_STEP),
+  );
+}
+
 /// Bloques libres de un profesional en un día. Sin servicio, son los tramos
 /// de franja sin feriado, ausencia ni turno que ocupe. Con servicio, la misma
 /// grilla que ofrece el alta (HU-09). Solo se ofrece lo que el alta aceptaría:
@@ -146,10 +160,8 @@ export function calculateFreeBlocks(input: {
       endMinute: toMinute(appointment.endsAt),
     })),
   ];
-  if (input.date === input.today) {
-    const elapsed = Math.ceil(toMinute(input.now) / FREE_BLOCK_STEP);
-    cuts.push({ startMinute: 0, endMinute: elapsed * FREE_BLOCK_STEP });
-  }
+  const past = pastUntilMinute(input.date, input.today, input.now);
+  if (past) cuts.push({ startMinute: 0, endMinute: past });
   return cuts
     .reduce<MinuteRange[]>(subtract, [...input.windows])
     .filter((block) => block.endMinute - block.startMinute >= FREE_BLOCK_STEP)

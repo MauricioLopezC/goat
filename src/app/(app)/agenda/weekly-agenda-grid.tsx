@@ -21,6 +21,7 @@ import {
   toLocalSlot,
   WEEKDAY_LABEL,
 } from "@/lib/schedule";
+import { cn } from "@/lib/utils";
 import type { AgendaAppointment, AgendaData } from "./agenda-types";
 
 // Altura por hora compacta para que entre el día completo sin scroll con ruedita
@@ -84,11 +85,14 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
               return (
                 <div
                   key={day.date}
-                  className={`pb-2 text-center transition-colors flex flex-col items-center justify-start ${
-                    isToday
-                      ? "bg-primary-soft/40 rounded-t-lg border-b-2 border-primary pt-1"
-                      : ""
-                  }`}
+                  className={cn(
+                    "pb-2 text-center transition-colors flex flex-col items-center justify-start rounded-t-lg",
+                    isToday &&
+                      !holiday &&
+                      "bg-primary-soft/40 border-b-2 border-primary pt-1",
+                    holiday &&
+                      "bg-holiday/15 border-b-2 border-holiday/60 pt-1",
+                  )}
                 >
                   <p className="text-label-md text-muted-foreground uppercase">
                     {WEEKDAY_LABEL[day.weekday]}
@@ -114,7 +118,7 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                   {/* Feriado en la cabecera (sin pisar las franjas) */}
                   {holiday && (
                     <span
-                      className="mt-1 w-full max-w-[130px] truncate rounded bg-amber-500/15 border border-amber-500/30 px-1 py-0.5 text-[10px] font-semibold text-amber-900 dark:text-amber-200"
+                      className="mt-1 w-full max-w-[130px] truncate rounded bg-holiday/15 border border-holiday/30 px-1 py-0.5 text-[10px] font-semibold text-holiday-muted-foreground"
                       title={`Feriado: ${holiday.description}`}
                     >
                       Feriado: {holiday.description}
@@ -166,10 +170,32 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                 (e) => e.startMinute !== null && e.endMinute !== null,
               );
 
+              if (holiday) {
+                return (
+                  <div
+                    key={day.date}
+                    className="relative rounded-lg border border-holiday/30 bg-holiday/10 pt-1 transition-colors"
+                    style={{ height }}
+                  >
+                    <div className="absolute inset-1 flex flex-col items-center justify-center rounded-md border-2 border-dashed border-holiday/40 bg-holiday/15 p-2 text-center">
+                      <span className="rounded-full bg-holiday/25 border border-holiday/40 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-holiday-foreground">
+                        Centro cerrado
+                      </span>
+                      <span className="text-xs font-bold text-holiday-foreground mt-1.5 max-w-[120px] line-clamp-2">
+                        {holiday.description}
+                      </span>
+                      <span className="text-[10px] text-holiday-muted-foreground/80 mt-1 max-w-[120px] leading-tight font-medium">
+                        Cerrado para atención médica, recepción y gerencia
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div
                   key={day.date}
-                  className="bg-muted/30 border-border relative rounded-lg border pt-1"
+                  className="bg-muted/30 border-border relative rounded-lg border pt-1 transition-colors"
                   style={{ height }}
                 >
                   {/* Líneas tenues separadoras de cada hora */}
@@ -202,7 +228,7 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
 
                   {/* Franjas horarias de atención del profesional (Rectángulos base) */}
                   {dayWindows.map((window) => {
-                    const isClosed = Boolean(holiday || fullDayException);
+                    const isClosed = Boolean(fullDayException);
                     // El rótulo de la franja arranca después de las ausencias
                     // que tapan su inicio, para no quedar debajo de ellas
                     let labelMinute = window.startMinute;
@@ -224,7 +250,7 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                         className={`pointer-events-none absolute inset-x-0.5 flex flex-col justify-between overflow-hidden rounded-lg border-2 border-dashed p-1.5 ${
                           isClosed
                             ? "border-muted-foreground/30 bg-muted/40 text-muted-foreground opacity-50"
-                            : "border-primary/40 bg-primary-soft/30 text-primary-soft-foreground"
+                            : "border-primary/70 bg-primary-soft text-primary shadow-xs"
                         }`}
                         style={{
                           top: offset(window.startMinute),
@@ -244,18 +270,16 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                             className={`font-semibold tabular-nums text-[10px] uppercase ${
                               isClosed
                                 ? "text-muted-foreground"
-                                : "text-primary"
+                                : "text-primary font-bold"
                             }`}
                           >
                             {window.room ? `${window.room.name} · ` : ""}
                             {formatMinute(window.startMinute)}–
                             {formatMinute(window.endMinute)}
                           </span>
-                          <span className="text-[10px] truncate opacity-80">
-                            {isClosed
-                              ? holiday
-                                ? "Sin atención (Feriado)"
-                                : "Sin atención (Ausencia)"
+                          <span className="text-[10px] truncate font-medium opacity-90">
+                            {fullDayException
+                              ? "Sin atención (Ausencia)"
                               : window.services.length
                                 ? window.services.map((s) => s.name).join(", ")
                                 : "Todos sus servicios"}
