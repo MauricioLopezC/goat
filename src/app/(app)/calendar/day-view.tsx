@@ -55,22 +55,51 @@ export function DayView({
     ((minute - firstHour * 60) / 60) * HOUR_HEIGHT;
   const detailSearch = calendarSearch(query);
 
+  if (day.holiday) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="bg-amber-500/10 border-amber-500/30 text-amber-950 flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center shadow-xs sm:p-14">
+          <div className="mb-4 flex size-14 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/20 text-amber-900 shadow-xs">
+            <span className="text-2xl font-bold">🚫</span>
+          </div>
+          <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/25 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-900">
+            Centro cerrado · Feriado nacional
+          </span>
+          <h2 className="text-2xl font-extrabold tracking-tight text-amber-950 sm:text-3xl">
+            {day.holiday}
+          </h2>
+          <p className="mt-3 max-w-xl text-sm font-medium leading-relaxed text-amber-900/90 sm:text-base">
+            El policonsultorio permanece cerrado durante toda la jornada. Esta
+            disposición rige para todo el centro, incluyendo atención médica de
+            todas las especialidades, recepción / mesa de entradas y gerencia.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold text-amber-900">
+            <span className="rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-1.5">
+              Sin turnos ni atención médica
+            </span>
+            <span className="rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-1.5">
+              Mesa de entradas cerrada
+            </span>
+            <span className="rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-1.5">
+              Gerencia y administración sin atención
+            </span>
+          </div>
+        </div>
+        <Legend freeClickable />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {nobodyAttends && (
         <Empty className="border">
           <EmptyHeader>
-            <EmptyTitle>
-              {day.holiday
-                ? `Feriado: ${day.holiday}`
-                : "Ningún profesional atiende este día"}
-            </EmptyTitle>
+            <EmptyTitle>Ningún profesional atiende este día</EmptyTitle>
             <EmptyDescription>
-              {day.holiday
-                ? "El centro no atiende en feriados."
-                : filtered
-                  ? "No hay profesionales con franja de atención ese día para los filtros elegidos."
-                  : "No hay profesionales con franja de atención ese día, o todos cargaron una ausencia."}
+              {filtered
+                ? "No hay profesionales con franja de atención ese día para los filtros elegidos."
+                : "No hay profesionales con franja de atención ese día, o todos cargaron una ausencia."}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -92,14 +121,27 @@ export function DayView({
                 <p className="text-label-md truncate uppercase">
                   {item.professional.lastName}, {item.professional.firstName}
                 </p>
-                <p className="text-muted-foreground truncate text-sm">
-                  {item.absence
-                    ? `Ausente: ${item.absence}`
-                    : day.holiday
-                      ? "Feriado"
-                      : !item.windows.length
-                        ? "Sin franja este día"
-                        : `${item.freeBlocks.length} ${item.freeBlocks.length === 1 ? "bloque libre" : "bloques libres"}`}
+                <p className="truncate text-sm">
+                  {item.absence ? (
+                    <span className="text-muted-foreground">
+                      Ausente: {item.absence}
+                    </span>
+                  ) : !item.windows.length ? (
+                    <span className="text-muted-foreground">
+                      Sin franja este día
+                    </span>
+                  ) : item.freeBlocks.length > 0 ? (
+                    <span className="text-primary font-medium">
+                      {item.freeBlocks.length}{" "}
+                      {item.freeBlocks.length === 1
+                        ? "bloque libre"
+                        : "bloques libres"}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      Sin bloques libres
+                    </span>
+                  )}
                 </p>
               </div>
             ))}
@@ -126,7 +168,7 @@ export function DayView({
               return (
                 <div
                   key={item.professional.id}
-                  className="bg-muted relative overflow-hidden rounded-md border"
+                  className="bg-muted border-border relative overflow-hidden rounded-md border transition-colors"
                   style={{ height }}
                 >
                   {item.windows.map((window) => (
@@ -177,7 +219,7 @@ export function DayView({
                         )}
                         aria-label={`Dar turno con ${item.professional.lastName} a las ${formatMinute(block.startMinute)}`}
                         title="Dar turno en este horario"
-                        className="border-primary-soft-border bg-primary-soft/40 text-primary-soft-foreground hover:bg-primary-soft focus-visible:ring-ring absolute overflow-hidden rounded-sm border border-dashed px-1.5 py-0.5 text-xs outline-none focus-visible:ring-2"
+                        className="border-primary/60 bg-primary-soft text-primary font-semibold hover:bg-primary-soft/80 hover:border-primary focus-visible:ring-ring absolute overflow-hidden rounded-sm border-2 border-dashed px-1.5 py-0.5 text-xs outline-none focus-visible:ring-2 shadow-xs transition-all"
                         style={{
                           ...mainLane,
                           top: offset(block.startMinute) + 1,
@@ -189,8 +231,10 @@ export function DayView({
                           ),
                         }}
                       >
-                        <span className="font-medium">Libre</span>{" "}
-                        <span className="tabular-nums">{label}</span>
+                        <span className="font-bold text-primary">Libre</span>{" "}
+                        <span className="tabular-nums font-semibold">
+                          {label}
+                        </span>
                       </Link>
                     );
                   })}
@@ -265,8 +309,12 @@ export function Legend({ freeClickable }: { freeClickable: boolean }) {
       className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm"
     >
       <li className="flex items-center gap-1.5">
-        <span className="border-primary-soft-border bg-primary-soft/40 size-3 rounded-sm border border-dashed" />
+        <span className="border-primary/60 bg-primary-soft size-3.5 rounded-sm border-2 border-dashed" />
         {freeClickable ? "Bloque libre (clic para dar turno)" : "Bloque libre"}
+      </li>
+      <li className="flex items-center gap-1.5">
+        <span className="border-amber-500/40 bg-amber-500/25 size-3.5 rounded-sm border-2 border-dashed" />
+        Feriado (centro cerrado)
       </li>
       {(["SCHEDULED", "COMPLETED", "EXPIRED", "CANCELLED"] as const).map(
         (status) => (

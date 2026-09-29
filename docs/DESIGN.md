@@ -11,8 +11,8 @@ colors:
   success: '#2E7D32'
   destructive: '#C62828'
   # Variantes suaves (badges, avisos): fondo / borde / texto
-  primary-soft: '#EAEDFF'
-  primary-soft-border: '#B0C6FF'
+  primary-soft: '#D8E2FF'
+  primary-soft-border: '#80A5FF'
   primary-soft-foreground: '#0D47A1'
   info-soft: '#E0F7FA'
   info-soft-border: '#80DEEA'
