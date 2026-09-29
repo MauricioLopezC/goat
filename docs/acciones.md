@@ -130,6 +130,11 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `AVAILABILITY_WINDOW_OVERLAP` | La franja se superpone con otra del mismo profesional el mismo día. |
 | `UNMET_DEPENDENCY` | La operación no puede completarse porque existen registros dependientes (por ejemplo, dar de baja un servicio con turnos futuros programados). |
 | `LAST_ACTIVE_PAYMENT_METHOD` | El medio de pago que se intenta desactivar es el único activo. No se puede dejar el centro sin medios de pago (HU-20). |
+| `SERVICE_WITHOUT_PRICE` | El servicio del turno no tiene valor cargado: no hay qué cobrar (HU-21). |
+| `APPOINTMENT_ALREADY_PAID` | El turno ya tiene un cobro vigente (`Payment` en `PAID`). Lo dispara también el índice único parcial si dos cobros llegan a la vez (HU-21). |
+| `PATIENT_HAS_HEALTH_INSURANCE` | Se intenta cobrar a un paciente con obra social; en el Inc. 2 solo se cobra a particulares (HU-21). |
+| `AUTHORIZATION_NOT_REQUIRED` | Se intenta registrar una autorización en un turno de un paciente particular o de un servicio que no requiere orden (HU-21). |
+| `APPOINTMENT_HAS_PAYMENT` | El turno tiene un cobro vigente y no se puede cancelar, reprogramar ni marcar Vencido: primero se anula el cobro (HU-21). |
 
 Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
 
@@ -219,7 +224,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Efectos:** ninguno. Devuelve los turnos que empiezan en el rango, en hora del centro, ordenados por inicio e ID, filtrados por profesional y servicio. Con `hideCancelled` excluye los `CANCELLED`.
 **Errores:** `FORBIDDEN`, `VALIDATION`.
 **Revalida:** no aplica; lectura desde Server Component.
-**Devuelve:** resúmenes con paciente, servicio, profesional, horario, estado y autoría.
+**Devuelve:** resúmenes con paciente, servicio, profesional, horario, estado y autoría. Para `RECEPTIONIST` y `MANAGER` suman lo necesario para la marca de cobro o autorización ([HU-21](hu/HU-21-cobrar-turno.md)); el profesional no la recibe.
 
 ### `listAvailabilityWindows`
 
@@ -241,7 +246,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Efectos:** ninguno.
 **Errores:** `FORBIDDEN`, `NOT_FOUND`.
 **Revalida:** no aplica.
-**Devuelve:** resumen con paciente, servicio, profesional, horario, estado y autoría. Incluye los últimos eventos de trazabilidad.
+**Devuelve:** resumen con paciente, servicio, profesional, horario, estado y autoría. Incluye los últimos eventos de trazabilidad. Para `RECEPTIONIST` y `MANAGER` suma los datos de cobro de [HU-21](hu/HU-21-cobrar-turno.md): cobertura del paciente, valor del servicio y si requiere orden, cobros (vigente y anulados, con autor) y autorización. El profesional no los recibe.
 
 ### `cancelAppointment`
 
@@ -250,7 +255,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Entrada:** `appointmentId` (entero positivo), `reason` (1–500 caracteres, obligatorio), `requestedBy` (1–100 caracteres, obligatorio).
 **Precondiciones:** el turno existe y está en estado `SCHEDULED`.
 **Efectos:** transacción `Serializable` que actualiza `Appointment.status` a `CANCELLED` y crea un `AppointmentEvent` de tipo `CANCELLED` con `reason`, `requestedBy`, `userId` (actor) y `createdAt` (ahora). El horario queda libre de inmediato.
-**Errores:** `VALIDATION` (campo vacío o ID inválido), `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`), `REASON_REQUIRED` (falta el motivo de cancelación).
+**Errores:** `VALIDATION` (campo vacío o ID inválido), `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`), `REASON_REQUIRED` (falta el motivo de cancelación), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente; [HU-21](hu/HU-21-cobrar-turno.md)).
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
 **Devuelve:** `{ id }`.
 
@@ -272,7 +277,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Entrada:** `appointmentId` (entero positivo), `reason` (hasta 500 caracteres, opcional).
 **Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya terminó (`endsAt` no es posterior a ahora). La restricción de exclusión no cubre `EXPIRED`: vencer un turno futuro liberaría su horario, por eso la DAL lo impide.
 **Efectos:** en una transacción, actualiza `Appointment.status` a `EXPIRED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya terminado, y crea un `AppointmentEvent` de tipo `EXPIRED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Igual que al completar, un cambio concurrente no se pisa.
-**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no terminó).
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no terminó), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente: si se cobró, el paciente vino; [HU-21](hu/HU-21-cobrar-turno.md)).
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
 **Devuelve:** `{ id }`.
 
@@ -342,7 +347,7 @@ Una ficha por operación implementada o acordada. Se agregan a medida que se tra
 **Entrada:** `appointmentId`, `professionalId`, `reason` y `requestedBy` obligatorios.
 **Precondiciones:** el turno pertenece al profesional de la ficha, está `SCHEDULED` y todavía no comenzó.
 **Efectos:** pasa a `CANCELLED` y crea `AppointmentEvent` con autor, fecha, motivo y solicitante, en una transacción.
-**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION`.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION`, `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente; [HU-21](hu/HU-21-cobrar-turno.md)).
 **Revalida:** `/professionals/[id]` y `/professionals/[id]/edit`.
 **Devuelve:** `{ id }`.
 
@@ -760,3 +765,36 @@ No es una Server Action: la usa el formulario de cobro de HU-21 (ADR 0001).
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `DUPLICATE` (nombre ya tomado), `LAST_ACTIVE_PAYMENT_METHOD` (no se puede desactivar el último activo).
 **Revalida:** `/payment-methods`.
 **Devuelve:** `{ id, name, active }`.
+
+### `registerPayment`
+
+**Historia de usuario:** [HU-21 — Cobrar un turno en el mostrador](hu/HU-21-cobrar-turno.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `appointmentId` (entero positivo), `paymentMethodId` (entero positivo).
+**Precondiciones:** el turno existe y está habilitado para cobrar: `SCHEDULED` con inicio hoy (hora de Argentina) o `COMPLETED`. El paciente es particular (`coverageType` `PRIVATE`). El servicio tiene `price` cargado. El medio de pago existe y está activo. El turno no tiene otro `Payment` en `PAID`.
+**Efectos:** en una transacción `Serializable`, crea un `Payment` en `PAID` con `amount` igual a `Service.price` en ese momento, `createdById` (actor) y `createdAt` (ahora). El monto no cambia si después cambia el valor del servicio. Si dos cobros llegan a la vez, el índice único parcial `Payment_one_paid_per_appointment` deja pasar uno solo.
+**Errores:** `VALIDATION` (entrada inválida, o medio de pago inexistente o inactivo, con `fieldErrors.paymentMethodId`), `FORBIDDEN`, `NOT_FOUND` (el turno no existe), `INVALID_STATUS_TRANSITION` (el turno no está habilitado para cobrar), `PATIENT_HAS_HEALTH_INSURANCE`, `SERVICE_WITHOUT_PRICE`, `APPOINTMENT_ALREADY_PAID`.
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
+**Devuelve:** `{ id, amount }`, con `amount` como texto decimal (`"15000.00"`).
+
+### `voidPayment`
+
+**Historia de usuario:** [HU-21 — Cobrar un turno en el mostrador](hu/HU-21-cobrar-turno.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `paymentId` (entero positivo), `reason` (1–500 caracteres, obligatorio).
+**Precondiciones:** el cobro existe y está en `PAID`.
+**Efectos:** pasa el `Payment` a `VOIDED` y carga juntos `voidedAt` (ahora), `voidedById` (actor) y `voidReason`, con un `UPDATE` condicionado a que siga en `PAID`: dos anulaciones simultáneas no se pisan. El cobro no se borra. El turno queda pendiente de cobro y se puede volver a cobrar.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `REASON_REQUIRED` (falta el motivo), `INVALID_STATUS_TRANSITION` (el cobro ya estaba anulado).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
+**Devuelve:** `{ id, appointmentId }`.
+
+### `registerAuthorization`
+
+**Historia de usuario:** [HU-21 — Cobrar un turno en el mostrador](hu/HU-21-cobrar-turno.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `appointmentId` (entero positivo), `authorizationNumber` (1–50 caracteres, obligatorio).
+**Precondiciones:** el turno existe y está habilitado (`SCHEDULED` con inicio hoy o `COMPLETED`). El paciente tiene obra social y el servicio requiere orden.
+**Efectos:** en una transacción, carga juntos `authorizationNumber`, `authorizedAt` (ahora) y `authorizedById` (actor). Si el turno ya tenía una autorización con otro número, la corrige y crea un `AppointmentEvent` `UPDATED` con el número anterior en `reason`, para que quede en el historial del turno.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está habilitado), `AUTHORIZATION_NOT_REQUIRED` (paciente particular o servicio sin orden).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
+**Devuelve:** `{ id, authorizationNumber }`.

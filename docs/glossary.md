@@ -70,11 +70,11 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 
 **Día de la semana** (`Weekday`): `MONDAY` a `SUNDAY`. Es el día del patrón semanal de una `AvailabilityWindow`, no una fecha.
 
-**Tipo de cambio en un turno** (`AppointmentEventType`): `UPDATED`, `CANCELLED`, `COMPLETED`, `EXPIRED`, y desde el Inc. 2 `RESCHEDULED` (reprogramado) y `PRIORITY_CHANGED` (cambio de prioridad, con `previousPriority` y `newPriority`; [HU-19](hu/HU-19-turno-prioritario.md)).
+**Tipo de cambio en un turno** (`AppointmentEventType`): `UPDATED` (incluye la corrección del número de autorización, [HU-21](hu/HU-21-cobrar-turno.md)), `CANCELLED`, `COMPLETED`, `EXPIRED`, y desde el Inc. 2 `RESCHEDULED` (reprogramado) y `PRIORITY_CHANGED` (cambio de prioridad, con `previousPriority` y `newPriority`; [HU-19](hu/HU-19-turno-prioritario.md)).
 
 **Prioridad del turno** (`AppointmentPriority`): `NORMAL` o `URGENT` (urgente). Un turno `URGENT` lleva su motivo en `priorityReason` ([HU-19](hu/HU-19-turno-prioritario.md)).
 
-**Estado del cobro** (`PaymentStatus`): `PAID` (cobrado) o `VOIDED` (anulado). Un turno tiene como máximo un `Payment` en `PAID`. Un turno sin cobro vigente está *pendiente de cobro*; no hay un estado persistido para eso.
+**Estado del cobro** (`PaymentStatus`): `PAID` (cobrado) o `VOIDED` (anulado). Un turno tiene como máximo un `Payment` en `PAID`. Un turno sin cobro vigente está *pendiente de cobro*; no hay un estado persistido para eso. Del mismo modo, un turno de un paciente con obra social cuyo servicio requiere orden está *pendiente de autorización* hasta que tiene `authorizationNumber`, y entonces está *autorizado*. Estos cuatro estados se calculan con `paymentState` (`src/lib/payments.ts`): `PENDING_PAYMENT`, `PAID`, `PENDING_AUTHORIZATION` y `AUTHORIZED` ([HU-21](hu/HU-21-cobrar-turno.md)).
 
 **Tipo de cambio en un profesional** (`ProfessionalEventType`): `UPDATED`, `DEACTIVATED`, `REACTIVATED`.
 
