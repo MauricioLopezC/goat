@@ -58,6 +58,9 @@
   --color-destructive-soft: var(--destructive-soft);
   --color-destructive-soft-border: var(--destructive-soft-border);
   --color-destructive-soft-foreground: var(--destructive-soft-foreground);
+  --color-holiday: var(--holiday);
+  --color-holiday-foreground: var(--holiday-foreground);
+  --color-holiday-muted-foreground: var(--holiday-muted-foreground);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -182,6 +185,9 @@
   --destructive-soft: #ffebee;
   --destructive-soft-border: #ffcdd2;
   --destructive-soft-foreground: #c62828;
+  --holiday: #fe9a00;
+  --holiday-foreground: #461901;
+  --holiday-muted-foreground: #7b3306;
 
   --chart-1: #0d47a1;
   --chart-2: #00838f;

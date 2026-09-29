@@ -96,7 +96,7 @@ export function WeekView({
                     "border-b border-l p-2 text-left font-normal transition-colors",
                     day.date === today && !day.holiday && "bg-primary-soft",
                     day.holiday &&
-                      "bg-amber-500/15 border-b-2 border-b-amber-500/50",
+                      "bg-holiday/15 border-b-2 border-b-holiday/50",
                   )}
                 >
                   <Link
@@ -107,7 +107,7 @@ export function WeekView({
                       className={cn(
                         "text-label-md uppercase",
                         day.holiday
-                          ? "text-amber-950 font-bold"
+                          ? "text-holiday-foreground font-bold"
                           : "text-muted-foreground",
                       )}
                     >
@@ -116,7 +116,7 @@ export function WeekView({
                     <span
                       className={cn(
                         "tabular-nums font-semibold",
-                        day.holiday && "text-amber-950 font-bold",
+                        day.holiday && "text-holiday-foreground font-bold",
                       )}
                     >
                       {dateToDb(day.date).getUTCDate()}/
@@ -124,7 +124,7 @@ export function WeekView({
                     </span>
                     {day.holiday && (
                       <span
-                        className="mt-0.5 rounded bg-amber-500/25 border border-amber-500/40 px-1 py-0.5 text-[10px] font-bold text-amber-950 truncate max-w-[140px]"
+                        className="mt-0.5 rounded bg-holiday/25 border border-holiday/40 px-1 py-0.5 text-[10px] font-bold text-holiday-foreground truncate max-w-[140px]"
                         title={`Feriado: ${day.holiday}`}
                       >
                         Feriado: {day.holiday}
@@ -151,20 +151,20 @@ export function WeekView({
                       <td
                         key={day.date}
                         rowSpan={professionals.length}
-                        className="border-b border-l border-amber-500/30 bg-amber-500/15 p-3 align-middle text-center transition-colors"
+                        className="border-b border-l border-holiday/30 bg-holiday/15 p-3 align-middle text-center transition-colors"
                       >
                         <Link
                           href={calendarHref(dayQuery(day.date))}
                           aria-label={`Ver feriado ${day.holiday}`}
-                          className="focus-visible:ring-ring flex h-full min-h-36 flex-col items-center justify-center gap-2 rounded-lg p-2 text-center outline-none transition-colors hover:bg-amber-500/20 focus-visible:ring-2"
+                          className="focus-visible:ring-ring flex h-full min-h-36 flex-col items-center justify-center gap-2 rounded-lg p-2 text-center outline-none transition-colors hover:bg-holiday/20 focus-visible:ring-2"
                         >
-                          <span className="rounded-full bg-amber-500/25 border border-amber-500/40 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-950">
+                          <span className="rounded-full bg-holiday/25 border border-holiday/40 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-holiday-foreground">
                             Centro cerrado
                           </span>
-                          <span className="text-sm font-bold text-amber-950">
+                          <span className="text-sm font-bold text-holiday-foreground">
                             {day.holiday}
                           </span>
-                          <span className="text-xs text-amber-900/80 max-w-[160px] leading-tight font-medium">
+                          <span className="text-xs text-holiday-muted-foreground/80 max-w-[160px] leading-tight font-medium">
                             Cerrado para atención médica, recepción y gerencia
                           </span>
                         </Link>

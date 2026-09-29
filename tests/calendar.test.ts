@@ -6,6 +6,7 @@ import {
   calendarHref,
   calendarRange,
   parseCalendarQuery,
+  pastUntilMinute,
   shiftCalendarDate,
 } from "../src/lib/calendar";
 import { weekdayOf } from "../src/lib/schedule";
@@ -77,6 +78,13 @@ test("hoy se descuenta el tiempo ya transcurrido, redondeado a 5 minutos", () =>
     }),
     [{ startMinute: 605, endMinute: 720 }],
   );
+});
+
+test("el horario pasado llega hasta donde empiezan los bloques libres", () => {
+  assert.equal(pastUntilMinute(date, date, at(602)), 605);
+  assert.equal(pastUntilMinute(date, date, at(600)), 600);
+  assert.equal(pastUntilMinute(date, "2026-10-02", at(0)), 1440);
+  assert.equal(pastUntilMinute(date, "2026-09-30", at(0)), 0);
 });
 
 test("con servicio, los bloques siguen la grilla del alta de turno", () => {

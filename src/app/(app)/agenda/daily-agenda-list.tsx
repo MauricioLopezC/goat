@@ -65,7 +65,7 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
         </p>
 
         {holiday && (
-          <div className="bg-amber-500/15 border-amber-500/30 text-amber-900 dark:text-amber-200 mb-3 rounded-lg border p-2 text-xs font-medium">
+          <div className="bg-holiday/15 border-holiday/30 text-holiday-muted-foreground mb-3 rounded-lg border p-2 text-xs font-medium">
             Feriado: {holiday.description}
           </div>
         )}
@@ -101,20 +101,20 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
             className={cn(
               "relative rounded-lg border transition-colors",
               holiday
-                ? "bg-amber-500/10 border-amber-500/30"
+                ? "bg-holiday/10 border-holiday/30"
                 : "bg-muted/30 border-border",
             )}
             style={{ height }}
           >
             {holiday ? (
-              <div className="absolute inset-1 flex flex-col items-center justify-center rounded-md border-2 border-dashed border-amber-500/40 bg-amber-500/15 p-4 text-center">
-                <span className="rounded-full bg-amber-500/25 border border-amber-500/40 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-amber-950">
+              <div className="absolute inset-1 flex flex-col items-center justify-center rounded-md border-2 border-dashed border-holiday/40 bg-holiday/15 p-4 text-center">
+                <span className="rounded-full bg-holiday/25 border border-holiday/40 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-holiday-foreground">
                   Centro cerrado
                 </span>
-                <span className="text-sm font-bold text-amber-950 mt-2">
+                <span className="text-sm font-bold text-holiday-foreground mt-2">
                   {holiday.description}
                 </span>
-                <p className="text-xs text-amber-900/80 mt-1 max-w-[200px] leading-tight font-medium">
+                <p className="text-xs text-holiday-muted-foreground/80 mt-1 max-w-[200px] leading-tight font-medium">
                   Cerrado durante toda la jornada para atención médica,
                   recepción y gerencia.
                 </p>
@@ -203,14 +203,14 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
         </div>
 
         {holiday ? (
-          <div className="bg-amber-500/10 border-amber-500/30 text-amber-950 flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center shadow-xs">
-            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/25 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-900">
+          <div className="bg-holiday/10 border-holiday/30 text-holiday-foreground flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center shadow-xs">
+            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-holiday/40 bg-holiday/25 px-3 py-1 text-xs font-bold uppercase tracking-wider text-holiday-muted-foreground">
               Centro cerrado · Feriado nacional
             </span>
-            <h4 className="text-xl font-bold text-amber-950 sm:text-2xl">
+            <h4 className="text-xl font-bold text-holiday-foreground sm:text-2xl">
               {holiday.description}
             </h4>
-            <p className="mt-2 max-w-md text-sm font-medium text-amber-900/80">
+            <p className="mt-2 max-w-md text-sm font-medium text-holiday-muted-foreground/80">
               El policonsultorio permanece cerrado durante toda la jornada para
               todas las áreas (atención médica, recepción y gerencia). No se
               brindan turnos en este día.

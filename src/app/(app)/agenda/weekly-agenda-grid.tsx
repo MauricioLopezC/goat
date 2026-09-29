@@ -91,7 +91,7 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                       !holiday &&
                       "bg-primary-soft/40 border-b-2 border-primary pt-1",
                     holiday &&
-                      "bg-amber-500/15 border-b-2 border-amber-500/60 pt-1",
+                      "bg-holiday/15 border-b-2 border-holiday/60 pt-1",
                   )}
                 >
                   <p className="text-label-md text-muted-foreground uppercase">
@@ -118,7 +118,7 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                   {/* Feriado en la cabecera (sin pisar las franjas) */}
                   {holiday && (
                     <span
-                      className="mt-1 w-full max-w-[130px] truncate rounded bg-amber-500/15 border border-amber-500/30 px-1 py-0.5 text-[10px] font-semibold text-amber-900 dark:text-amber-200"
+                      className="mt-1 w-full max-w-[130px] truncate rounded bg-holiday/15 border border-holiday/30 px-1 py-0.5 text-[10px] font-semibold text-holiday-muted-foreground"
                       title={`Feriado: ${holiday.description}`}
                     >
                       Feriado: {holiday.description}
@@ -174,17 +174,17 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                 return (
                   <div
                     key={day.date}
-                    className="relative rounded-lg border border-amber-500/30 bg-amber-500/10 pt-1 transition-colors"
+                    className="relative rounded-lg border border-holiday/30 bg-holiday/10 pt-1 transition-colors"
                     style={{ height }}
                   >
-                    <div className="absolute inset-1 flex flex-col items-center justify-center rounded-md border-2 border-dashed border-amber-500/40 bg-amber-500/15 p-2 text-center">
-                      <span className="rounded-full bg-amber-500/25 border border-amber-500/40 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-950">
+                    <div className="absolute inset-1 flex flex-col items-center justify-center rounded-md border-2 border-dashed border-holiday/40 bg-holiday/15 p-2 text-center">
+                      <span className="rounded-full bg-holiday/25 border border-holiday/40 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-holiday-foreground">
                         Centro cerrado
                       </span>
-                      <span className="text-xs font-bold text-amber-950 mt-1.5 max-w-[120px] line-clamp-2">
+                      <span className="text-xs font-bold text-holiday-foreground mt-1.5 max-w-[120px] line-clamp-2">
                         {holiday.description}
                       </span>
-                      <span className="text-[10px] text-amber-900/80 mt-1 max-w-[120px] leading-tight font-medium">
+                      <span className="text-[10px] text-holiday-muted-foreground/80 mt-1 max-w-[120px] leading-tight font-medium">
                         Cerrado para atención médica, recepción y gerencia
                       </span>
                     </div>
@@ -268,11 +268,9 @@ export function WeeklyAgendaGrid({ data }: { data: AgendaData }) {
                         >
                           <span
                             className={`font-semibold tabular-nums text-[10px] uppercase ${
-                              holiday
-                                ? "text-amber-900 font-bold"
-                                : isClosed
-                                  ? "text-muted-foreground"
-                                  : "text-primary font-bold"
+                              isClosed
+                                ? "text-muted-foreground"
+                                : "text-primary font-bold"
                             }`}
                           >
                             {window.room ? `${window.room.name} · ` : ""}

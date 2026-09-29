@@ -29,6 +29,10 @@ colors:
   destructive-soft: '#FFEBEE'
   destructive-soft-border: '#FFCDD2'
   destructive-soft-foreground: '#C62828'
+  # Feriado (centro cerrado): se usa con opacidad, ej. bg-holiday/15
+  holiday: '#FE9A00'
+  holiday-foreground: '#461901'
+  holiday-muted-foreground: '#7B3306'
   # Neutros (escala slate)
   foreground: '#0F172A'
   muted-foreground: '#475569'
@@ -84,6 +88,7 @@ Estilo: **minimalismo de precisión clínica** — bordes definidos, superficies
 | **Advertencia** `#E65100` (ámbar) | `warning` | Turnos vencidos, avisos que requieren atención sin ser críticos. |
 | **Éxito** `#2E7D32` (verde recuperación) | `success` | Turno completado, pagado, confirmaciones completadas. |
 | **Crítico** `#C62828` | `destructive` | Urgencia/prioridad, errores de validación, acciones destructivas. |
+| **Feriado** `#FE9A00` (ámbar) | `holiday` | Solo feriados (centro cerrado) en calendario y agenda. Fondos y bordes con opacidad (`bg-holiday/15`, `border-holiday/40`); texto en `holiday-foreground` (`#461901`) o `holiday-muted-foreground` (`#7B3306`). |
 
 **Superficies:** lienzo `#F8FAFC` (`background`), tarjetas y paneles `#FFFFFF` (`card`), bandejas/columnas laterales `#F1F5F9` (`tray`, `muted`, `sidebar`), bordes `#E2E8F0` (`border`) y `#CBD5E1` (`input`, bordes de paneles activos).
 
@@ -159,7 +164,7 @@ Profundidad por **bordes de bajo contraste** y sombras tenues teñidas de slate.
 ### Componentes propios del dominio
 
 - **Bloque de turno en agenda:** ítem con **borde izquierdo de 4 px** según estado (ver tabla). Muestra horario (tabular), paciente, prestación y profesional; badge "Urgente" si corresponde.
-- **Franja de atención:** en el calendario, las horas fuera de la franja del profesional se muestran sobre `tray` y no aceptan turnos (refuerza la regla de no turnos fuera de horario).
+- **Franja de atención:** en el calendario, las horas fuera de la franja del profesional se muestran sobre `tray` y no aceptan turnos (refuerza la regla de no turnos fuera de horario). La parte de la franja que ya pasó (hoy, hasta la hora actual redondeada a 5 min; días anteriores, completa) va sobre `tray` con un rayado diagonal en `placeholder` (`#94A3B8`), para no confundirla con un hueco libre.
 - **Indicador de ocupación / ausentismo:** pista de doble capa (`#E2E8F0` base, relleno `success` o `primary`) con el porcentaje en Geist negrita tabular. Base para el tablero de gerencia y del profesional.
 
 ## Implementación (shadcn/ui + Tailwind 4)

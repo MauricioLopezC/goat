@@ -6,7 +6,11 @@ import {
   appointmentDateBounds,
   type MinuteRange,
 } from "@/lib/appointment-slots";
-import { calculateFreeBlocks, type FreeBlock } from "@/lib/calendar";
+import {
+  calculateFreeBlocks,
+  pastUntilMinute,
+  type FreeBlock,
+} from "@/lib/calendar";
 import { toLocalSlot, weekdayOf } from "@/lib/schedule";
 
 export type CalendarAvailability = Awaited<
@@ -33,6 +37,8 @@ export type ProfessionalDay = {
 export type CalendarDay = {
   date: string;
   holiday: string | null;
+  /// Minuto hasta el que el día ya pasó (0 si es futuro, 1440 si es anterior).
+  pastUntilMinute: number;
   professionals: ProfessionalDay[];
 };
 
@@ -123,7 +129,12 @@ export function buildCalendarDay(
     });
   }
 
-  return { date, holiday, professionals };
+  return {
+    date,
+    holiday,
+    pastUntilMinute: pastUntilMinute(date, bounds.min, now),
+    professionals,
+  };
 }
 
 /// Rango de horas a dibujar: el que cubre franjas y turnos, o 8 a 18.
