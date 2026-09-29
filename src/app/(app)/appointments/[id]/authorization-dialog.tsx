@@ -24,13 +24,16 @@ import type { ActionResult } from "@/lib/actions";
 
 export function AuthorizationDialog({
   appointmentId,
-  returnSearch,
+  successHref,
+  triggerClassName,
   summary,
   currentNumber,
 }: {
   appointmentId: number;
-  /** Parámetros del calendario de origen, para conservarlos al volver (HU-11). */
-  returnSearch: string;
+  /** A dónde ir después de guardar, con el aviso de éxito. */
+  successHref: string;
+  /** Ajuste del botón que abre el diálogo (ej. alto dentro de una tabla). */
+  triggerClassName?: string;
   summary: string;
   currentNumber: string | null;
 }) {
@@ -46,9 +49,7 @@ export function AuthorizationDialog({
     });
     if (result.ok) {
       setOpen(false);
-      const search = new URLSearchParams(returnSearch);
-      search.set("billing", "authorized");
-      router.replace(`/appointments/${appointmentId}?${search}`);
+      router.replace(successHref);
     }
     return result;
   }, null);
@@ -59,7 +60,10 @@ export function AuthorizationDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={correcting ? "outline" : "default"}>
+        <Button
+          variant={correcting ? "outline" : "default"}
+          className={triggerClassName}
+        >
           {correcting ? "Corregir autorización" : "Registrar autorización"}
         </Button>
       </DialogTrigger>

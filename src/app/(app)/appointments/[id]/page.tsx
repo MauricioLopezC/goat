@@ -93,6 +93,11 @@ export default async function AppointmentPage({
   // abrió el turno; sin parámetros, al día del turno.
   const calendarQuery = parseCalendarQuery(query, start.date);
   const returnSearch = calendarSearch(calendarQuery);
+  const billingHref = (notice: "paid" | "authorized") => {
+    const search = new URLSearchParams(returnSearch);
+    search.set("billing", notice);
+    return `/appointments/${appointment.id}?${search}`;
+  };
 
   return (
     <>
@@ -322,7 +327,7 @@ export default async function AppointmentPage({
                 {canCharge && billing.price !== null && (
                   <PaymentDialog
                     appointmentId={appointment.id}
-                    returnSearch={returnSearch}
+                    successHref={billingHref("paid")}
                     summary={summary}
                     price={billing.price}
                     paymentMethods={paymentMethods}
@@ -339,7 +344,7 @@ export default async function AppointmentPage({
                 {canAuthorize && (
                   <AuthorizationDialog
                     appointmentId={appointment.id}
-                    returnSearch={returnSearch}
+                    successHref={billingHref("authorized")}
                     summary={summary}
                     currentNumber={billing.authorization?.number ?? null}
                   />

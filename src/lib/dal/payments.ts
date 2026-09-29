@@ -6,12 +6,15 @@ import { assertRole, type Actor } from "@/lib/dal/auth";
 import { serializableTransaction } from "@/lib/dal/transactions";
 import {
   AppointmentEventType,
+  AppointmentStatus,
   CoverageType,
   PaymentStatus,
   Role,
 } from "@/generated/prisma/enums";
 import { Prisma } from "@/generated/prisma/client";
 import { isChargeable, paymentState, type PaymentState } from "@/lib/payments";
+import { appointmentInstant } from "@/lib/appointment-slots";
+import { toLocalSlot } from "@/lib/schedule";
 import {
   registerAuthorizationSchema,
   registerPaymentSchema,
@@ -157,6 +160,70 @@ export async function getPaymentStates(
     if (state) states[appointment.id] = state;
   }
   return states;
+}
+
+/// Turnos de hoy (Programados y Completados) en los que aplica el cobro o la
+/// autorización, para la pantalla Cobros del día.
+export async function listTodayBilling(actor: Actor, now = new Date()) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  const today = toLocalSlot(now).date;
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      startsAt: {
+        gte: appointmentInstant(today, 0),
+        lt: appointmentInstant(today, 1440),
+      },
+      status: {
+        in: [AppointmentStatus.SCHEDULED, AppointmentStatus.COMPLETED],
+      },
+    },
+    select: {
+      id: true,
+      status: true,
+      startsAt: true,
+      endsAt: true,
+      authorizationNumber: true,
+      patient: {
+        select: {
+          firstName: true,
+          lastName: true,
+          documentType: true,
+          documentNumber: true,
+          coverageType: true,
+        },
+      },
+      professional: { select: personSelect },
+      service: { select: { name: true, price: true, requiresReferral: true } },
+      payments: {
+        where: { status: PaymentStatus.PAID },
+        select: { amount: true, paymentMethod: { select: { name: true } } },
+      },
+    },
+    orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+  });
+  return appointments.flatMap(({ payments, service, ...appointment }) => {
+    const [activePayment] = payments;
+    const state = paymentState({
+      coverageType: appointment.patient.coverageType,
+      requiresReferral: service.requiresReferral,
+      hasActivePayment: activePayment !== undefined,
+      authorizationNumber: appointment.authorizationNumber,
+    });
+    if (!state) return [];
+    return [
+      {
+        ...appointment,
+        state,
+        service: { name: service.name },
+        // Decimal no cruza a componentes cliente: va como texto ("15000.00").
+        price: service.price?.toFixed(2) ?? null,
+        activePayment: activePayment && {
+          amount: activePayment.amount.toFixed(2),
+          paymentMethod: activePayment.paymentMethod.name,
+        },
+      },
+    ];
+  });
 }
 
 export async function registerPayment(

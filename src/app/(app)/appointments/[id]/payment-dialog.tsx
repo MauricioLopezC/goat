@@ -30,14 +30,17 @@ import { formatAmount } from "@/lib/payments";
 
 export function PaymentDialog({
   appointmentId,
-  returnSearch,
+  successHref,
+  triggerClassName,
   summary,
   price,
   paymentMethods,
 }: {
   appointmentId: number;
-  /** Parámetros del calendario de origen, para conservarlos al volver (HU-11). */
-  returnSearch: string;
+  /** A dónde ir después de guardar, con el aviso de éxito. */
+  successHref: string;
+  /** Ajuste del botón que abre el diálogo (ej. alto dentro de una tabla). */
+  triggerClassName?: string;
   summary: string;
   /** Valor del servicio como texto decimal ("15000.00"). */
   price: string;
@@ -57,9 +60,7 @@ export function PaymentDialog({
     });
     if (result.ok) {
       setOpen(false);
-      const search = new URLSearchParams(returnSearch);
-      search.set("billing", "paid");
-      router.replace(`/appointments/${appointmentId}?${search}`);
+      router.replace(successHref);
     }
     return result;
   }, null);
@@ -73,7 +74,7 @@ export function PaymentDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button>Cobrar</Button>
+        <Button className={triggerClassName}>Cobrar</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

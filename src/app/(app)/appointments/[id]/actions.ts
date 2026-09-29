@@ -25,6 +25,7 @@ function revalidateAppointment(appointmentId: number) {
   revalidatePath("/calendar");
   revalidatePath("/agenda");
   revalidatePath(`/appointments/${appointmentId}`);
+  revalidatePath("/payments");
 }
 
 export const cancelAppointment = defineAction({
