@@ -14,6 +14,7 @@ import { canViewProfessional } from "@/lib/dal/availability";
 import { STAFF_ROLES } from "@/lib/roles";
 import { getTodayDateString } from "@/lib/utils";
 import { emptyPage, paginate, type Page } from "@/lib/pagination";
+import type { ServiceOption } from "@/lib/services";
 
 // ─────────────────────── Tipos de entrada ────────────────────────────
 
@@ -565,12 +566,19 @@ export async function listActiveProfessionalTitles(actor: Actor) {
 /**
  * Devuelve el catálogo de servicios activos para las opciones de formulario.
  */
-export async function listActiveServices(actor: Actor) {
+export async function listActiveServices(
+  actor: Actor,
+): Promise<ServiceOption[]> {
   assertRole(actor, ...STAFF_ROLES);
 
   return prisma.service.findMany({
     where: { active: true },
-    select: { id: true, name: true, durationMinutes: true },
+    select: {
+      id: true,
+      name: true,
+      durationMinutes: true,
+      specialty: { select: { id: true, name: true } },
+    },
     orderBy: { name: "asc" },
   });
 }

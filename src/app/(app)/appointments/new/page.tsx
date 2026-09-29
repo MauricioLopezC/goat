@@ -23,15 +23,11 @@ import {
   CardContent,
   CardDescription,
 } from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AppointmentForm } from "./appointment-form";
 import { PatientSearch } from "./patient-search";
 import { ProfessionalPicker } from "./professional-picker";
+import { ServicePicker } from "./service-picker";
 
 export const metadata = { title: "Nuevo turno · Goat" };
 function positiveId(value: string | string[] | undefined) {
@@ -273,38 +269,12 @@ export default async function NewAppointmentPage({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form action="/appointments/new" className="flex flex-col gap-3">
-              <input type="hidden" name="patientId" value={patient.id} />
-              {[...preset]
-                .filter(([key]) => key !== "serviceId")
-                .map(([key, value]) => (
-                  <input key={key} type="hidden" name={key} value={value} />
-                ))}
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="service">Servicio</FieldLabel>
-                  <NativeSelect
-                    id="service"
-                    name="serviceId"
-                    defaultValue={service?.id ?? ""}
-                    required
-                    className="w-full"
-                  >
-                    <NativeSelectOption value="">
-                      Elegí un servicio
-                    </NativeSelectOption>
-                    {serviceOptions.map((item) => (
-                      <NativeSelectOption value={item.id} key={item.id}>
-                        {item.name} · {item.durationMinutes} min
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </Field>
-              </FieldGroup>
-              <Button type="submit" variant="outline" className="self-start">
-                Seleccionar servicio
-              </Button>
-            </form>
+            <ServicePicker
+              patientId={patient.id}
+              selectedServiceId={service?.id}
+              services={serviceOptions}
+              preset={Object.fromEntries(preset.entries())}
+            />
           </CardContent>
         </Card>
       )}

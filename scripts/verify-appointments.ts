@@ -222,7 +222,11 @@ async function main() {
         where: { id: exception.id },
       });
       const holiday = await prisma.holiday.create({
-        data: { date: dateToDb(date), description: tag },
+        data: {
+          date: dateToDb(date),
+          description: tag,
+          createdById: manager.id,
+        },
       });
       try {
         assert.equal((await listAvailableSlots(input, manager)).length, 0);

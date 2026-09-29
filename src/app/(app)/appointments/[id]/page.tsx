@@ -31,6 +31,8 @@ const EVENT_TYPE_LABEL: Record<AppointmentEventType, string> = {
   CANCELLED: "Cancelado",
   COMPLETED: "Completado",
   EXPIRED: "Vencido",
+  RESCHEDULED: "Reprogramado",
+  PRIORITY_CHANGED: "Prioridad cambiada",
 };
 
 export default async function AppointmentPage({

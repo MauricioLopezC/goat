@@ -1,4 +1,4 @@
-// Modelo de datos del Incremento 1.
+// Modelo de datos vigente (Incrementos 1 y 2).
 //
 // Nombres de dominio: docs/glossary.md. Historias: docs/hu/.
 // Documentación en español, código en inglés (AGENTS.md).
@@ -78,6 +78,23 @@ enum AppointmentEventType {
   CANCELLED
   COMPLETED
   EXPIRED
+  /// Otro horario o profesional, mismo turno (HU-16).
+  RESCHEDULED
+  /// Cambio de prioridad (HU-19).
+  PRIORITY_CHANGED
+}
+
+/// Prioridad del turno (HU-19). Un turno `URGENT` lleva su motivo.
+enum AppointmentPriority {
+  NORMAL
+  URGENT
+}
+
+/// Estado del cobro (HU-21). Un turno tiene como máximo un cobro `PAID`; sin
+/// cobro vigente está pendiente de cobro, que no es un estado persistido.
+enum PaymentStatus {
+  PAID
+  VOIDED
 }
 
 enum ProfessionalEventType {
@@ -95,7 +112,7 @@ model User {
   id Int @id @default(autoincrement())
 
   /// Identificador de ingreso (ADR 0002): obligatorio y único.
-  email        String @unique
+  email        String   @unique
   /// argon2id, con sus parámetros incluidos. Nunca la contraseña en claro.
   passwordHash String
   lastName     String
@@ -116,9 +133,13 @@ model User {
   createdPatients          Patient[]               @relation("PatientCreatedBy")
   updatedPatients          Patient[]               @relation("PatientUpdatedBy")
   createdExceptions        AvailabilityException[] @relation("AvailabilityExceptionCreatedBy")
+  createdHolidays          Holiday[]               @relation("HolidayCreatedBy")
   createdAppointments      Appointment[]           @relation("AppointmentCreatedBy")
+  authorizedAppointments   Appointment[]           @relation("AppointmentAuthorizedBy")
   appointmentEvents        AppointmentEvent[]
   professionalEvents       ProfessionalEvent[]
+  createdPayments          Payment[]               @relation("PaymentCreatedBy")
+  voidedPayments           Payment[]               @relation("PaymentVoidedBy")
 
   @@index([lastName, firstName])
 }
@@ -193,6 +214,10 @@ model Professional {
   appointments        Appointment[]
   events              ProfessionalEvent[]
 
+  /// Reprogramaciones que movieron un turno desde o hacia este profesional.
+  rescheduledFromEvents AppointmentEvent[] @relation("AppointmentEventPreviousProfessional")
+  rescheduledToEvents   AppointmentEvent[] @relation("AppointmentEventNewProfessional")
+
   @@unique([documentType, documentNumber])
   @@index([lastName, firstName])
   @@index([active])
@@ -225,8 +250,8 @@ model Service {
   durationMinutes  Int
   /// Requiere orden médica.
   requiresReferral Boolean  @default(false)
-  /// Valor de la prestación. Se mantiene separado de la cobertura y de lo que
-  /// paga el paciente. Opcional: no se cobra en el Inc. 1.
+  /// Valor de la prestación (HU-20). Se mantiene separado de la cobertura y de
+  /// lo que paga el paciente (`Payment.amount`). Sin valor no se cobra (HU-21).
   price            Decimal? @db.Decimal(12, 2)
   active           Boolean  @default(true)
 
@@ -289,12 +314,17 @@ model AvailabilityException {
   @@index([professionalId, date])
 }
 
-/// Feriado: el centro permanece cerrado y no genera disponibilidad para
-/// ningún profesional (HU-05).
+/// Feriado o día excepcional: el centro permanece cerrado el día completo y
+/// no genera disponibilidad para ningún profesional (HU-05, HU-14).
 model Holiday {
   id          Int      @id @default(autoincrement())
   date        DateTime @unique @db.Date
   description String
+
+  createdById Int
+  createdBy   User @relation("HolidayCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
 }
 
 // ──────────────────────────── Pacientes ──────────────────────────────
@@ -313,7 +343,19 @@ model Patient {
   /// Responsable o tutor, para pacientes menores de edad.
   guardianName   String?
   guardianPhone  String?
-  active         Boolean      @default(true)
+
+  /// Ficha completa (HU-17). Todo opcional: el alta no se alarga.
+  address                      String?
+  city                         String?
+  /// Nombre y teléfono van juntos (restricción en la migración).
+  emergencyContactName         String?
+  emergencyContactPhone        String?
+  /// Vínculo con el paciente (madre, pareja, vecino…).
+  emergencyContactRelationship String?
+  /// Observaciones administrativas del mostrador. No son datos clínicos.
+  notes                        String?
+
+  active Boolean @default(true)
 
   createdById Int
   createdBy   User  @relation("PatientCreatedBy", fields: [createdById], references: [id])
@@ -354,7 +396,8 @@ model InsurancePlan {
   @@unique([healthInsurerId, name])
 }
 
-/// Afiliación del paciente: plan, número de afiliado y coseguro.
+/// Afiliación del paciente: plan y número de afiliado. El coseguro se modela
+/// en el Inc. 3 (`Copay`, ver glosario).
 model Coverage {
   id        Int     @id @default(autoincrement())
   patientId Int     @unique
@@ -364,8 +407,6 @@ model Coverage {
   insurancePlan   InsurancePlan @relation(fields: [insurancePlanId], references: [id])
   /// Número de afiliado.
   memberNumber    String
-  /// Coseguro: lo que paga el paciente aunque tenga cobertura.
-  copayAmount     Decimal       @db.Decimal(12, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -389,14 +430,29 @@ model Appointment {
   status   AppointmentStatus @default(SCHEDULED)
   notes    String?
 
+  /// Prioridad (HU-19). Un turno `URGENT` exige motivo (restricción en la
+  /// migración).
+  priority       AppointmentPriority @default(NORMAL)
+  priorityReason String?
+
+  /// Orden o autorización de la obra social (HU-21). Los tres campos se
+  /// cargan juntos, al llegar el paciente.
+  authorizationNumber String?
+  authorizedAt        DateTime?
+  authorizedById      Int?
+  authorizedBy        User?     @relation("AppointmentAuthorizedBy", fields: [authorizedById], references: [id])
+
   createdById Int
   createdBy   User @relation("AppointmentCreatedBy", fields: [createdById], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  /// Todo cambio posterior al alta (cancelación, cierre, vencimiento).
-  events AppointmentEvent[]
+  /// Todo cambio posterior al alta (cancelación, cierre, vencimiento,
+  /// reprogramación, prioridad).
+  events   AppointmentEvent[]
+  /// Cobros del turno: a lo sumo uno `PAID`, más los anulados.
+  payments Payment[]
 
   @@index([professionalId, startsAt])
   @@index([patientId, startsAt])
@@ -416,10 +472,72 @@ model AppointmentEvent {
   /// Quién solicitó el cambio (el paciente, el profesional, el centro).
   requestedBy   String?
 
+  /// Horario y profesional antes y después (HU-16). Obligatorios en
+  /// `RESCHEDULED`, nulos en el resto (restricción en la migración).
+  previousStartsAt       DateTime?
+  previousEndsAt         DateTime?
+  previousProfessionalId Int?
+  previousProfessional   Professional? @relation("AppointmentEventPreviousProfessional", fields: [previousProfessionalId], references: [id])
+  newStartsAt            DateTime?
+  newEndsAt              DateTime?
+  newProfessionalId      Int?
+  newProfessional        Professional? @relation("AppointmentEventNewProfessional", fields: [newProfessionalId], references: [id])
+
+  /// Prioridad antes y después (HU-19). Obligatorias en `PRIORITY_CHANGED`,
+  /// nulas en el resto.
+  previousPriority AppointmentPriority?
+  newPriority      AppointmentPriority?
+
   userId Int
   user   User @relation(fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
 
   @@index([appointmentId, createdAt])
+}
+
+// ────────────────────────────── Cobros ───────────────────────────────
+
+/// Medio de pago que acepta el centro (HU-20). No se borra: se desactiva.
+model PaymentMethod {
+  id     Int     @id @default(autoincrement())
+  name   String  @unique
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments Payment[]
+}
+
+/// Cobro de un turno a un paciente particular, con un solo medio de pago
+/// (HU-21). No se borra: se anula con motivo y se vuelve a cobrar con una
+/// fila nueva. Un turno tiene como máximo un cobro `PAID` (índice único
+/// parcial en la migración).
+model Payment {
+  id            Int         @id @default(autoincrement())
+  appointmentId Int
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  paymentMethodId Int
+  paymentMethod   PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+
+  /// Lo que pagó el paciente: el valor del servicio en el momento del cobro.
+  /// No cambia si después cambia `Service.price`.
+  amount Decimal       @db.Decimal(12, 2)
+  status PaymentStatus @default(PAID)
+
+  /// Quién cobró y cuándo.
+  createdById Int
+  createdBy   User     @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  /// Anulación: los tres se cargan juntos, solo en `VOIDED`.
+  voidedAt   DateTime?
+  voidedById Int?
+  voidedBy   User?     @relation("PaymentVoidedBy", fields: [voidedById], references: [id])
+  voidReason String?
+
+  @@index([appointmentId])
+  @@index([createdAt])
 }

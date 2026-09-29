@@ -178,14 +178,14 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 ### `getAppointmentOptions`
 
-**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md).
+**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), [HU-13](hu/HU-13-buscar-servicio-al-dar-turno.md).
 **Roles:** `RECEPTIONIST`, `MANAGER`.
 **Entrada:** texto de búsqueda (hasta 80 caracteres), `patientPage` (página de 10, desde 1), `patientId?`, `serviceId?`.
 **Precondiciones:** rol autorizado; IDs válidos.
 **Efectos:** ninguno. Sin búsqueda muestra los 10 pacientes activos registrados más recientemente. Con búsqueda filtra por palabras del nombre, apellido o documento. Pagina ambos listados de 10 en 10, ordenados por fecha de alta descendente e ID descendente; recupera por separado el paciente elegido. Lista servicios activos y profesionales activos asociados al servicio con alguna franja habilitada.
 **Errores:** `FORBIDDEN`, `VALIDATION`.
 **Revalida:** no aplica.
-**Devuelve:** pacientes identificados por nombre y documento, indicador de página siguiente, paciente elegido, servicios (con duración), profesionales habilitados.
+**Devuelve:** pacientes identificados por nombre y documento, indicador de página siguiente, paciente elegido, servicios (con duración y especialidad `{ id, name } | null`), profesionales habilitados.
 
 ### `listAvailableDates`
 
@@ -439,13 +439,15 @@ No es una Server Action: es la lectura del listado de `/professionals` (ADR 0001
 
 ### `listActiveServices`
 
-**Historia de usuario:** [HU-02 — Registrar un profesional](hu/HU-02-registrar-profesional.md) / [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
+**Historia de usuario:** [HU-02 — Registrar un profesional](hu/HU-02-registrar-profesional.md) / [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md) / [HU-13 — Buscar el servicio al dar un turno](hu/HU-13-buscar-servicio-al-dar-turno.md)
 **Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
 **Entrada:** el `actor`. No recibe parámetros de la interfaz.
 **Precondiciones:** el actor pertenece a `STAFF_ROLES`.
 **Efectos:** ninguno. Es una lectura del catálogo de servicios activos.
 **Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
 **Revalida:** no aplica.
+**Devuelve:** `{ id, name, durationMinutes, specialty: { id, name } | null }[]`, ordenado alfabéticamente por nombre.
+
 ### `listServices`
 
 **Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
@@ -656,12 +658,12 @@ No es una Server Action: la página `/holidays` la llama directo a la DAL (ADR 0
 
 **Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`
-**Entrada:** `query` (cadena de búsqueda), `page` (de `?page=`) y el `actor`.
-**Precondiciones:** el actor pertenece a `STAFF_ROLES`. Si `query.trim().length < 3`, la operación no ejecuta la consulta a la base y retorna una página vacía.
-**Efectos:** ninguno. Es una lectura de pacientes activos (`active: true`) con coincidencia parcial insensible a mayúsculas en `lastName` o `firstName`, o coincidencia en `documentNumber`. Incluye la afiliación (`coverage`) con su plan y obra social.
+**Entrada:** `query` (cadena de búsqueda, puede venir vacía), `page` (de `?page=`) y el `actor`.
+**Precondiciones:** el actor pertenece a `STAFF_ROLES`.
+**Efectos:** ninguno. Es una lectura de pacientes activos (`active: true`). Si `query.trim().length < 3`, no filtra y devuelve el listado completo. Si no, filtra por coincidencia parcial insensible a mayúsculas en `lastName`, `firstName` o `documentNumber` (un documento con puntos o guiones también se busca solo con sus dígitos). Incluye la afiliación (`coverage`) con su plan y obra social.
 **Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro.
 **Revalida:** no aplica.
-**Devuelve:** `Page<Patient>` con `coverage` incluida, ordenados alfabéticamente por apellido, nombre e `id` ([listados paginados](#listados-paginados)).
+**Devuelve:** `Page<Patient>` con `coverage` incluida, del registrado más recientemente al más antiguo (`createdAt` e `id` descendentes), con o sin búsqueda ([listados paginados](#listados-paginados)).
 
 No es una Server Action: es una lectura que el Server Component de `/patients` llama directo a la DAL (ADR 0001).
 

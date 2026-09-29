@@ -579,7 +579,11 @@ export async function createHoliday(input: HolidayInput, actor: Actor) {
     );
 
     const holiday = await tx.holiday.create({
-      data: { date: dateToDb(input.date), description: input.description },
+      data: {
+        date: dateToDb(input.date),
+        description: input.description,
+        createdById: actor.id,
+      },
       select: { id: true, date: true, description: true },
     });
     return { ...holiday, date: dateFromDb(holiday.date) };

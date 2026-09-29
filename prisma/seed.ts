@@ -35,6 +35,7 @@ import {
   HOLIDAYS,
   MANAGER_EMAIL,
   PATIENTS,
+  PAYMENT_METHODS,
   PROFESSIONAL_HISTORY,
   PROFESSIONALS,
   ROOMS,
@@ -124,12 +125,13 @@ async function seedCatalog(prisma: PrismaClient) {
   }
 
   const serviceIds: Ids = new Map();
-  for (const { specialty, active, ...fields } of SERVICES) {
+  for (const { specialty, active, price, ...fields } of SERVICES) {
     const specialtyId = specialty
       ? idOf(specialtyIds, specialty, "Especialidad")
       : null;
     const input = createServiceSchema.parse({ ...fields, specialtyId });
-    const data = { ...input, active };
+    // El valor todavía no pasa por el validador de servicios: lo suma HU-20.
+    const data = { ...input, active, price };
 
     const { id } = await prisma.service.upsert({
       where: { name: input.name },
@@ -138,6 +140,14 @@ async function seedCatalog(prisma: PrismaClient) {
       select: { id: true },
     });
     serviceIds.set(input.name, id);
+  }
+
+  for (const method of PAYMENT_METHODS) {
+    await prisma.paymentMethod.upsert({
+      where: { name: method.name },
+      create: method,
+      update: method,
+    });
   }
 
   return { titleIds, serviceIds };
@@ -259,9 +269,11 @@ async function seedProfessionalHistory(
 
 async function seedSchedule(
   prisma: PrismaClient,
+  userIds: Ids,
   professionalIds: Ids,
   serviceIds: Ids,
 ) {
+  const managerId = idOf(userIds, MANAGER_EMAIL, "Usuario");
   const roomIds: Ids = new Map();
   for (const room of ROOMS) {
     const { id } = await prisma.room.upsert({
@@ -317,7 +329,7 @@ async function seedSchedule(
     const date = new Date(`${input.date}T00:00:00.000Z`);
     await prisma.holiday.upsert({
       where: { date },
-      create: { date, description: input.description },
+      create: { date, description: input.description, createdById: managerId },
       update: { description: input.description },
     });
   }
@@ -411,11 +423,9 @@ async function seedPatients(
     ids.set(input.documentNumber, patientId);
 
     if (insurancePlanId && input.memberNumber) {
-      // Coseguro en 0, igual que el alta desde la UI.
       const coverage = {
         insurancePlanId,
         memberNumber: input.memberNumber,
-        copayAmount: 0,
       };
       await prisma.coverage.upsert({
         where: { patientId },
@@ -744,7 +754,7 @@ async function main() {
 
     const { titleIds, serviceIds } = await seedCatalog(prisma);
     console.log(
-      `✓ ${TITLES.length} títulos, ${SPECIALTIES.length} especialidades y ${SERVICES.length} servicios`,
+      `✓ ${TITLES.length} títulos, ${SPECIALTIES.length} especialidades, ${SERVICES.length} servicios y ${PAYMENT_METHODS.length} medios de pago`,
     );
 
     const professionalIds = await seedProfessionals(
@@ -762,7 +772,12 @@ async function main() {
       `✓ ${PROFESSIONALS.length} profesionales (${history} cambios nuevos en su historial)`,
     );
 
-    const schedule = await seedSchedule(prisma, professionalIds, serviceIds);
+    const schedule = await seedSchedule(
+      prisma,
+      userIds,
+      professionalIds,
+      serviceIds,
+    );
     console.log(
       `✓ ${schedule.rooms} consultorios, ${schedule.windows} franjas nuevas y ${HOLIDAYS.length} feriados`,
     );
