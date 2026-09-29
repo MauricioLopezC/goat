@@ -38,6 +38,8 @@ export interface ServiceListItem {
   durationMinutes: number;
   requiresReferral: boolean;
   active: boolean;
+  /** Precio de la prestación. Prisma devuelve Decimal; se muestra con .toString(). */
+  price: { toString(): string } | null;
   specialtyId: number | null;
   specialty: {
     id: number;
@@ -77,6 +79,7 @@ export function ServicesManager({
       requiresReferral: service.requiresReferral,
       description: service.description,
       specialtyId: service.specialtyId,
+      price: service.price !== null ? String(service.price) : null,
     });
     setIsFormVisible(true);
     // Scroll suave hacia el formulario
@@ -183,6 +186,7 @@ export function ServicesManager({
                 <TableHead>Prestación</TableHead>
                 <TableHead>Área / Especialidad</TableHead>
                 <TableHead>Duración</TableHead>
+                <TableHead>Valor</TableHead>
                 <TableHead>Orden médica</TableHead>
                 <TableHead>Estado</TableHead>
                 {isManager && (
@@ -226,6 +230,21 @@ export function ServicesManager({
                     <span className="text-body-sm font-mono font-medium">
                       {service.durationMinutes} min
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {service.price !== null ? (
+                      <span className="text-body-sm font-mono font-medium">
+                        ${" "}
+                        {Number(service.price).toLocaleString("es-AR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    ) : (
+                      <span className="text-label-sm text-muted-foreground">
+                        —
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {service.requiresReferral ? (

@@ -15,6 +15,7 @@ export interface CreateServiceInput {
   requiresReferral: boolean;
   description?: string | null;
   specialtyId?: number | null;
+  price?: number | null;
 }
 
 export interface UpdateServiceInput {
@@ -24,6 +25,7 @@ export interface UpdateServiceInput {
   requiresReferral: boolean;
   description?: string | null;
   specialtyId?: number | null;
+  price?: number | null;
 }
 
 // ─────────────────────── Funciones de lectura ──────────────────────────
@@ -49,6 +51,7 @@ export async function listServices(page: number, actor: Actor) {
           durationMinutes: true,
           requiresReferral: true,
           active: true,
+          price: true,
           specialtyId: true,
           specialty: {
             select: {
@@ -124,6 +127,7 @@ export async function createService(input: CreateServiceInput, actor: Actor) {
       requiresReferral: input.requiresReferral,
       description: input.description ?? null,
       specialtyId: input.specialtyId ?? null,
+      price: input.price ?? null,
       active: true,
     },
     select: {
@@ -131,6 +135,7 @@ export async function createService(input: CreateServiceInput, actor: Actor) {
       name: true,
       durationMinutes: true,
       requiresReferral: true,
+      price: true,
     },
   });
 }
@@ -192,12 +197,14 @@ export async function updateService(input: UpdateServiceInput, actor: Actor) {
       requiresReferral: input.requiresReferral,
       description: input.description ?? null,
       specialtyId: input.specialtyId ?? null,
+      price: input.price ?? null,
     },
     select: {
       id: true,
       name: true,
       durationMinutes: true,
       requiresReferral: true,
+      price: true,
     },
   });
 }

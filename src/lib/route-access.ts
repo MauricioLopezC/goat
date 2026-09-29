@@ -26,6 +26,7 @@ const ROUTE_RULES: RouteRule[] = [
   { pattern: /^\/professionals\/[^/]+(\/|$)/, roles: STAFF },
   { pattern: /^\/professionals\/?$/, roles: FRONT_DESK },
   { pattern: /^\/services(\/|$)/, roles: STAFF },
+  { pattern: /^\/payment-methods(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/holidays(\/|$)/, roles: STAFF },
   { pattern: /^\/users(\/|$)/, roles: ["MANAGER"] },
   { pattern: /^\/agenda(\/|$)/, roles: STAFF },

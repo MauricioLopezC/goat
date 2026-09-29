@@ -65,6 +65,7 @@ export type SubmittedServiceValues = {
   requiresReferral: boolean;
   description: string;
   specialtyId: string;
+  price: string;
 };
 
 export type ServiceFormState =
@@ -73,6 +74,8 @@ export type ServiceFormState =
       name: string;
       durationMinutes: number;
       requiresReferral: boolean;
+      /** Precio de la prestación. Prisma devuelve Decimal; en la UI se muestra con .toString(). */
+      price: { toString(): string } | null;
     }> & {
       values?: SubmittedServiceValues;
     })
@@ -89,6 +92,7 @@ function submitted(formData: FormData): SubmittedServiceValues {
       formData.get("requiresReferral") === "true",
     description: read("description"),
     specialtyId: read("specialtyId"),
+    price: read("price"),
   };
 }
 
@@ -108,6 +112,7 @@ export async function createServiceAction(
       formData.get("specialtyId") && formData.get("specialtyId") !== "none"
         ? formData.get("specialtyId")
         : null,
+    price: formData.get("price") || null,
   };
 
   const result = await create(raw);
@@ -136,6 +141,7 @@ export async function updateServiceAction(
       formData.get("specialtyId") && formData.get("specialtyId") !== "none"
         ? formData.get("specialtyId")
         : null,
+    price: formData.get("price") || null,
   };
 
   const result = await update(raw);

@@ -129,6 +129,7 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `FUTURE_APPOINTMENTS` | Turnos programados que todavía no comenzaron impiden quitar un servicio o dar de baja al profesional. El mensaje enumera los turnos afectados al quitar servicios y da el total en la baja. En la agenda (HU-05), modificar o eliminar una franja o cargar una excepción o un feriado que los deje fuera de horario: los turnos afectados van en `meta.appointments`. |
 | `AVAILABILITY_WINDOW_OVERLAP` | La franja se superpone con otra del mismo profesional el mismo día. |
 | `UNMET_DEPENDENCY` | La operación no puede completarse porque existen registros dependientes (por ejemplo, dar de baja un servicio con turnos futuros programados). |
+| `LAST_ACTIVE_PAYMENT_METHOD` | El medio de pago que se intenta desactivar es el único activo. No se puede dejar el centro sin medios de pago (HU-20). |
 
 Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
 
@@ -476,23 +477,23 @@ No es una Server Action: es una lectura que el Server Component de `/services` l
 
 **Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
 **Roles:** `MANAGER`
-**Entrada:** `name`, `durationMinutes` (por defecto 30 en Inc. 1), `requiresReferral` (booleano), `description?`, `specialtyId?`.
+**Entrada:** `name`, `durationMinutes` (por defecto 30 en Inc. 1), `requiresReferral` (booleano), `description?`, `specialtyId?`, `price?` (decimal ≥ 0, hasta dos decimales; `null` si no se cargó aún).
 **Precondiciones:** el actor es `MANAGER`. No existe otro `Service` con el mismo `name`. Si se envía `specialtyId`, debe corresponder a una `Specialty` activa.
-**Efectos:** crea un `Service` con `active: true`.
-**Errores:** `VALIDATION` (nombre vacío o duración inválida), `FORBIDDEN` (actor no es `MANAGER`), `DUPLICATE` (ya existe un servicio con ese nombre; incluye `fieldErrors`), `NOT_FOUND` (la especialidad indicada no existe o no está activa).
+**Efectos:** crea un `Service` con `active: true`. El campo `price` se guarda tal cual; si queda en `null` el servicio no es cobrable (HU-21).
+**Errores:** `VALIDATION` (nombre vacío o duración inválida, precio negativo o con más de dos decimales), `FORBIDDEN` (actor no es `MANAGER`), `DUPLICATE` (ya existe un servicio con ese nombre; incluye `fieldErrors`), `NOT_FOUND` (la especialidad indicada no existe o no está activa).
 **Revalida:** `/services` y `/professionals`.
-**Devuelve:** `{ id, name, durationMinutes, requiresReferral }`.
+**Devuelve:** `{ id, name, durationMinutes, requiresReferral, price }`.
 
 ### `updateService`
 
 **Historia de usuario:** [HU-06 — Catálogo de servicios](hu/HU-06-catalogo-de-servicios.md)
 **Roles:** `MANAGER`
-**Entrada:** `id`, `name`, `durationMinutes`, `requiresReferral`, `description?`, `specialtyId?`.
+**Entrada:** `id`, `name`, `durationMinutes`, `requiresReferral`, `description?`, `specialtyId?`, `price?` (decimal ≥ 0, hasta dos decimales; `null` borra el precio existente).
 **Precondiciones:** el actor es `MANAGER`. El servicio existe. No existe otro servicio con ese `name` (distinto id). Si se envía `specialtyId`, debe existir.
-**Efectos:** actualiza los datos del `Service`.
+**Efectos:** actualiza los datos del `Service`. Cambiar `price` no modifica cobros ya registrados: cada `Payment.amount` guarda el monto del momento (HU-20).
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `DUPLICATE`.
 **Revalida:** `/services` y `/professionals`.
-**Devuelve:** `{ id, name, durationMinutes, requiresReferral }`.
+**Devuelve:** `{ id, name, durationMinutes, requiresReferral, price }`.
 
 ### `deactivateService`
 
@@ -711,3 +712,51 @@ No es una Server Action: el Server Component de `/agenda` la llama directo a la 
 `defineAction` exige declarar roles, y estas dos operaciones no tienen ninguno que exigir: una corre sin sesión por definición y la otra acepta cualquiera. Ambas siguen igual el resto del flujo del [ADR 0001](adr/0001-server-actions-y-capa-de-acceso-a-datos.md) —validar con Zod, delegar en la DAL, devolver `ActionResult` ante el error— y siguen siendo endpoints POST públicos.
 
 `getSession()` y `requireRole()` no llevan ficha: no son acciones, son las funciones de `src/lib/dal/auth.ts` sobre las que se apoya todo lo demás.
+
+### `listPaymentMethods`
+
+**Historia de usuario:** [HU-20 — Configurar valores y medios de pago](hu/HU-20-aranceles-y-medios-de-pago.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`
+**Entrada:** el `actor`.
+**Precondiciones:** el actor es `RECEPTIONIST` o `MANAGER`.
+**Efectos:** ninguno. Lectura del catálogo completo de medios de pago (activos e inactivos).
+**Errores:** `FORBIDDEN`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ id, name, active }[]`, ordenado alfabéticamente por nombre.
+
+No es una Server Action: la página `/payment-methods` la llama directo a la DAL (ADR 0001).
+
+### `listActivePaymentMethods`
+
+**Historia de usuario:** [HU-21 — Cobrar un turno](hu/HU-21-cobrar-turno.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`
+**Entrada:** el `actor`.
+**Precondiciones:** el actor es `RECEPTIONIST` o `MANAGER`.
+**Efectos:** ninguno. Lectura de los medios de pago activos para el formulario de cobro.
+**Errores:** `FORBIDDEN`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ id, name }[]` de medios activos, ordenado alfabéticamente por nombre.
+
+No es una Server Action: la usa el formulario de cobro de HU-21 (ADR 0001).
+
+### `createPaymentMethod`
+
+**Historia de usuario:** [HU-20 — Configurar valores y medios de pago](hu/HU-20-aranceles-y-medios-de-pago.md)
+**Roles:** `MANAGER`
+**Entrada:** `name` (1–80 caracteres, obligatorio).
+**Precondiciones:** el actor es `MANAGER`. No existe otro `PaymentMethod` con el mismo nombre.
+**Efectos:** crea un `PaymentMethod` con `active: true`.
+**Errores:** `VALIDATION` (nombre vacío o demasiado largo), `FORBIDDEN`, `DUPLICATE` (nombre ya registrado; incluye `fieldErrors`).
+**Revalida:** `/payment-methods`.
+**Devuelve:** `{ id, name, active }`.
+
+### `updatePaymentMethod`
+
+**Historia de usuario:** [HU-20 — Configurar valores y medios de pago](hu/HU-20-aranceles-y-medios-de-pago.md)
+**Roles:** `MANAGER`
+**Entrada:** `id`, `name` (1–80 caracteres), `active` (booleano).
+**Precondiciones:** el actor es `MANAGER`. El medio de pago existe. El nuevo nombre no está tomado por otro medio. Si `active` pasa a `false`, no debe ser el último medio activo en ese momento.
+**Efectos:** actualiza `name` y `active` del `PaymentMethod`. Un medio inactivo no se ofrece al cobrar (HU-21), pero permanece en los cobros ya registrados.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `DUPLICATE` (nombre ya tomado), `LAST_ACTIVE_PAYMENT_METHOD` (no se puede desactivar el último activo).
+**Revalida:** `/payment-methods`.
+**Devuelve:** `{ id, name, active }`.

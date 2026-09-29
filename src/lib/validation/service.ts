@@ -46,6 +46,14 @@ export const createServiceSchema = z.object({
     .positive()
     .nullish()
     .transform((v) => (v ? v : null)),
+
+  /// Valor de la prestación en pesos (HU-20). Opcional: `null` significa que
+  /// todavía no se cargó el precio. Un campo vacío en el formulario llega como
+  /// cadena vacía y se convierte a `null`.
+  price: z.preprocess((val) => {
+    if (val === null || val === undefined || val === "") return null;
+    return val;
+  }, z.coerce.number().nonnegative("El valor de la prestación no puede ser negativo").multipleOf(0.01, "El valor admite como máximo dos decimales").nullable()),
 });
 
 export type CreateServiceInput = z.infer<typeof createServiceSchema>;
