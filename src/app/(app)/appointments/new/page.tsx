@@ -29,7 +29,7 @@ import { PatientSearch } from "./patient-search";
 import { ProfessionalPicker } from "./professional-picker";
 import { ServicePicker } from "./service-picker";
 
-export const metadata = { title: "Nuevo turno · Goat" };
+export const metadata = { title: "Nuevo turno · GOAT" };
 function positiveId(value: string | string[] | undefined) {
   const id = typeof value === "string" ? Number(value) : NaN;
   return Number.isSafeInteger(id) && id > 0 ? id : undefined;

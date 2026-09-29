@@ -4,7 +4,7 @@ import { listPaymentMethods } from "@/lib/dal/payment-methods";
 import { PaymentMethodsManager } from "./payment-methods-manager";
 
 export const metadata: Metadata = {
-  title: "Medios de pago · Goat",
+  title: "Medios de pago · GOAT",
   description:
     "Configuración de medios de pago aceptados por el centro de traumatología (HU-20).",
 };

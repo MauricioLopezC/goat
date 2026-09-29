@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { NewPatientForm } from "./NewPatientForm";
 
 export const metadata: Metadata = {
-  title: "Registrar paciente nuevo · Goat",
+  title: "Registrar paciente nuevo · GOAT",
 };
 
 interface NewPatientPageProps {

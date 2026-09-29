@@ -18,6 +18,7 @@ import {
 import {
   dateFromDb,
   dateToDb,
+  getMonthRange,
   getWeekDays,
   parseTime,
   toLocalSlot,
@@ -799,18 +800,20 @@ export async function getProfessionalAgenda(
 
   const selectedDate = date ?? toLocalSlot(new Date()).date;
   const week = getWeekDays(selectedDate);
+  const month = getMonthRange(selectedDate);
 
-  const rangeStart =
-    view === "week"
-      ? appointmentInstant(week.monday, 0)
-      : appointmentInstant(selectedDate, 0);
-  const rangeEnd =
-    view === "week"
-      ? appointmentInstant(week.sunday, 1440)
-      : appointmentInstant(selectedDate, 1440);
+  let fromDateStr = selectedDate;
+  let toDateStr = selectedDate;
+  if (view === "week") {
+    fromDateStr = week.monday;
+    toDateStr = week.sunday;
+  } else if (view === "month") {
+    fromDateStr = month.from;
+    toDateStr = month.to;
+  }
 
-  const fromDateStr = view === "week" ? week.monday : selectedDate;
-  const toDateStr = view === "week" ? week.sunday : selectedDate;
+  const rangeStart = appointmentInstant(fromDateStr, 0);
+  const rangeEnd = appointmentInstant(toDateStr, 1440);
 
   const [appointments, holidays, exceptions] = await Promise.all([
     prisma.appointment.findMany({
@@ -908,6 +911,7 @@ export async function getProfessionalAgenda(
     view,
     hideCancelled,
     week,
+    month,
     windows: professional.availabilityWindows,
     appointments: displayedAppointments,
     summary,

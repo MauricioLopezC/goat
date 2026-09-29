@@ -1,14 +1,14 @@
 ---
 name: code-review
 description: >-
-  Realiza una revisión de código exhaustiva para features, fixes, ramas y PRs en Goat y proyectos Next.js.
+  Realiza una revisión de código exhaustiva para features, fixes, ramas y PRs en GOAT y proyectos Next.js.
   Evalúa los cambios contra los criterios de aceptación de las historias de usuario (docs/hu/), las reglas de arquitectura y convenciones del proyecto (AGENTS.md, docs/acciones.md, docs/adr/, docs/modelo-de-datos.md, glossary.md) y las buenas prácticas de Next.js App Router, generando un reporte estructurado y procesable.
   Se activa ante: "code review", "revisar código", "hacer review", "review del PR", "review de la rama", "revisar cambios", "revisar feature", "reporte de review", "review".
 ---
 
-# Code Review — Goat & Next.js
+# Code Review — GOAT & Next.js
 
-Esta skill define el procedimiento paso a paso para realizar una revisión de código integral en el proyecto Goat, evaluando fidelidad a la historia de usuario, arquitectura del proyecto, calidad de código Next.js y verificación técnica, culminando en un reporte estructurado.
+Esta skill define el procedimiento paso a paso para realizar una revisión de código integral en el proyecto GOAT, evaluando fidelidad a la historia de usuario, arquitectura del proyecto, calidad de código Next.js y verificación técnica, culminando en un reporte estructurado.
 
 ---
 

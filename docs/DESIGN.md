@@ -1,5 +1,5 @@
 ---
-name: Goat — Gestión de turnos para policonsultorio de traumatología
+name: GOAT — Gestión de turnos para policonsultorio de traumatología
 colors:
   # Marca
   primary: '#0D47A1'
@@ -68,13 +68,13 @@ spacing:
   space-xl: 2rem
 ---
 
-> Diseño específico de Goat, derivado del diseño genérico "Clinical Traumatology & Orthopedic System".
+> Diseño específico de GOAT, derivado del diseño genérico "Clinical Traumatology & Orthopedic System".
 > El tema vive en `src/app/globals.css` y **debe mantenerse sincronizado con este documento**: si cambia un color acá, cambia allá (y viceversa).
 > Nombres de estados, roles y entidades: ver `glossary.md`.
 
 ## Marca y estilo
 
-Goat es una herramienta **administrativa y ambulatoria**: el usuario más intensivo es mesa de entradas, con el paciente enfrente y presión de tiempo (criterio de éxito: un turno completo en menos de un minuto). La interfaz prioriza claridad, calma y densidad de información legible.
+GOAT es una herramienta **administrativa y ambulatoria**: el usuario más intensivo es mesa de entradas, con el paciente enfrente y presión de tiempo (criterio de éxito: un turno completo en menos de un minuto). La interfaz prioriza claridad, calma y densidad de información legible.
 
 Estilo: **minimalismo de precisión clínica** — bordes definidos, superficies limpias, sin ruido de alertas. El rojo se reserva para lo urgente; nada más grita.
 
@@ -178,4 +178,4 @@ Profundidad por **bordes de bajo contraste** y sombras tenues teñidas de slate.
 
 ## Qué se quitó del diseño genérico
 
-El diseño base apunta a un entorno hospitalario y quirúrgico. Se eliminó lo que Goat no tiene (y que el contexto declara fuera de alcance): visor radiológico y PACS, inventario de implantes, clasificación AO/OTA, MRN/ICD-10, triage de traumatología nivel 1, medidor de rango de movimiento y flujo quirúrgico de tres paneles con inspector radiológico. La paleta, la tipografía, la elevación y el sistema de formas se conservan.
+El diseño base apunta a un entorno hospitalario y quirúrgico. Se eliminó lo que GOAT no tiene (y que el contexto declara fuera de alcance): visor radiológico y PACS, inventario de implantes, clasificación AO/OTA, MRN/ICD-10, triage de traumatología nivel 1, medidor de rango de movimiento y flujo quirúrgico de tres paneles con inspector radiológico. La paleta, la tipografía, la elevación y el sistema de formas se conservan.

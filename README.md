@@ -1,4 +1,4 @@
-# Goat
+# GOAT
 
 Sistema de gestión de turnos y atención ambulatoria para un policonsultorio de traumatología.
 
@@ -6,7 +6,7 @@ Permite registrar pacientes, administrar la agenda de los profesionales, dar y r
 
 ## Qué resuelve
 
-Hoy el centro lleva la agenda en papel o planillas, y eso produce turnos superpuestos, pacientes sin registro de su obra social, ausentismo que nadie mide, cobros sin trazabilidad y un gerente sin información para decidir. Goat busca ser la **única fuente de verdad de la agenda** y dar **trazabilidad de cada turno**: quién lo dio, quién lo modificó o canceló, cuándo y con qué motivo.
+Hoy el centro lleva la agenda en papel o planillas, y eso produce turnos superpuestos, pacientes sin registro de su obra social, ausentismo que nadie mide, cobros sin trazabilidad y un gerente sin información para decidir. GOAT busca ser la **única fuente de verdad de la agenda** y dar **trazabilidad de cada turno**: quién lo dio, quién lo modificó o canceló, cuándo y con qué motivo.
 
 ## A quién sirve
 
