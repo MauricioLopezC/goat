@@ -191,7 +191,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Efectos:** ninguno. Sin búsqueda muestra los 10 pacientes activos registrados más recientemente. Con búsqueda filtra por palabras del nombre, apellido o documento. Pagina ambos listados de 10 en 10, ordenados por fecha de alta descendente e ID descendente; recupera por separado el paciente elegido. Lista servicios activos y profesionales activos asociados al servicio con alguna franja habilitada.
 **Errores:** `FORBIDDEN`, `VALIDATION`.
 **Revalida:** no aplica.
-**Devuelve:** pacientes identificados por nombre y documento, indicador de página siguiente, paciente elegido, servicios (con duración y especialidad `{ id, name } | null`), profesionales habilitados.
+**Devuelve:** pacientes identificados por nombre y documento, indicador de página siguiente, paciente elegido (con su `coverageType`), servicios (con duración, si requieren orden y especialidad `{ id, name } | null`), profesionales habilitados. Con obra social y un servicio que requiere orden, la página avisa "Recordale al paciente traer la orden" ([HU-21](hu/HU-21-cobrar-turno.md)).
 
 ### `listAvailableDates`
 
@@ -224,7 +224,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Efectos:** ninguno. Devuelve los turnos que empiezan en el rango, en hora del centro, ordenados por inicio e ID, filtrados por profesional y servicio. Con `hideCancelled` excluye los `CANCELLED`.
 **Errores:** `FORBIDDEN`, `VALIDATION`.
 **Revalida:** no aplica; lectura desde Server Component.
-**Devuelve:** resúmenes con paciente, servicio, profesional, horario, estado y autoría. Para `RECEPTIONIST` y `MANAGER` suman lo necesario para la marca de cobro o autorización ([HU-21](hu/HU-21-cobrar-turno.md)); el profesional no la recibe.
+**Devuelve:** resúmenes con paciente, servicio, profesional, horario, estado y autoría. La marca de cobro o autorización va aparte, en `getPaymentStates` ([HU-21](hu/HU-21-cobrar-turno.md)).
 
 ### `listAvailabilityWindows`
 
@@ -246,7 +246,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Efectos:** ninguno.
 **Errores:** `FORBIDDEN`, `NOT_FOUND`.
 **Revalida:** no aplica.
-**Devuelve:** resumen con paciente, servicio, profesional, horario, estado y autoría. Incluye los últimos eventos de trazabilidad. Para `RECEPTIONIST` y `MANAGER` suma los datos de cobro de [HU-21](hu/HU-21-cobrar-turno.md): cobertura del paciente, valor del servicio y si requiere orden, cobros (vigente y anulados, con autor) y autorización. El profesional no los recibe.
+**Devuelve:** resumen con paciente, servicio, profesional, horario, estado y autoría. Incluye los últimos eventos de trazabilidad. Los datos de cobro van aparte, en `getAppointmentBilling`, que el profesional no puede llamar ([HU-21](hu/HU-21-cobrar-turno.md)).
 
 ### `cancelAppointment`
 
@@ -798,3 +798,29 @@ No es una Server Action: la usa el formulario de cobro de HU-21 (ADR 0001).
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está habilitado), `AUTHORIZATION_NOT_REQUIRED` (paciente particular o servicio sin orden).
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
 **Devuelve:** `{ id, authorizationNumber }`.
+
+### `getAppointmentBilling`
+
+**Historia de usuario:** [HU-21 — Cobrar un turno en el mostrador](hu/HU-21-cobrar-turno.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** ID del turno.
+**Precondiciones:** el turno existe. El profesional no accede: no ve cobros ni autorizaciones.
+**Efectos:** ninguno.
+**Errores:** `FORBIDDEN`, `NOT_FOUND`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `state` (`PENDING_PAYMENT`, `PAID`, `PENDING_AUTHORIZATION`, `AUTHORIZED` o `null` si no aplica), `chargeable` (si hoy admite cobro o autorización), `price` del servicio como texto decimal o `null`, `activePayment` (monto, medio, quién y cuándo), `voidedPayments` (además quién anuló, cuándo y por qué) y `authorization` (número, quién y cuándo).
+
+No es una Server Action: la llama el detalle del turno (ADR 0001).
+
+### `getPaymentStates`
+
+**Historia de usuario:** [HU-21 — Cobrar un turno en el mostrador](hu/HU-21-cobrar-turno.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** lista de IDs de turnos.
+**Precondiciones:** ninguna además del rol.
+**Efectos:** ninguno.
+**Errores:** `FORBIDDEN`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ [appointmentId]: PaymentState }`, solo para los turnos Programados de hoy y los Completados en los que el estado aplica. Los demás no figuran.
+
+No es una Server Action: la usa el calendario del centro para la marca de cada turno (ADR 0001).
