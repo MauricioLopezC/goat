@@ -22,16 +22,23 @@ export function AppSidebar({ actor }: { actor: Actor }) {
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1.5">
+        <div className="flex items-center gap-3 px-2 py-1.5">
           <Image
             src={logo}
-            width={32}
-            height={32}
-            alt=""
-            className="size-8 rounded-lg"
+            width={40}
+            height={40}
+            alt="GOAT"
+            className="size-10 shrink-0 rounded-xl"
             loading="eager"
           />
-          <span className="text-title-lg">Goat</span>
+          <div className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
+            <span className="text-xs font-medium leading-snug text-foreground">
+              Gestión Ortopédica y
+            </span>
+            <span className="text-xs font-medium leading-snug text-foreground">
+              Atención Traumatológica
+            </span>
+          </div>
         </div>
       </SidebarHeader>
 

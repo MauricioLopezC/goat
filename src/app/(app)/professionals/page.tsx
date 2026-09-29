@@ -22,7 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ProfessionalFilters } from "./professional-filters";
 
 export const metadata: Metadata = {
-  title: "Profesionales · Goat",
+  title: "Profesionales · GOAT",
   description: "Gestión y listado de profesionales del centro.",
 };
 

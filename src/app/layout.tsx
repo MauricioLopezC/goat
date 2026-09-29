@@ -13,7 +13,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Goat",
+  title: "GOAT",
   description:
     "Gestión de turnos y atención ambulatoria para un policonsultorio de traumatología.",
 };

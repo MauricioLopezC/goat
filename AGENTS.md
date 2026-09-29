@@ -9,7 +9,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 <!-- END:nextjs-agent-rules -->
 
 
-# Goat — gestión de turnos para un policonsultorio de traumatología
+# GOAT — gestión de turnos para un policonsultorio de traumatología
 
 Sistema de turnos y atención ambulatoria: pacientes, agenda de profesionales, turnos por prestación, registro de la atención, cobros e indicadores. Es un proyecto académico; el profesor actúa como cliente del centro y evalúa la demo funcional y la documentación.
 

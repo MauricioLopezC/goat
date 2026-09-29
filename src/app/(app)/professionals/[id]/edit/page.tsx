@@ -14,7 +14,7 @@ import {
 import { ProfessionalEditor } from "../professional-editor";
 import { FutureAppointmentsSection } from "../future-appointment-cancel";
 
-export const metadata: Metadata = { title: "Modificar profesional · Goat" };
+export const metadata: Metadata = { title: "Modificar profesional · GOAT" };
 
 export default async function EditProfessionalPage({
   params,
