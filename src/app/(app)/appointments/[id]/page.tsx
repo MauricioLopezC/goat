@@ -56,7 +56,13 @@ export default async function AppointmentPage({
   );
   const { id } = await params;
   const query = await searchParams;
-  const { created, cancelled, changed, billing: billingNotice } = query;
+  const {
+    created,
+    cancelled,
+    changed,
+    rescheduled,
+    billing: billingNotice,
+  } = query;
   let appointment;
   try {
     appointment = await getAppointment(Number(id), actor);
@@ -85,6 +91,7 @@ export default async function AppointmentPage({
   const scheduled = appointment.status === "SCHEDULED";
   const canChangeStatus = !own && scheduled;
   const now = new Date();
+  const canReschedule = canChangeStatus && appointment.startsAt > now;
   const canComplete = canChangeStatus && appointment.startsAt <= now;
   const canExpire = canChangeStatus && !paid && appointment.endsAt <= now;
 
@@ -108,6 +115,17 @@ export default async function AppointmentPage({
           <AlertDescription className="text-success-soft-foreground">
             El horario quedó reservado y ya aparece en el calendario y en la
             agenda del profesional.
+          </AlertDescription>
+        </Alert>
+      )}
+      {rescheduled === "1" && !own && (
+        <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
+          <AlertTitle>Turno reprogramado exitosamente</AlertTitle>
+          <AlertDescription className="text-success-soft-foreground">
+            El nuevo horario es el {formatDate(start.date)}, de{" "}
+            {formatMinute(start.minute)} a {formatMinute(end.minute)} con{" "}
+            {appointment.professional.lastName},{" "}
+            {appointment.professional.firstName}.
           </AlertDescription>
         </Alert>
       )}
@@ -402,6 +420,34 @@ export default async function AppointmentPage({
                   <p className="text-muted-foreground">
                     Por: {event.user.lastName}, {event.user.firstName}
                   </p>
+                  {event.type === "RESCHEDULED" &&
+                    event.previousStartsAt &&
+                    event.newStartsAt && (
+                      <div className="text-muted-foreground flex flex-col gap-0.5">
+                        <p>
+                          Horario anterior:{" "}
+                          {formatDate(toLocalSlot(event.previousStartsAt).date)}
+                          ,{" "}
+                          {formatMinute(
+                            toLocalSlot(event.previousStartsAt).minute,
+                          )}
+                          –
+                          {formatMinute(
+                            toLocalSlot(event.previousEndsAt!).minute,
+                          )}
+                          {event.previousProfessional &&
+                            ` · ${event.previousProfessional.lastName}, ${event.previousProfessional.firstName}`}
+                        </p>
+                        <p>
+                          Nuevo horario:{" "}
+                          {formatDate(toLocalSlot(event.newStartsAt).date)},{" "}
+                          {formatMinute(toLocalSlot(event.newStartsAt).minute)}–
+                          {formatMinute(toLocalSlot(event.newEndsAt!).minute)}
+                          {event.newProfessional &&
+                            ` · ${event.newProfessional.lastName}, ${event.newProfessional.firstName}`}
+                        </p>
+                      </div>
+                    )}
                   {event.reason && (
                     <p className="text-muted-foreground">
                       Motivo: {event.reason}
@@ -438,6 +484,15 @@ export default async function AppointmentPage({
         {!own && (
           <Button asChild>
             <Link href="/appointments/new">Dar otro turno</Link>
+          </Button>
+        )}
+        {canReschedule && (
+          <Button asChild variant="outline">
+            <Link
+              href={`/appointments/${appointment.id}/reschedule${returnSearch ? `?${returnSearch}` : ""}`}
+            >
+              Reprogramar turno
+            </Link>
           </Button>
         )}
         {canComplete && (

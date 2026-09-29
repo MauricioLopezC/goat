@@ -13,6 +13,7 @@ import {
   cancelAppointment,
   completeAppointment,
   expireAppointment,
+  rescheduleAppointment,
 } from "../src/lib/dal/appointments";
 import { DomainError } from "../src/lib/actions";
 import { Role } from "../src/generated/prisma/enums";
@@ -20,7 +21,12 @@ import {
   appointmentInstant,
   appointmentDateBounds,
 } from "../src/lib/appointment-slots";
-import { addDays, dateToDb, toLocalSlot } from "../src/lib/schedule";
+import {
+  addDays,
+  dateToDb,
+  formatMinute,
+  toLocalSlot,
+} from "../src/lib/schedule";
 import type { Actor } from "../src/lib/dal/auth";
 
 async function main() {
@@ -596,6 +602,223 @@ async function main() {
         );
       },
     );
+
+    await verify("HU-16 reprogramación de turnos", async () => {
+      let testDay = addDays(date, 7);
+      while (
+        await prisma.holiday.findUnique({
+          where: { date: dateToDb(testDay) },
+        })
+      ) {
+        testDay = addDays(testDay, 7);
+      }
+      const rescheduleDate = testDay;
+
+      // Asegurar que las ventanas de ambos profesionales habiliten todos sus servicios
+      for (const professionalId of professionals) {
+        const windows = await prisma.availabilityWindow.findMany({
+          where: { professionalId },
+        });
+        for (const w of windows) {
+          await prisma.availabilityWindow.update({
+            where: { id: w.id },
+            data: { services: { set: [] } },
+          });
+        }
+      }
+
+      // 1. Crear un turno programado a futuro
+      const appt = await createAppointment(
+        { ...input, date: rescheduleDate, startTime: "09:00" },
+        receptionist,
+      );
+
+      // 2. Permisos: profesional no puede reprogramar
+      await rejects(
+        () =>
+          rescheduleAppointment(
+            {
+              appointmentId: appt.id,
+              date: rescheduleDate,
+              startTime: "09:30",
+              reason: "Cambio de horario",
+              requestedBy: "el paciente",
+            },
+            professionalActor,
+          ),
+        "FORBIDDEN",
+      );
+
+      // 3. Validación: motivo obligatorio
+      await rejects(
+        () =>
+          rescheduleAppointment(
+            {
+              appointmentId: appt.id,
+              date: rescheduleDate,
+              startTime: "09:30",
+              reason: "   ",
+              requestedBy: "el paciente",
+            },
+            receptionist,
+          ),
+        "REASON_REQUIRED",
+      );
+
+      // 4. Validación: debe diferir del actual
+      await rejects(
+        () =>
+          rescheduleAppointment(
+            {
+              appointmentId: appt.id,
+              date: rescheduleDate,
+              startTime: "09:00",
+              reason: "Sin cambio",
+              requestedBy: "el paciente",
+            },
+            receptionist,
+          ),
+        "VALIDATION",
+      );
+
+      // 5. Disponibilidad excluyendo el turno: debe ofrecer 09:00 (su propio horario) y 09:30
+      const availableSlots = await listAvailableSlots(
+        { ...input, date: rescheduleDate, excludeAppointmentId: appt.id },
+        receptionist,
+      );
+      assert.ok(availableSlots.some((s) => s.startTime === "09:00"));
+      assert.ok(availableSlots.some((s) => s.startTime === "09:30"));
+
+      // 6. Reprogramar dentro del mismo día a 09:30 con el mismo profesional
+      await rescheduleAppointment(
+        {
+          appointmentId: appt.id,
+          date: rescheduleDate,
+          startTime: "09:30",
+          reason: "Paciente pidió retrasar media hora",
+          requestedBy: "el paciente",
+        },
+        receptionist,
+      );
+
+      const rescheduled = await prisma.appointment.findUniqueOrThrow({
+        where: { id: appt.id },
+        include: { events: true },
+      });
+      assert.equal(rescheduled.status, "SCHEDULED");
+      assert.equal(
+        formatMinute(toLocalSlot(rescheduled.startsAt).minute),
+        "09:30",
+      );
+      assert.equal(
+        formatMinute(toLocalSlot(rescheduled.endsAt).minute),
+        "10:00",
+      );
+      assert.equal(rescheduled.events.length, 1);
+      const event = rescheduled.events[0];
+      assert.equal(event.type, "RESCHEDULED");
+      assert.equal(event.reason, "Paciente pidió retrasar media hora");
+      assert.equal(event.requestedBy, "el paciente");
+      assert.equal(event.userId, receptionist.id);
+      assert.equal(
+        formatMinute(toLocalSlot(event.previousStartsAt!).minute),
+        "09:00",
+      );
+      assert.equal(
+        formatMinute(toLocalSlot(event.newStartsAt!).minute),
+        "09:30",
+      );
+      assert.equal(event.previousProfessionalId, professionals[0]);
+      assert.equal(event.newProfessionalId, professionals[0]);
+
+      // 7. Reprogramar a otro profesional (professionals[1]) a las 10:00
+      await rescheduleAppointment(
+        {
+          appointmentId: appt.id,
+          newProfessionalId: professionals[1],
+          date: rescheduleDate,
+          startTime: "10:00",
+          reason: "Derivado a otro traumatólogo",
+          requestedBy: "el profesional",
+        },
+        manager,
+      );
+      const rescheduled2 = await prisma.appointment.findUniqueOrThrow({
+        where: { id: appt.id },
+        include: { events: { orderBy: { createdAt: "desc" } } },
+      });
+      assert.equal(rescheduled2.professionalId, professionals[1]);
+      assert.equal(rescheduled2.events.length, 2);
+      assert.equal(rescheduled2.events[0].type, "RESCHEDULED");
+      assert.equal(
+        rescheduled2.events[0].previousProfessionalId,
+        professionals[0],
+      );
+      assert.equal(rescheduled2.events[0].newProfessionalId, professionals[1]);
+
+      // 8. Conflicto de solapamiento: crear otro turno para professionals[1] a las 10:30
+      const otherAppt = await createAppointment(
+        {
+          ...input,
+          date: rescheduleDate,
+          patientId: patients[1],
+          professionalId: professionals[1],
+          startTime: "10:30",
+        },
+        manager,
+      );
+
+      // Intentar reprogramar appt a las 10:30 con professionals[1] -> APPOINTMENT_OVERLAP
+      await rejects(
+        () =>
+          rescheduleAppointment(
+            {
+              appointmentId: appt.id,
+              newProfessionalId: professionals[1],
+              date: rescheduleDate,
+              startTime: "10:30",
+              reason: "Intento sobre horario ocupado",
+              requestedBy: "el centro",
+            },
+            manager,
+          ),
+        "APPOINTMENT_OVERLAP",
+      );
+
+      // 9. No se puede reprogramar turno cancelado
+      await cancelAppointment(
+        {
+          appointmentId: otherAppt.id,
+          reason: "Cancelación para prueba",
+          requestedBy: "el centro",
+        },
+        manager,
+      );
+      await rejects(
+        () =>
+          rescheduleAppointment(
+            {
+              appointmentId: otherAppt.id,
+              date: rescheduleDate,
+              startTime: "11:00",
+              reason: "Intento sobre cancelado",
+              requestedBy: "el paciente",
+            },
+            manager,
+          ),
+        "INVALID_STATUS_TRANSITION",
+      );
+
+      // Limpiar turnos de prueba creados en este bloque
+      await cancelAppointment(
+        {
+          appointmentId: appt.id,
+          reason: "Limpieza",
+          requestedBy: "el centro",
+        },
+        manager,
+      );
+    });
     console.log(`${passed} grupos de verificaciones PostgreSQL correctos.`);
   } finally {
     await prisma.appointment.deleteMany({

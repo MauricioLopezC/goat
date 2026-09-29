@@ -15,6 +15,7 @@ export const availableSlotsSchema = z.object({
   serviceId: z.number().int().positive(),
   professionalId: z.number().int().positive(),
   date: appointmentDateSchema,
+  excludeAppointmentId: z.number().int().positive().optional(),
 });
 export const createAppointmentSchema = availableSlotsSchema.extend({
   startTime: z.string().regex(TIME_PATTERN, "Elegí un horario disponible."),
@@ -33,6 +34,22 @@ export const cancelAppointmentSchema = z.object({
     .max(100),
 });
 export type CancelAppointmentInput = z.infer<typeof cancelAppointmentSchema>;
+
+export const rescheduleAppointmentSchema = z.object({
+  appointmentId: z.number().int().positive(),
+  newProfessionalId: z.number().int().positive().optional(),
+  date: appointmentDateSchema,
+  startTime: z.string().regex(TIME_PATTERN, "Elegí un horario disponible."),
+  reason: z.string().trim().max(500),
+  requestedBy: z
+    .string()
+    .trim()
+    .min(1, "Indicá quién solicitó la reprogramación.")
+    .max(100),
+});
+export type RescheduleAppointmentInput = z.infer<
+  typeof rescheduleAppointmentSchema
+>;
 
 export const appointmentStatusChangeSchema = z.object({
   appointmentId: z.number().int().positive(),
