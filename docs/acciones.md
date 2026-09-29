@@ -126,7 +126,7 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `DUPLICATE_PATIENT` | Ya existe un paciente con ese tipo y número de documento. Incluye metadatos en `meta` (id, nombre, etc.) para que la UI pueda ofrecer abrir el paciente existente. |
 | `INVALID_CREDENTIALS` | El ingreso falló. Cubre email inexistente, contraseña incorrecta y usuario inactivo: los tres devuelven lo mismo, a propósito (HU-01). |
 | `EMAIL_TAKEN` | Ya existe un usuario con ese email. |
-| `FUTURE_APPOINTMENTS` | Turnos programados que todavía no comenzaron impiden quitar un servicio o dar de baja al profesional. El mensaje enumera los turnos afectados al quitar servicios y da el total en la baja. En la agenda (HU-05), modificar o eliminar una franja o cargar una excepción o un feriado que los deje fuera de horario: los turnos afectados van en `meta.appointments`. |
+| `FUTURE_APPOINTMENTS` | Turnos programados que todavía no comenzaron impiden quitar un servicio o dar de baja al profesional. El mensaje enumera los turnos afectados al quitar servicios y da el total en la baja. En la agenda (HU-05), modificar o eliminar una franja o cargar una excepción que los deje fuera de horario, o cerrar el centro un día con turnos (HU-14): los turnos afectados van en `meta.appointments`. |
 | `AVAILABILITY_WINDOW_OVERLAP` | La franja se superpone con otra del mismo profesional el mismo día. |
 | `UNMET_DEPENDENCY` | La operación no puede completarse porque existen registros dependientes (por ejemplo, dar de baja un servicio con turnos futuros programados). |
 | `LAST_ACTIVE_PAYMENT_METHOD` | El medio de pago que se intenta desactivar es el único activo. No se puede dejar el centro sin medios de pago (HU-20). |
@@ -583,7 +583,7 @@ No es una Server Action: la página `/my-schedule` la llama directo a la DAL y r
 **Entrada:** `id`, `professionalId` y los mismos campos que `createAvailabilityWindow`.
 **Precondiciones:** las mismas que el alta, y además la franja pertenece a ese profesional. Ningún turno `SCHEDULED` que todavía no comenzó queda fuera de horario por el cambio: un turno que entraba en alguna franja del profesional (con su servicio habilitado) tiene que seguir entrando. Esto cubre acortar la franja, cambiarla de día y quitarle servicios.
 **Efectos:** actualiza la franja y reemplaza sus servicios habilitados.
-**Errores:** los del alta y `FUTURE_APPOINTMENTS`, con la lista de turnos afectados en `meta.appointments` (`{ id, startsAt, patientName, serviceName }[]`).
+**Errores:** los del alta y `FUTURE_APPOINTMENTS`, con la lista de turnos afectados en `meta.appointments` (`{ id, startsAt, patientName, patientPhone, serviceName, professionalName }[]`).
 **Revalida:** `/professionals/[id]`, `/professionals/[id]/schedule` y `/calendar`.
 **Devuelve:** `{ id }`.
 
@@ -622,7 +622,7 @@ No es una Server Action: la página `/my-schedule` la llama directo a la DAL y r
 
 ### `listHolidays`
 
-**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md), [HU-14](hu/HU-14-cerrar-el-centro.md)
 **Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
 **Entrada:** `page` (de `?page=`) y el `actor`.
 **Precondiciones:** el actor pertenece a `STAFF_ROLES`.
@@ -635,24 +635,24 @@ No es una Server Action: la página `/holidays` la llama directo a la DAL (ADR 0
 
 ### `createHoliday`
 
-**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
-**Roles:** `MANAGER`
-**Entrada:** `date` (`AAAA-MM-DD`), `description`.
-**Precondiciones:** la fecha es hoy o futura, en hora de Argentina, y no hay otro `Holiday` ese día. Ningún profesional tiene turnos `SCHEDULED` que todavía no comenzaron ese día.
-**Efectos:** crea el `Holiday`. Ese día el centro no ofrece disponibilidad para nadie.
-**Errores:** `VALIDATION` (fecha inválida o pasada, descripción vacía), `FORBIDDEN`, `DUPLICATE` (ya hay un feriado ese día; incluye `fieldErrors`), `FUTURE_APPOINTMENTS` (con `meta.appointments`).
-**Revalida:** `/holidays` y `/calendar`.
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md), [HU-14](hu/HU-14-cerrar-el-centro.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`
+**Entrada:** `date` (`AAAA-MM-DD`), `description` (feriado o día excepcional, hasta 120 caracteres). La UI la llama desde `/holidays` y desde la vista día de `/calendar`, con la fecha del día que se está viendo.
+**Precondiciones:** la fecha es hoy o futura, en hora de Argentina, y no hay otro `Holiday` ese día. Ningún profesional tiene turnos `SCHEDULED` que todavía no comenzaron ese día; los que ya comenzaron no bloquean el cierre.
+**Efectos:** crea el `Holiday` con su autor (`createdById`) y fecha de carga (`createdAt`). El cierre es siempre del día completo: ese día el centro no ofrece disponibilidad para nadie y se pinta en el calendario y en la agenda de cada profesional.
+**Errores:** `VALIDATION` (fecha inválida o pasada, descripción vacía), `FORBIDDEN`, `DUPLICATE` (ya hay un cierre ese día; incluye `fieldErrors`), `FUTURE_APPOINTMENTS` (con `meta.appointments`, incluido el teléfono del paciente para avisarle; hay que cancelar o reprogramar esos turnos antes de volver a intentar).
+**Revalida:** `/holidays`, `/calendar` y `/agenda`.
 **Devuelve:** `{ id, date, description }`.
 
 ### `deleteHoliday`
 
-**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
-**Roles:** `MANAGER`
-**Entrada:** `id`.
-**Precondiciones:** el feriado existe.
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md), [HU-14](hu/HU-14-cerrar-el-centro.md)
+**Roles:** `MANAGER`, `RECEPTIONIST`
+**Entrada:** `id`. La UI la llama desde `/holidays` y desde la vista día de `/calendar`, con confirmación.
+**Precondiciones:** el cierre existe.
 **Efectos:** lo borra: el día vuelve a ofrecer disponibilidad según las franjas.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`.
-**Revalida:** `/holidays` y `/calendar`.
+**Revalida:** `/holidays`, `/calendar` y `/agenda`.
 **Devuelve:** `{ id }`.
 
 ### `searchPatients`
