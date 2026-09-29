@@ -12,7 +12,7 @@
 ## Validaciones
 
 - Si no hay ningún profesional con franja ese día, se muestra un mensaje explícito, no una grilla vacía sin explicación. Si el día es feriado, el mensaje lo nombra.
-- Solo se ofrecen como bloques libres los horarios que el alta de turno aceptaría: desde ahora hasta dos meses inclusive ([HU-09](HU-09-asignar-turno.md)). El tiempo libre ya pasado se muestra vacío, sin enlace.
+- Solo se ofrecen como bloques libres los horarios que el alta de turno aceptaría: desde ahora hasta dos meses inclusive ([HU-09](HU-09-asignar-turno.md)), y con una duración mínima de 30 minutos (el bloque de grilla del centro y duración mínima de cualquier prestación, [HU-06](HU-06-catalogo-de-servicios.md)). Los tramos menores y el tiempo libre ya pasado se muestran vacíos, sin enlace.
 - Completar un turno exige que ya haya comenzado; marcarlo Vencido exige que ya haya terminado. Así un turno futuro nunca libera su horario por error.
 - Solo se cambia el estado de un turno Programado; los otros tres estados son finales.
 

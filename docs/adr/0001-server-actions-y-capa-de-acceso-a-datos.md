@@ -6,7 +6,7 @@
 
 ## Contexto
 
-Goat es una aplicación Next.js (App Router) con un único cliente: su propia interfaz web. No hay app móvil nativa ni API pública (fuera de alcance), y los usuarios son personal interno con distintos roles (`RECEPTIONIST`, `PROFESSIONAL`, `MANAGER`).
+GOAT es una aplicación Next.js (App Router) con un único cliente: su propia interfaz web. No hay app móvil nativa ni API pública (fuera de alcance), y los usuarios son personal interno con distintos roles (`RECEPTIONIST`, `PROFESSIONAL`, `MANAGER`).
 
 Hay que decidir si el acceso a datos se resuelve con una API (Route Handlers) o con Server Actions. Las reglas que no se negocian (sin turnos superpuestos, trazabilidad, control de acceso por rol) tienen que cumplirse sin importar por dónde entre la operación.
 

@@ -10,7 +10,7 @@ import { Role } from "@/generated/prisma/enums";
 import { AgendaView } from "./agenda-view";
 import { AgendaProfessionalPicker } from "./agenda-professional-picker";
 
-export const metadata: Metadata = { title: "Agenda · Goat" };
+export const metadata: Metadata = { title: "Agenda · GOAT" };
 
 export default async function AgendaPage({
   searchParams,
@@ -22,7 +22,7 @@ export default async function AgendaPage({
 
   const validDate =
     typeof date === "string" && isCalendarDate(date) ? date : undefined;
-  const viewMode = view === "day" ? "day" : "week";
+  const viewMode = view === "month" ? "month" : view === "day" ? "day" : "week";
   const hide = hideCancelled === "1" || hideCancelled === "true";
   const profId =
     typeof professionalId === "string" && Number(professionalId) > 0

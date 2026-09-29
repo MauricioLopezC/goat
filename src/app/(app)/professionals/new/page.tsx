@@ -7,7 +7,7 @@ import {
 import { ProfessionalForm } from "./professional-form";
 
 export const metadata: Metadata = {
-  title: "Nuevo profesional · Goat",
+  title: "Nuevo profesional · GOAT",
   description: "Registrar un nuevo profesional en el centro de traumatología.",
 };
 

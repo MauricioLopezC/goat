@@ -14,7 +14,7 @@ import { WeeklySchedule } from "@/components/weekly-schedule";
 
 import { FutureAppointmentsSection } from "./future-appointment-cancel";
 
-export const metadata: Metadata = { title: "Ficha profesional · Goat" };
+export const metadata: Metadata = { title: "Ficha profesional · GOAT" };
 
 export default async function ProfessionalDetailPage({
   params,

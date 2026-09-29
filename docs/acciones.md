@@ -1,6 +1,6 @@
 # Acciones: convención y catálogo
 
-Contrato de las Server Actions de Goat y catálogo de operaciones. La decisión de fondo está en [ADR 0001](adr/0001-server-actions-y-capa-de-acceso-a-datos.md).
+Contrato de las Server Actions de GOAT y catálogo de operaciones. La decisión de fondo está en [ADR 0001](adr/0001-server-actions-y-capa-de-acceso-a-datos.md).
 
 Los nombres de código (modelos, roles, estados, funciones) siguen [`glossary.md`](glossary.md). La documentación va en español y el código en inglés.
 
@@ -217,9 +217,9 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 ### `listAppointments`
 
-**Historia de usuario:** [HU-11 — Ver el calendario de turnos del centro](hu/HU-11-calendario-del-centro.md). También la usa la consulta del turno creado en [HU-09](hu/HU-09-asignar-turno.md).
+**Historia de usuario:** [HU-11 — Ver el calendario de turnos del centro](hu/HU-11-calendario-del-centro.md), [HU-15 — Ver el calendario por mes](hu/HU-15-vista-mensual-del-calendario.md). También la usa la consulta del turno creado en [HU-09](hu/HU-09-asignar-turno.md).
 **Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
-**Entrada:** `from` y `to` (AAAA-MM-DD, inclusive, hasta 7 días), `professionalId?`, `serviceId?`, `hideCancelled?` (booleano, por defecto `false`).
+**Entrada:** `from` y `to` (AAAA-MM-DD, inclusive, hasta un mes / 31 días), `professionalId?`, `serviceId?`, `hideCancelled?` (booleano, por defecto `false`).
 **Precondiciones:** `from` no es posterior a `to`. El profesional solo accede a turnos cuyo `professional.userId` coincida con su usuario, verificado en la DAL; si pide otro `professionalId`, se rechaza.
 **Efectos:** ninguno. Devuelve los turnos que empiezan en el rango, en hora del centro, ordenados por inicio e ID, filtrados por profesional y servicio. Con `hideCancelled` excluye los `CANCELLED`.
 **Errores:** `FORBIDDEN`, `VALIDATION`.
@@ -228,9 +228,9 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 ### `listAvailabilityWindows`
 
-**Historia de usuario:** [HU-11](hu/HU-11-calendario-del-centro.md).
+**Historia de usuario:** [HU-11](hu/HU-11-calendario-del-centro.md), [HU-15](hu/HU-15-vista-mensual-del-calendario.md).
 **Roles:** `RECEPTIONIST`, `MANAGER`.
-**Entrada:** `from` y `to` (AAAA-MM-DD, inclusive, hasta 7 días), `professionalId?`, `serviceId?`.
+**Entrada:** `from` y `to` (AAAA-MM-DD, inclusive, hasta un mes / 31 días), `professionalId?`, `serviceId?`.
 **Precondiciones:** `from` no es posterior a `to`.
 **Efectos:** ninguno. Lista los profesionales activos, filtrados por `professionalId` y por los que prestan `serviceId`, con sus `AvailabilityWindow` (con `serviceId`, solo las que no restringen servicios o incluyen ese servicio) y sus `AvailabilityException` del rango, más los `Holiday` del rango. Si viene `serviceId`, incluye la duración del servicio. El cálculo de bloques libres se hace fuera de la DAL, con una función pura.
 **Errores:** `FORBIDDEN`, `VALIDATION`, `NOT_FOUND` (el servicio no existe o está inactivo).
@@ -699,13 +699,13 @@ No es una Server Action: es una lectura que el Server Component de `/patients/[i
 
 ### `getProfessionalAgenda`
 
-**Historia de usuario:** [HU-12 — Ver mi agenda completa](hu/HU-12-agenda-del-profesional.md)
+**Historia de usuario:** [HU-12 — Ver mi agenda completa](hu/HU-12-agenda-del-profesional.md), [HU-15 — Ver el calendario por mes](hu/HU-15-vista-mensual-del-calendario.md)
 **Roles:** `PROFESSIONAL`, `MANAGER`, `RECEPTIONIST`
-**Entrada:** `input: { date?: string, view?: "week" | "day", hideCancelled?: boolean, professionalId?: number }` y `actor: Actor`.
+**Entrada:** `input: { date?: string, view?: "month" | "week" | "day", hideCancelled?: boolean, professionalId?: number }` y `actor: Actor`.
 **Precondiciones:**
 - Si `actor.role === Role.PROFESSIONAL`, el profesional es el correspondiente a su usuario (`Professional.userId`). Si viene `input.professionalId` en los parámetros y no coincide con el suyo, la DAL rechaza la solicitud con `FORBIDDEN`.
 - Si `actor.role` es `MANAGER` o `RECEPTIONIST`, deben especificar `input.professionalId`.
-**Efectos:** ninguno. Es una lectura para la pantalla de agenda. Obtiene el perfil del profesional, sus franjas de atención semanales con consultorio y servicios, los turnos asignados en el rango temporal solicitado (semanal o diario) ordenados cronológicamente con datos clínicos completos (paciente con nombre, apellido y documento; servicio; horario y estado), el resumen de KPIs (total, programados, completados y cancelados), y los feriados y excepciones vigentes. Si `hideCancelled` es verdadero, los turnos cancelados se excluyen del listado de turnos pero se conservan en el contador del resumen.
+**Efectos:** ninguno. Es una lectura para la pantalla de agenda. Obtiene el perfil del profesional, sus franjas de atención semanales con consultorio y servicios, los turnos asignados en el rango temporal solicitado (mensual, semanal o diario) ordenados cronológicamente con datos clínicos completos (paciente con nombre, apellido y documento; servicio; horario y estado), el resumen de KPIs (total, programados, completados y cancelados), y los feriados y excepciones vigentes. Si `hideCancelled` es verdadero, los turnos cancelados se excluyen del listado de turnos pero se conservan en el contador del resumen.
 **Errores:** `FORBIDDEN` (rol no habilitado, o un `PROFESSIONAL` que consulta la agenda de otro), `NOT_FOUND` (profesional no encontrado), `VALIDATION` (parámetros inválidos o falta `professionalId` en roles administrativos).
 **Revalida:** no aplica.
 **Devuelve:** `{ professional, date, view, hideCancelled, week, windows, appointments, summary, holidays, exceptions }`.
