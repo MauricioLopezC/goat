@@ -10,6 +10,7 @@ import {
   formatAmount,
 } from "@/lib/payments";
 import { APPOINTMENT_STATUS_LABEL } from "@/lib/appointment-status";
+import { COVERAGE_TYPE_LABEL } from "@/lib/patients";
 import { formatDate, formatMinute, toLocalSlot } from "@/lib/schedule";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -178,9 +179,12 @@ function BillingTable({
           <TableHead>Horario</TableHead>
           <TableHead>Paciente</TableHead>
           <TableHead>Profesional · Servicio</TableHead>
-          <TableHead className="text-right">Cobro</TableHead>
-          <TableHead>Estado</TableHead>
-          <TableHead className="text-right">Acción</TableHead>
+          <TableHead>Cobertura</TableHead>
+          <TableHead className="text-right">Importe</TableHead>
+          <TableHead>Cobro o autorización</TableHead>
+          <TableHead>
+            <span className="sr-only">Acción</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -189,7 +193,7 @@ function BillingTable({
             <TableCell>
               <p className="tabular-nums">{schedule(row)}</p>
               <p className="text-muted-foreground text-xs">
-                {APPOINTMENT_STATUS_LABEL[row.status]}
+                Turno {APPOINTMENT_STATUS_LABEL[row.status].toLowerCase()}
               </p>
             </TableCell>
             <TableCell>
@@ -211,22 +215,18 @@ function BillingTable({
                 {row.service.name}
               </p>
             </TableCell>
+            <TableCell>
+              {COVERAGE_TYPE_LABEL[row.patient.coverageType]}
+            </TableCell>
             <TableCell className="text-right tabular-nums">
               {row.activePayment ? (
-                <>
-                  <p>{formatAmount(row.activePayment.amount)}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {row.activePayment.paymentMethod}
-                  </p>
-                </>
+                formatAmount(row.activePayment.amount)
               ) : row.state === "PENDING_PAYMENT" && row.price !== null ? (
                 formatAmount(row.price)
-              ) : row.authorizationNumber ? (
-                <p className="text-muted-foreground text-xs">
-                  Nº {row.authorizationNumber}
-                </p>
+              ) : row.state === "PENDING_PAYMENT" ? (
+                <span className="text-muted-foreground">Sin valor</span>
               ) : (
-                <span className="text-muted-foreground">—</span>
+                <span className="text-muted-foreground">No se cobra</span>
               )}
             </TableCell>
             <TableCell>
@@ -236,6 +236,16 @@ function BillingTable({
               >
                 {PAYMENT_STATE_LABEL[row.state]}
               </Badge>
+              {row.activePayment && (
+                <p className="text-muted-foreground text-xs">
+                  {row.activePayment.paymentMethod}
+                </p>
+              )}
+              {row.authorizationNumber && (
+                <p className="text-muted-foreground text-xs">
+                  Nº {row.authorizationNumber}
+                </p>
+              )}
             </TableCell>
             <TableCell className="text-right">{action(row)}</TableCell>
           </TableRow>
