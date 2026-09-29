@@ -14,7 +14,7 @@ import { getProfessionalSchedule } from "@/lib/dal/availability";
 import { ExceptionsSection } from "./exceptions-section";
 import { ScheduleEditor } from "./schedule-editor";
 
-export const metadata: Metadata = { title: "Horarios de atención · Goat" };
+export const metadata: Metadata = { title: "Horarios de atención · GOAT" };
 
 export default async function ProfessionalSchedulePage({
   params,

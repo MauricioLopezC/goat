@@ -1,6 +1,6 @@
 # Checklist Rápido de Code Review
 
-Guía condensada para evaluar un diff o pull request en Goat.
+Guía condensada para evaluar un diff o pull request en GOAT.
 
 ---
 

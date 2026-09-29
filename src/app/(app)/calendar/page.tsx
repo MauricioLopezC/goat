@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
+  Calendar as CalendarIcon,
   CalendarDays,
   CalendarRange,
   ChevronLeft,
@@ -18,6 +19,7 @@ import {
   listAvailabilityWindows,
 } from "@/lib/dal/appointments";
 import { listActiveServices, listProfessionals } from "@/lib/dal/professionals";
+import { getPaymentStates } from "@/lib/dal/payments";
 import {
   calendarHref,
   calendarRange,
@@ -28,7 +30,9 @@ import {
 import {
   addDays,
   formatDate,
+  formatMonth,
   formatWeekRange,
+  getMonthDays,
   toLocalSlot,
 } from "@/lib/schedule";
 import { WeeklyAgendaGrid } from "../agenda/weekly-agenda-grid";
@@ -36,9 +40,10 @@ import { buildCalendarDay } from "./calendar-model";
 import { CenterClosureControls } from "./center-closure-controls";
 import { CalendarFilters } from "./calendar-filters";
 import { DayView } from "./day-view";
+import { MonthView } from "./month-view";
 import { WeekView } from "./week-view";
 
-export const metadata: Metadata = { title: "Calendario · Goat" };
+export const metadata: Metadata = { title: "Calendario · GOAT" };
 
 // Calendario del centro (HU-11). La vista, la fecha y los filtros viven en la
 // URL; el profesional usa su agenda (HU-12).
@@ -106,11 +111,32 @@ export default async function CalendarPage({
     }
   }
 
-  const days = Array.from({ length: query.view === "week" ? 7 : 1 }, (_, i) =>
-    buildCalendarDay(addDays(range.from, i), availability, appointments, now),
-  );
+  const isMonth = query.view === "month";
+
+  // Marca de cobro o autorización de los turnos de hoy y completados (HU-21).
+  // La vista mes no la muestra.
+  const paymentStates = isMonth
+    ? {}
+    : await getPaymentStates(
+        [...appointments, ...(agenda?.appointments ?? [])].map((a) => a.id),
+        actor,
+      );
   const isWeek = query.view === "week";
-  const unit = isWeek ? "Semana" : "Día";
+  const unit = isMonth ? "Mes" : isWeek ? "Semana" : "Día";
+
+  const monthInfo = isMonth ? getMonthDays(query.date) : null;
+  const days = isMonth
+    ? monthInfo!.days.map((d) =>
+        buildCalendarDay(d.date, availability, appointments, now),
+      )
+    : Array.from({ length: isWeek ? 7 : 1 }, (_, i) =>
+        buildCalendarDay(
+          addDays(range.from, i),
+          availability,
+          appointments,
+          now,
+        ),
+      );
   // Cierre del día que se ve, para quitarlo desde la vista día (HU-14).
   const closure = availability.holidays.find(
     (holiday) => holiday.date === query.date,
@@ -127,7 +153,7 @@ export default async function CalendarPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {!isWeek && (
+          {!isWeek && !isMonth && (
             <CenterClosureControls
               date={query.date}
               holiday={closure ?? null}
@@ -172,20 +198,22 @@ export default async function CalendarPage({
               </Link>
             </Button>
             <h2 className="text-title-lg px-2 first-letter:uppercase">
-              {isWeek
-                ? formatWeekRange(range.from, range.to)
-                : formatDate(query.date)}
+              {isMonth
+                ? formatMonth(query.date)
+                : isWeek
+                  ? formatWeekRange(range.from, range.to)
+                  : formatDate(query.date)}
             </h2>
           </nav>
           <div className="flex flex-wrap items-center gap-2">
             <div className="bg-muted inline-flex rounded-md border p-0.5">
-              <Button asChild size="sm" variant={isWeek ? "ghost" : "default"}>
+              <Button asChild size="sm" variant={isMonth ? "default" : "ghost"}>
                 <Link
-                  href={calendarHref({ ...query, view: "day" })}
-                  aria-current={isWeek ? undefined : "page"}
+                  href={calendarHref({ ...query, view: "month" })}
+                  aria-current={isMonth ? "page" : undefined}
                 >
-                  <CalendarDays data-icon="inline-start" />
-                  Día
+                  <CalendarIcon data-icon="inline-start" />
+                  Mes
                 </Link>
               </Button>
               <Button asChild size="sm" variant={isWeek ? "default" : "ghost"}>
@@ -195,6 +223,19 @@ export default async function CalendarPage({
                 >
                   <CalendarRange data-icon="inline-start" />
                   Semana
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant={!isMonth && !isWeek ? "default" : "ghost"}
+              >
+                <Link
+                  href={calendarHref({ ...query, view: "day" })}
+                  aria-current={!isMonth && !isWeek ? "page" : undefined}
+                >
+                  <CalendarDays data-icon="inline-start" />
+                  Día
                 </Link>
               </Button>
             </div>
@@ -224,7 +265,9 @@ export default async function CalendarPage({
             services={services}
           />
           <form action="/calendar" className="flex items-end gap-2">
-            {isWeek && <input type="hidden" name="view" value="week" />}
+            {query.view !== "day" && (
+              <input type="hidden" name="view" value={query.view} />
+            )}
             {query.professionalId && (
               <input
                 type="hidden"
@@ -260,12 +303,26 @@ export default async function CalendarPage({
             {agenda.professional.firstName}. Para dar un turno desde un bloque
             libre, abrí la vista día.
           </p>
-          <WeeklyAgendaGrid data={agenda} />
+          <WeeklyAgendaGrid data={agenda} paymentStates={paymentStates} />
         </>
+      ) : isMonth && monthInfo ? (
+        <MonthView
+          days={days}
+          leadingBlankDays={monthInfo.leadingBlankDays}
+          trailingBlankDays={monthInfo.trailingBlankDays}
+          query={query}
+          today={today}
+          now={now}
+        />
       ) : isWeek ? (
-        <WeekView days={days} query={query} today={today} />
+        <WeekView
+          days={days}
+          query={query}
+          today={today}
+          paymentStates={paymentStates}
+        />
       ) : (
-        <DayView day={days[0]} query={query} />
+        <DayView day={days[0]} query={query} paymentStates={paymentStates} />
       )}
     </div>
   );

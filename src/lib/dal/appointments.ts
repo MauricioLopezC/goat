@@ -3,6 +3,8 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
 import { assertRole, type Actor } from "@/lib/dal/auth";
+import { assertNoActivePayment } from "@/lib/dal/payments";
+import { serializableTransaction } from "@/lib/dal/transactions";
 import {
   AppointmentEventType,
   AppointmentStatus,
@@ -18,6 +20,7 @@ import {
 import {
   dateFromDb,
   dateToDb,
+  getMonthRange,
   getWeekDays,
   parseTime,
   toLocalSlot,
@@ -153,7 +156,8 @@ export async function getAppointmentOptions(
     patientId
       ? prisma.patient.findFirst({
           where: { id: patientId, active: true },
-          select: patientSelect,
+          // La cobertura decide el aviso de la orden médica (HU-21).
+          select: { ...patientSelect, coverageType: true },
         })
       : null,
     prisma.service.findMany({
@@ -162,6 +166,7 @@ export async function getAppointmentOptions(
         id: true,
         name: true,
         durationMinutes: true,
+        requiresReferral: true,
         specialty: { select: { id: true, name: true } },
       },
       orderBy: { name: "asc" },
@@ -691,47 +696,45 @@ export async function cancelProfessionalAppointment(
   actor: Actor,
 ) {
   assertRole(actor, Role.MANAGER);
-  return prisma.$transaction(
-    async (tx) => {
-      const appointment = await tx.appointment.findUnique({
-        where: { id: input.appointmentId },
-        select: {
-          id: true,
-          professionalId: true,
-          status: true,
-          startsAt: true,
-        },
-      });
-      if (!appointment || appointment.professionalId !== input.professionalId)
-        throw new DomainError(
-          "NOT_FOUND",
-          "El turno no existe en la ficha de este profesional.",
-        );
-      if (
-        appointment.status !== AppointmentStatus.SCHEDULED ||
-        appointment.startsAt <= new Date()
-      )
-        throw new DomainError(
-          "INVALID_STATUS_TRANSITION",
-          "Solo se puede cancelar un turno programado que aún no comenzó.",
-        );
-      await tx.appointment.update({
-        where: { id: appointment.id },
-        data: { status: AppointmentStatus.CANCELLED },
-      });
-      await tx.appointmentEvent.create({
-        data: {
-          appointmentId: appointment.id,
-          type: AppointmentEventType.CANCELLED,
-          reason: input.reason,
-          requestedBy: input.requestedBy,
-          userId: actor.id,
-        },
-      });
-      return { id: appointment.id };
-    },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-  );
+  return serializableTransaction(async (tx) => {
+    const appointment = await tx.appointment.findUnique({
+      where: { id: input.appointmentId },
+      select: {
+        id: true,
+        professionalId: true,
+        status: true,
+        startsAt: true,
+      },
+    });
+    if (!appointment || appointment.professionalId !== input.professionalId)
+      throw new DomainError(
+        "NOT_FOUND",
+        "El turno no existe en la ficha de este profesional.",
+      );
+    if (
+      appointment.status !== AppointmentStatus.SCHEDULED ||
+      appointment.startsAt <= new Date()
+    )
+      throw new DomainError(
+        "INVALID_STATUS_TRANSITION",
+        "Solo se puede cancelar un turno programado que aún no comenzó.",
+      );
+    await assertNoActivePayment(tx, appointment.id, "cancelarlo");
+    await tx.appointment.update({
+      where: { id: appointment.id },
+      data: { status: AppointmentStatus.CANCELLED },
+    });
+    await tx.appointmentEvent.create({
+      data: {
+        appointmentId: appointment.id,
+        type: AppointmentEventType.CANCELLED,
+        reason: input.reason,
+        requestedBy: input.requestedBy,
+        userId: actor.id,
+      },
+    });
+    return { id: appointment.id };
+  });
 }
 
 export async function getProfessionalAgenda(
@@ -814,18 +817,20 @@ export async function getProfessionalAgenda(
 
   const selectedDate = date ?? toLocalSlot(new Date()).date;
   const week = getWeekDays(selectedDate);
+  const month = getMonthRange(selectedDate);
 
-  const rangeStart =
-    view === "week"
-      ? appointmentInstant(week.monday, 0)
-      : appointmentInstant(selectedDate, 0);
-  const rangeEnd =
-    view === "week"
-      ? appointmentInstant(week.sunday, 1440)
-      : appointmentInstant(selectedDate, 1440);
+  let fromDateStr = selectedDate;
+  let toDateStr = selectedDate;
+  if (view === "week") {
+    fromDateStr = week.monday;
+    toDateStr = week.sunday;
+  } else if (view === "month") {
+    fromDateStr = month.from;
+    toDateStr = month.to;
+  }
 
-  const fromDateStr = view === "week" ? week.monday : selectedDate;
-  const toDateStr = view === "week" ? week.sunday : selectedDate;
+  const rangeStart = appointmentInstant(fromDateStr, 0);
+  const rangeEnd = appointmentInstant(toDateStr, 1440);
 
   const [appointments, holidays, exceptions] = await Promise.all([
     prisma.appointment.findMany({
@@ -923,6 +928,7 @@ export async function getProfessionalAgenda(
     view,
     hideCancelled,
     week,
+    month,
     windows: professional.availabilityWindows,
     appointments: displayedAppointments,
     summary,
@@ -956,36 +962,33 @@ export async function cancelAppointment(
       "El motivo de cancelación es obligatorio.",
     );
   }
-  return prisma.$transaction(
-    async (tx) => {
-      const appointment = await tx.appointment.findUnique({
-        where: { id: data.appointmentId },
-        select: { id: true, status: true },
-      });
-      if (!appointment)
-        throw new DomainError("NOT_FOUND", "El turno no existe.");
-      if (appointment.status !== AppointmentStatus.SCHEDULED)
-        throw new DomainError(
-          "INVALID_STATUS_TRANSITION",
-          "Solo se puede cancelar un turno en estado Programado.",
-        );
-      await tx.appointment.update({
-        where: { id: appointment.id },
-        data: { status: AppointmentStatus.CANCELLED },
-      });
-      await tx.appointmentEvent.create({
-        data: {
-          appointmentId: appointment.id,
-          type: AppointmentEventType.CANCELLED,
-          reason: data.reason,
-          requestedBy: data.requestedBy,
-          userId: actor.id,
-        },
-      });
-      return { id: appointment.id };
-    },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-  );
+  return serializableTransaction(async (tx) => {
+    const appointment = await tx.appointment.findUnique({
+      where: { id: data.appointmentId },
+      select: { id: true, status: true },
+    });
+    if (!appointment) throw new DomainError("NOT_FOUND", "El turno no existe.");
+    if (appointment.status !== AppointmentStatus.SCHEDULED)
+      throw new DomainError(
+        "INVALID_STATUS_TRANSITION",
+        "Solo se puede cancelar un turno en estado Programado.",
+      );
+    await assertNoActivePayment(tx, appointment.id, "cancelarlo");
+    await tx.appointment.update({
+      where: { id: appointment.id },
+      data: { status: AppointmentStatus.CANCELLED },
+    });
+    await tx.appointmentEvent.create({
+      data: {
+        appointmentId: appointment.id,
+        type: AppointmentEventType.CANCELLED,
+        reason: data.reason,
+        requestedBy: data.requestedBy,
+        userId: actor.id,
+      },
+    });
+    return { id: appointment.id };
+  });
 }
 
 export async function rescheduleAppointment(
@@ -1166,7 +1169,11 @@ async function closeAppointment(
     throw new DomainError("VALIDATION", "Revisá los datos ingresados.");
   const { appointmentId, reason } = parsed.data;
   const completing = target === AppointmentStatus.COMPLETED;
-  return prisma.$transaction(async (tx) => {
+  // Serializable: vencer compite con cobrar (HU-21); si los dos llegan a la
+  // vez, uno se reintenta y ve el estado del otro.
+  return serializableTransaction(async (tx) => {
+    if (!completing)
+      await assertNoActivePayment(tx, appointmentId, "marcarlo como vencido");
     const now = new Date();
     const { count } = await tx.appointment.updateMany({
       where: {

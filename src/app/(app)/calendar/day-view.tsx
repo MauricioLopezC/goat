@@ -12,6 +12,8 @@ import {
   occupiesSlot,
 } from "@/lib/appointment-status";
 import { calendarSearch, type CalendarQuery } from "@/lib/calendar";
+import { PAYMENT_STATE_LABEL, type PaymentState } from "@/lib/payments";
+import { PaymentStateIcon } from "@/components/payment-state-icon";
 import { formatMinute, toLocalSlot } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { hourRange, type CalendarDay } from "./calendar-model";
@@ -47,9 +49,11 @@ function newAppointmentHref(
 export function DayView({
   day,
   query,
+  paymentStates,
 }: {
   day: CalendarDay;
   query: CalendarQuery;
+  paymentStates: Record<number, PaymentState>;
 }) {
   const filtered = Boolean(query.professionalId || query.serviceId);
   const nobodyAttends = !day.professionals.some((item) => item.attends);
@@ -268,11 +272,12 @@ export function DayView({
                       end.date === start.date ? end.minute : 1440;
                     const occupies = occupiesSlot(appointment.status);
                     const patient = `${appointment.patient.lastName}, ${appointment.patient.firstName}`;
+                    const paymentState = paymentStates[appointment.id];
                     return (
                       <Link
                         key={appointment.id}
                         href={`/appointments/${appointment.id}?${detailSearch}`}
-                        title={`${formatMinute(start.minute)} · ${patient} · ${appointment.service.name} · ${APPOINTMENT_STATUS_LABEL[appointment.status]}`}
+                        title={`${formatMinute(start.minute)} · ${patient} · ${appointment.service.name} · ${APPOINTMENT_STATUS_LABEL[appointment.status]}${paymentState ? ` · ${PAYMENT_STATE_LABEL[paymentState]}` : ""}`}
                         className={cn(
                           "focus-visible:ring-ring absolute z-10 flex flex-col overflow-hidden rounded-sm border border-l-4 px-1.5 py-0.5 text-xs shadow-sm outline-none hover:shadow-md focus-visible:ring-2",
                           APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
@@ -308,8 +313,17 @@ export function DayView({
                         <span className="text-muted-foreground truncate">
                           {appointment.service.name}
                         </span>
-                        <span className="text-muted-foreground truncate">
+                        <span className="text-muted-foreground flex items-center gap-1 truncate">
                           {APPOINTMENT_STATUS_LABEL[appointment.status]}
+                          {paymentState && (
+                            <>
+                              {" · "}
+                              <PaymentStateIcon state={paymentState} />
+                              <span className="truncate">
+                                {PAYMENT_STATE_LABEL[paymentState]}
+                              </span>
+                            </>
+                          )}
                         </span>
                       </Link>
                     );

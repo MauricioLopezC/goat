@@ -18,14 +18,23 @@
 - Un turno tiene como máximo un cobro vigente.
 - El servicio tiene que tener valor cargado ([HU-20](HU-20-aranceles-y-medios-de-pago.md)); si no, el sistema avisa y no cobra.
 - El medio de pago tiene que estar activo. Un cobro se paga con un solo medio.
+- "Hoy" es el día calendario en la hora de Argentina.
 
 ## Comportamiento
 
 - El detalle del turno ofrece **Cobrar** si el paciente es particular, o **Registrar autorización** si tiene obra social y el servicio requiere orden.
 - El cobro guarda el monto del momento, separado del valor del servicio: si después cambia el valor, el cobro no cambia.
 - El turno muestra su estado en el detalle, en el calendario y en el historial del paciente ([HU-18](HU-18-historial-de-turnos-del-paciente.md)): pendiente de cobro o cobrado (particular); pendiente de autorización o autorizado (obra social con orden).
+  - En el calendario, la marca aparece solo en los turnos Programados de hoy y en los Completados, para no llenar de "pendiente" los turnos futuros. En el detalle se ve siempre que aplique.
+  - El profesional no ve el estado de cobro ni la autorización, en ningún lugar.
 - **Anular un cobro:** si se cargó mal, se anula con motivo obligatorio; no se borra. Queda quién lo anuló y cuándo, y el turno se puede volver a cobrar.
-- Un turno con cobro vigente no se cancela ni se reprograma: primero se anula el cobro.
+- Un turno con cobro vigente no se cancela, no se reprograma ni se marca Vencido: primero se anula el cobro. Si se cobró, el paciente vino.
+- **Corregir una autorización:** si se cargó mal el número, se vuelve a registrar mientras el turno siga habilitado (Programado de hoy o Completado). Se guarda quién la registró por última vez y cuándo, y el número anterior queda en el historial del turno.
+- **Cobros del día:** pantalla en el menú lateral con los turnos de hoy (Programados y Completados) en los que aplica el cobro o la autorización, ordenados por horario.
+  - Arriba, los pendientes de cobro o de autorización, con **Cobrar** o **Registrar autorización** en la misma fila. El diálogo es el mismo del detalle del turno.
+  - Abajo, los ya cobrados o autorizados. Para anular un cobro o corregir una autorización se entra al detalle.
+  - Cada fila muestra horario, paciente, profesional, servicio y valor, y abre el detalle del turno.
+  - Si el servicio no tiene valor cargado, la fila lo avisa y no ofrece **Cobrar**.
 - Al dar el turno ([HU-09](HU-09-asignar-turno.md)), si el servicio requiere orden y el paciente tiene obra social, se avisa: "Recordale al paciente traer la orden".
 
 ## Confirmación
@@ -43,7 +52,9 @@
 
 - `registerPayment` — errores nuevos a documentar en `acciones.md`: servicio sin valor, turno ya cobrado, paciente con obra social.
 - `voidPayment` — anulación con motivo (`REASON_REQUIRED`).
-- `registerAuthorization` — número de autorización del turno.
+- `registerAuthorization` — número de autorización del turno; también la corrige.
+- `listTodayBilling` — turnos de hoy con su estado de cobro o autorización, para *Cobros del día*.
+- `cancelAppointment`, `cancelProfessionalAppointment`, `expireAppointment` — rechazan un turno con cobro vigente.
 
 ## A conversar
 
@@ -52,3 +63,13 @@
   - **Decisión del equipo (28/09/2026):** nada en el Inc. 2. Solo se registra la autorización cuando el servicio requiere orden. El coseguro queda para el Inc. 3.
 - **Supuesto del equipo:** la orden o autorización se pide por turno, solo cuando el servicio requiere orden y hay obra social, y se registra al llegar el paciente. A confirmar.
 - Devoluciones de dinero: fuera del Inc. 2.
+- ¿Un turno cobrado se puede marcar Vencido?
+  - **Decisión del equipo (29/09/2026):** no. Si se cobró, el paciente vino; para vencerlo primero se anula el cobro.
+- ¿Cómo se corrige una autorización mal cargada?
+  - **Decisión del equipo (29/09/2026):** se vuelve a registrar encima, sin anulación. El número anterior queda en el historial del turno.
+- ¿Dónde se ve la marca de cobro en el calendario?
+  - **Decisión del equipo (29/09/2026):** solo en los turnos Programados de hoy y en los Completados.
+- ¿Mesa de entradas necesita una pantalla para cobrar varios turnos seguidos?
+  - **Supuesto del equipo (29/09/2026):** sí, *Cobros del día*. Si se cobran muchos turnos por día, entrar de a uno desde el calendario es lento. A confirmar con el cliente.
+- ¿*Cobros del día* muestra también turnos Completados de días anteriores que quedaron sin cobrar?
+  - **Supuesto del equipo:** no, solo los de hoy. Los anteriores se cobran desde el detalle del turno. A confirmar.

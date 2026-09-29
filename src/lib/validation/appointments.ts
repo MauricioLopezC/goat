@@ -59,8 +59,8 @@ export type AppointmentStatusChangeInput = z.input<
   typeof appointmentStatusChangeSchema
 >;
 
-// Calendario del centro (HU-11): un día o una semana.
-const CALENDAR_MAX_DAYS = 7;
+// Calendario del centro (HU-11, HU-15): un día, una semana o un mes calendario.
+const CALENDAR_MAX_DAYS = 31;
 const calendarRangeShape = {
   from: appointmentDateSchema,
   to: appointmentDateSchema,
@@ -69,9 +69,9 @@ const calendarRangeShape = {
 };
 function isValidRange({ from, to }: { from: string; to: string }) {
   const days = (dateToDb(to).getTime() - dateToDb(from).getTime()) / 86_400_000;
-  return days >= 0 && days < CALENDAR_MAX_DAYS;
+  return days >= 0 && days <= CALENDAR_MAX_DAYS;
 }
-const rangeMessage = "El rango del calendario debe ser de uno a siete días.";
+const rangeMessage = "El rango del calendario debe ser de un día a un mes.";
 export const calendarAppointmentsSchema = z
   .object({
     ...calendarRangeShape,
@@ -90,7 +90,7 @@ export type CalendarAvailabilityInput = z.input<
 
 export const professionalAgendaSchema = z.object({
   date: appointmentDateSchema.optional(),
-  view: z.enum(["week", "day"]).default("week"),
+  view: z.enum(["month", "week", "day"]).default("week"),
   hideCancelled: z.boolean().default(false),
   professionalId: z.number().int().positive().optional(),
 });
