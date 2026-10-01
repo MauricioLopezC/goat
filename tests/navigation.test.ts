@@ -30,6 +30,7 @@ test("cada rol ve exactamente sus links", () => {
     "Calendario",
     "Nuevo turno",
     "Cobros del día",
+    "Turnos sin cerrar",
     "Agendas",
     "Pacientes",
     "Profesionales",
@@ -48,6 +49,7 @@ test("cada rol ve exactamente sus links", () => {
     "Calendario",
     "Nuevo turno",
     "Cobros del día",
+    "Turnos sin cerrar",
     "Agendas",
     "Pacientes",
     "Profesionales",
@@ -113,4 +115,7 @@ test("canAccess replica los permisos de las páginas", () => {
   assert.equal(canAccess("/appointments/4/reschedule", "MANAGER"), true);
   assert.equal(canAccess("/payments", "PROFESSIONAL"), false);
   assert.equal(canAccess("/payments", "RECEPTIONIST"), true);
+  assert.equal(canAccess("/appointments/unclosed", "PROFESSIONAL"), false);
+  assert.equal(canAccess("/appointments/unclosed", "RECEPTIONIST"), true);
+  assert.equal(canAccess("/appointments/unclosed", "MANAGER"), true);
 });

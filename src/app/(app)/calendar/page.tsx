@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   Calendar as CalendarIcon,
+  CalendarClock,
   CalendarDays,
   CalendarRange,
   ChevronLeft,
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { DomainError } from "@/lib/actions";
 import { requirePageRole } from "@/lib/dal/auth";
 import {
+  countUnclosedAppointments,
   getProfessionalAgenda,
   listAppointments,
   listAvailabilityWindows,
@@ -55,9 +57,10 @@ export default async function CalendarPage({
   const today = toLocalSlot(now).date;
   const parsed = parseCalendarQuery(await searchParams, today);
 
-  const [professionals, services] = await Promise.all([
+  const [professionals, services, unclosedCount] = await Promise.all([
     listProfessionals({ status: "active" }, actor),
     listActiveServices(actor),
+    countUnclosedAppointments(actor),
   ]);
   // Un servicio inexistente o dado de baja en la URL se ignora.
   const query: CalendarQuery = {
@@ -159,6 +162,17 @@ export default async function CalendarPage({
               holiday={closure ?? null}
               canClose={query.date >= today}
             />
+          )}
+          {/* Turnos pasados que siguen Programados (HU-22). */}
+          {unclosedCount > 0 && (
+            <Button asChild variant="outline">
+              <Link href="/appointments/unclosed">
+                <CalendarClock data-icon="inline-start" />
+                {unclosedCount === 1
+                  ? "1 turno sin cerrar"
+                  : `${unclosedCount} turnos sin cerrar`}
+              </Link>
+            </Button>
           )}
           <Button asChild>
             <Link href="/appointments/new">Nuevo turno</Link>

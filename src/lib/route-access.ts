@@ -18,6 +18,7 @@ const FRONT_DESK: readonly Role[] = ["RECEPTIONIST", "MANAGER"];
 /// sesión.
 const ROUTE_RULES: RouteRule[] = [
   { pattern: /^\/appointments\/new(\/|$)/, roles: FRONT_DESK },
+  { pattern: /^\/appointments\/unclosed(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/appointments\/[^/]+\/reschedule(\/|$)/, roles: STAFF },
   { pattern: /^\/patients\/new(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/patients\/[^/]+\/edit(\/|$)/, roles: FRONT_DESK },

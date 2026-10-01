@@ -19,7 +19,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ActionErrorAlert } from "@/components/action-error-alert";
 import type { ActionResult } from "@/lib/actions";
 
-// Confirmación para completar o marcar Vencido un turno Programado (HU-11).
+// Confirmación para completar o marcar Vencido un turno Programado, desde el
+// detalle del turno (HU-11) o la lista de turnos sin cerrar (HU-22).
 
 const COPY = {
   COMPLETED: {
@@ -36,18 +37,22 @@ const COPY = {
   },
 } as const;
 
+export type StatusChangeTarget = keyof typeof COPY;
+
 export function StatusChangeDialog({
   appointmentId,
   target,
   summary,
-  returnSearch,
+  successHref,
+  triggerClassName,
 }: {
   appointmentId: number;
-  target: keyof typeof COPY;
+  target: StatusChangeTarget;
   /** Paciente, profesional, servicio, día y hora. */
   summary: string;
-  /** Parámetros del calendario de origen, para conservarlos al volver. */
-  returnSearch: string;
+  /** A dónde ir al confirmar: el detalle del turno o la lista de origen. */
+  successHref: string;
+  triggerClassName?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -62,9 +67,7 @@ export function StatusChangeDialog({
     });
     if (result.ok) {
       setOpen(false);
-      const search = new URLSearchParams(returnSearch);
-      search.set("changed", target);
-      router.push(`/appointments/${appointmentId}?${search}`);
+      router.push(successHref);
     }
     return result;
   }, null);
@@ -72,7 +75,9 @@ export function StatusChangeDialog({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button variant="outline">{copy.trigger}</Button>
+        <Button variant="outline" className={triggerClassName}>
+          {copy.trigger}
+        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

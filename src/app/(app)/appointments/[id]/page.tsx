@@ -32,7 +32,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CancelAppointmentDialog } from "./cancel-dialog";
-import { StatusChangeDialog } from "./status-dialog";
+import { StatusChangeDialog, type StatusChangeTarget } from "./status-dialog";
 import { PaymentDialog } from "./payment-dialog";
 import { VoidPaymentDialog } from "./void-payment-dialog";
 import { AuthorizationDialog } from "./authorization-dialog";
@@ -95,6 +95,11 @@ export default async function AppointmentPage({
   const billingHref = (notice: "paid" | "authorized") => {
     const search = new URLSearchParams(returnSearch);
     search.set("billing", notice);
+    return `/appointments/${appointment.id}?${search}`;
+  };
+  const changedHref = (target: StatusChangeTarget) => {
+    const search = new URLSearchParams(returnSearch);
+    search.set("changed", target);
     return `/appointments/${appointment.id}?${search}`;
   };
 
@@ -497,7 +502,7 @@ export default async function AppointmentPage({
             appointmentId={appointment.id}
             target="COMPLETED"
             summary={summary}
-            returnSearch={returnSearch}
+            successHref={changedHref("COMPLETED")}
           />
         )}
         {canExpire && (
@@ -505,7 +510,7 @@ export default async function AppointmentPage({
             appointmentId={appointment.id}
             target="EXPIRED"
             summary={summary}
-            returnSearch={returnSearch}
+            successHref={changedHref("EXPIRED")}
           />
         )}
         {canCancel && (

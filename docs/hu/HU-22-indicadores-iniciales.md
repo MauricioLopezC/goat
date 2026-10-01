@@ -6,14 +6,16 @@
 
 ## Datos
 
-- **Ocupación:** minutos ocupados por turnos Programados y Completados sobre los minutos de franja disponibles (sin feriados ni ausencias), en porcentaje.
+- **Ocupación:** minutos ocupados por turnos Programados y Completados sobre los minutos de franja disponibles (sin feriados ni ausencias), en porcentaje. Solo cuenta la parte del turno que cae dentro de la franja disponible, así que nunca pasa del 100 %.
 - **Ausentismo:** turnos Vencidos sobre turnos Completados más Vencidos, en porcentaje.
 - **Cancelaciones:** cantidad de turnos Cancelados en el período.
 - **Turnos sin cerrar:** turnos Programados cuya hora de fin ya pasó.
 
 ## Validaciones
 
-- El período por defecto es el mes en curso; se puede elegir otro mes o un rango de hasta tres meses.
+- El período por defecto es el mes en curso; se puede elegir otro mes o un rango de meses completos, de hasta tres meses.
+- El período abarca todos sus días, también los que todavía no pasaron: la ocupación del mes en curso incluye los turnos Programados futuros.
+- Un turno pertenece al período por su fecha de inicio. Las cancelaciones también se cuentan así, no por el día en que se canceló el turno.
 - Sin turnos cerrados en el período, el ausentismo muestra "sin datos", no 0 %.
 
 ## Comportamiento
@@ -33,6 +35,7 @@
 
 - `getCenterIndicators` — indicadores por período, del centro y por profesional.
 - `listUnclosedAppointments` — turnos pasados que siguen Programados, paginados.
+- `countUnclosedAppointments` — cantidad de turnos sin cerrar, para el acceso del calendario.
 - `completeAppointment`, `expireAppointment` — sin cambios.
 
 ## A conversar
@@ -41,3 +44,7 @@
 - ¿Son estas las fórmulas de ocupación y ausentismo?
   - **Decisión del equipo (28/09/2026):** sí. Cada indicador muestra su fórmula como ayuda en el tablero.
 - Ingresos por período, demanda por servicio y el tablero del profesional: Inc. 3.
+- **Supuestos del equipo (01/10/2026)**, a validar con el cliente en la demo:
+  - No se guarda el historial de franjas, solo el patrón semanal vigente. Para un período pasado, los minutos disponibles se calculan con las franjas de hoy. Si un profesional cambió sus horarios, la ocupación de esos meses es aproximada.
+  - Un profesional dado de baja suma minutos de franja solo hasta su fecha de baja. La tabla muestra a los profesionales con franjas o turnos en el período.
+  - El cierre del centro no cancela turnos ([HU-14](HU-14-cerrar-el-centro.md)). Un turno en un día cerrado cuenta para el ausentismo y las cancelaciones, pero no suma ocupación: ese día no hay minutos disponibles.

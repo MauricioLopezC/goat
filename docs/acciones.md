@@ -267,7 +267,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya comenzó (`startsAt` no es posterior a ahora). Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`).
 **Efectos:** en una transacción, actualiza `Appointment.status` a `COMPLETED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya comenzado, y crea un `AppointmentEvent` de tipo `COMPLETED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Si otro usuario cambió el turno antes, la condición no coincide y se devuelve `INVALID_STATUS_TRANSITION` sin pisar su cambio. El horario sigue ocupado.
 **Errores:** `VALIDATION`, `FORBIDDEN` (rol no autorizado o profesional intentando completar un turno ajeno), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no comenzó).
-**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`.
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`, `/appointments/unclosed`, `/dashboard`.
 **Devuelve:** `{ id }`.
 
 ### `expireAppointment`
@@ -278,8 +278,34 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya terminó (`endsAt` no es posterior a ahora). Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`). La restricción de exclusión no cubre `EXPIRED`: vencer un turno futuro liberaría su horario, por eso la DAL lo impide.
 **Efectos:** en una transacción, actualiza `Appointment.status` a `EXPIRED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya terminado, y crea un `AppointmentEvent` de tipo `EXPIRED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Igual que al completar, un cambio concurrente no se pisa.
 **Errores:** `VALIDATION`, `FORBIDDEN` (rol no autorizado o profesional intentando vencer un turno ajeno), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no terminó), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente: si se cobró, el paciente vino; [HU-21](hu/HU-21-cobrar-turno.md)).
-**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`.
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`, `/appointments/unclosed`, `/dashboard`.
 **Devuelve:** `{ id }`.
+
+### `listUnclosedAppointments`
+
+**Historia de usuario:** [HU-22 — Ver la ocupación y el ausentismo del centro](hu/HU-22-indicadores-iniciales.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `page` (ver [listados paginados](#listados-paginados)).
+**Precondiciones:** ninguna además del rol.
+**Efectos:** ninguno. Lista los turnos sin cerrar (`UnclosedAppointment`): `SCHEDULED` con `endsAt` anterior a ahora, de cualquier profesional. Van del más viejo al más nuevo (`endsAt` e `id` ascendentes), de a 10.
+**Errores:** `FORBIDDEN`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `Page<UnclosedAppointment>`. Cada turno trae `id`, `startsAt`, `endsAt`, paciente (nombre y documento), profesional, servicio y si tiene un cobro vigente: un turno cobrado no se puede marcar Vencido ([HU-21](hu/HU-21-cobrar-turno.md)).
+
+No es una Server Action: la usa la pantalla `/appointments/unclosed`. Desde ahí, cada turno se cierra con `completeAppointment` o `expireAppointment`.
+
+### `countUnclosedAppointments`
+
+**Historia de usuario:** [HU-22 — Ver la ocupación y el ausentismo del centro](hu/HU-22-indicadores-iniciales.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** ninguna.
+**Precondiciones:** ninguna además del rol.
+**Efectos:** ninguno. Cuenta los turnos sin cerrar, con el mismo criterio que `listUnclosedAppointments`.
+**Errores:** `FORBIDDEN`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** la cantidad, un número.
+
+No es una Server Action: la usa el calendario para mostrar el acceso a la lista con la cantidad pendiente.
 
 ### `rescheduleAppointment`
 
@@ -863,3 +889,24 @@ No es una Server Action: la usa el calendario del centro para la marca de cada t
 **Devuelve:** los turnos `SCHEDULED` o `COMPLETED` que empiezan hoy y en los que el estado de cobro aplica, ordenados por horario. Cada uno con `id`, `status`, `startsAt`, `endsAt`, paciente (nombre y documento), profesional, servicio, `price` como texto decimal o `null`, `state`, `authorizationNumber` y `activePayment` (monto y medio) si lo tiene.
 
 No es una Server Action: la usa la pantalla *Cobros del día* (ADR 0001).
+
+### `getCenterIndicators`
+
+**Historia de usuario:** [HU-22 — Ver la ocupación y el ausentismo del centro](hu/HU-22-indicadores-iniciales.md)
+**Roles:** `MANAGER`.
+**Entrada:** `from` y `to` (AAAA-MM, inclusive, hasta tres meses; por defecto, el mes en curso) y `professionalId?` (entero positivo).
+**Precondiciones:** `from` no es posterior a `to`. Si viene `professionalId`, el profesional existe.
+**Efectos:** ninguno. Lee las franjas, las excepciones, los feriados y los turnos que empiezan en el período, y calcula en memoria con funciones puras, por profesional y para el centro, todos en hora del centro:
+- **Minutos disponibles:** por cada día del período, la franja del día de la semana menos las ausencias del profesional. Los feriados no suman. Para un profesional dado de baja, solo cuentan los días anteriores a su baja.
+- **Minutos ocupados:** la parte de cada turno `SCHEDULED` o `COMPLETED` que cae dentro de los minutos disponibles.
+- **Ocupación** (`occupancyRate`): ocupados sobre disponibles. Sin minutos disponibles, es `null`.
+- **Ausentismo** (`absenteeismRate`): `EXPIRED` sobre `COMPLETED` más `EXPIRED`. Sin turnos cerrados, es `null`.
+- **Cancelaciones:** cantidad de `CANCELLED`.
+- **Sin cerrar:** cantidad de `SCHEDULED` con `endsAt` anterior a ahora.
+
+El centro suma minutos y cantidades de todos los profesionales y calcula las tasas sobre esas sumas, no como promedio de las tasas. Con `professionalId`, el centro y la tabla se limitan a ese profesional.
+**Errores:** `FORBIDDEN`, `VALIDATION` (período inválido, invertido o de más de tres meses), `NOT_FOUND` (el profesional no existe).
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ period: { from, to }, center: Indicators, professionals: (Indicators & { id, firstName, lastName, active })[], professionalOptions }`. `Indicators` es `{ availableMinutes, occupiedMinutes, occupancyRate, completed, expired, absenteeismRate, cancelled, unclosed }`, con las tasas entre 0 y 1, o `null`. La tabla incluye a los profesionales con franjas o turnos en el período. `professionalOptions` son las opciones del filtro.
+
+No es una Server Action: la usa el Server Component de `/dashboard` (ADR 0001).
