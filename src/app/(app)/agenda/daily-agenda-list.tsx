@@ -181,9 +181,16 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                         <span className="font-semibold tabular-nums text-[11px]">
                           {formatMinute(startMinute)}–{formatMinute(endMinute)}
                         </span>
-                        <span className="text-[10px] text-muted-foreground truncate">
-                          {appointment.patient.lastName}
-                        </span>
+                        <div className="flex items-center gap-1 truncate">
+                          {appointment.priority === "URGENT" && (
+                            <span className="shrink-0 rounded bg-destructive-soft px-1 text-[9px] font-bold text-destructive-soft-foreground border border-destructive-soft-border">
+                              Urgente
+                            </span>
+                          )}
+                          <span className="text-[10px] text-muted-foreground truncate">
+                            {appointment.patient.lastName}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -249,22 +256,32 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                       <span className="font-bold tabular-nums text-base">
                         {formatMinute(startMinute)}–{formatMinute(endMinute)}
                       </span>
-                      <Badge
-                        variant="outline"
-                        className={
-                          isCancelled
-                            ? "bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
+                      <div className="flex items-center gap-1.5">
+                        {appointment.priority === "URGENT" && (
+                          <Badge
+                            variant="outline"
+                            className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
+                          >
+                            Urgente
+                          </Badge>
+                        )}
+                        <Badge
+                          variant="outline"
+                          className={
+                            isCancelled
+                              ? "bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
+                              : isCompleted
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                : "bg-primary-soft text-primary-soft-foreground border-primary-soft-border"
+                          }
+                        >
+                          {isCancelled
+                            ? "Cancelado"
                             : isCompleted
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                              : "bg-primary-soft text-primary-soft-foreground border-primary-soft-border"
-                        }
-                      >
-                        {isCancelled
-                          ? "Cancelado"
-                          : isCompleted
-                            ? "Completado"
-                            : "Programado"}
-                      </Badge>
+                              ? "Completado"
+                              : "Programado"}
+                        </Badge>
+                      </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="flex flex-col gap-3">
@@ -285,6 +302,16 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                         {appointment.service.name}
                       </p>
                     </div>
+
+                    {appointment.priority === "URGENT" &&
+                      appointment.priorityReason && (
+                        <div className="bg-destructive-soft/40 border-destructive-soft-border rounded border p-2 text-xs text-destructive-soft-foreground">
+                          <span className="font-semibold">
+                            Motivo de urgencia:{" "}
+                          </span>
+                          {appointment.priorityReason}
+                        </div>
+                      )}
 
                     {appointment.notes && (
                       <div className="bg-muted/50 rounded p-2 text-xs text-muted-foreground">

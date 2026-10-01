@@ -340,6 +340,11 @@ export function WeeklyAgendaGrid({
                             {formatMinute(startMinute)}–
                             {formatMinute(endMinute)}
                           </span>
+                          {appointment.priority === "URGENT" && (
+                            <span className="shrink-0 rounded bg-destructive-soft px-1 text-[9px] font-bold text-destructive-soft-foreground border border-destructive-soft-border">
+                              Urgente
+                            </span>
+                          )}
                           <span
                             className={`font-medium text-[11px] truncate ${isCancelled ? "" : "text-foreground/90"}`}
                           >
@@ -386,22 +391,32 @@ export function WeeklyAgendaGrid({
                   <Clock className="size-4 text-primary" />
                   Detalle del turno #{selectedAppointment.id}
                 </DialogTitle>
-                <Badge
-                  variant="outline"
-                  className={
-                    selectedAppointment.status === "CANCELLED"
-                      ? "bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
+                <div className="flex items-center gap-1.5">
+                  {selectedAppointment.priority === "URGENT" && (
+                    <Badge
+                      variant="outline"
+                      className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
+                    >
+                      Urgente
+                    </Badge>
+                  )}
+                  <Badge
+                    variant="outline"
+                    className={
+                      selectedAppointment.status === "CANCELLED"
+                        ? "bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
+                        : selectedAppointment.status === "COMPLETED"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                          : "bg-primary-soft text-primary-soft-foreground border-primary-soft-border"
+                    }
+                  >
+                    {selectedAppointment.status === "CANCELLED"
+                      ? "Cancelado"
                       : selectedAppointment.status === "COMPLETED"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                        : "bg-primary-soft text-primary-soft-foreground border-primary-soft-border"
-                  }
-                >
-                  {selectedAppointment.status === "CANCELLED"
-                    ? "Cancelado"
-                    : selectedAppointment.status === "COMPLETED"
-                      ? "Completado"
-                      : "Programado"}
-                </Badge>
+                        ? "Completado"
+                        : "Programado"}
+                  </Badge>
+                </div>
               </div>
               <DialogDescription>
                 Información del paciente y servicio asignado para esta consulta.
@@ -473,6 +488,21 @@ export function WeeklyAgendaGrid({
                   {selectedAppointment.service.name}
                 </p>
               </div>
+
+              {/* Prioridad y motivo si es urgente */}
+              {selectedAppointment.priority === "URGENT" && (
+                <div className="flex flex-col gap-1 border-b border-border/50 pb-2.5">
+                  <span className="text-xs text-destructive-soft-foreground font-semibold uppercase tracking-wide flex items-center gap-1.5">
+                    Prioridad: Urgente
+                  </span>
+                  {selectedAppointment.priorityReason && (
+                    <p className="bg-destructive-soft/40 border border-destructive-soft-border rounded p-2 text-xs text-destructive-soft-foreground">
+                      <span className="font-semibold">Motivo: </span>
+                      {selectedAppointment.priorityReason}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Notas u observaciones */}
               {selectedAppointment.notes && (

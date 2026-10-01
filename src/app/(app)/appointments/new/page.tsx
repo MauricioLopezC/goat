@@ -1,10 +1,13 @@
 import Link from "next/link";
-import { ChevronRightIcon } from "lucide-react";
+import { CheckIcon, ChevronRightIcon, ClockIcon } from "lucide-react";
 import { requirePageRole } from "@/lib/dal/auth";
+import { cn } from "@/lib/utils";
 import {
   getAppointmentOptions,
   listAvailableDates,
   listAvailableSlots,
+  listEarliestSlots,
+  type EarliestSlot,
 } from "@/lib/dal/appointments";
 import { listProfessionals } from "@/lib/dal/professionals";
 import { DomainError } from "@/lib/actions";
@@ -88,6 +91,17 @@ export default async function NewAppointmentPage({
   let slots: AvailableSlot[] = [];
   let availableDates: string[] = [];
   let availabilityError = "";
+  let earliestSlots: EarliestSlot[] = [];
+  if (patient && service) {
+    try {
+      earliestSlots = await listEarliestSlots(
+        { patientId: patient.id, serviceId: service.id, limit: 6 },
+        actor,
+      );
+    } catch (error) {
+      if (!(error instanceof DomainError)) throw error;
+    }
+  }
   if (patient && service && professional) {
     try {
       availableDates = await listAvailableDates(
@@ -306,13 +320,102 @@ export default async function NewAppointmentPage({
                 </AlertDescription>
               </Alert>
             ) : (
-              <div className="flex flex-col gap-4">
-                <ProfessionalPicker
-                  patientId={patient.id}
-                  serviceId={service.id}
-                  professionalId={professional?.id}
-                  professionals={options.professionals}
-                />
+              <div className="flex flex-col gap-5">
+                {earliestSlots.length > 0 && (
+                  <div className="flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <div className="flex flex-col gap-0.5">
+                      <p className="flex items-center gap-1.5 font-semibold text-primary">
+                        <ClockIcon className="size-4" aria-hidden="true" />
+                        Primer horario libre
+                      </p>
+                      <p className="text-body-sm text-muted-foreground">
+                        Próximos horarios disponibles del centro para{" "}
+                        {service.name} entre todos los profesionales. Al elegir
+                        uno quedan cargados profesional, fecha y hora:
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {earliestSlots.map((slot) => {
+                        const isSelected =
+                          professionalId === slot.professional.id &&
+                          date === slot.date &&
+                          startTime === slot.startTime;
+                        return (
+                          <Button
+                            key={`${slot.professional.id}-${slot.date}-${slot.startTime}`}
+                            asChild
+                            variant="outline"
+                            className={cn(
+                              "h-auto flex-col items-start p-3 text-left transition-all",
+                              isSelected
+                                ? "border-primary bg-primary-soft text-foreground ring-2 ring-primary/25 shadow-xs"
+                                : "bg-card text-foreground hover:bg-muted/50 border-border",
+                            )}
+                          >
+                            <Link
+                              href={withPreset({
+                                patientId: String(patient.id),
+                                serviceId: String(service.id),
+                                professionalId: String(slot.professional.id),
+                                date: slot.date,
+                                startTime: slot.startTime,
+                              })}
+                              prefetch={false}
+                            >
+                              <div className="flex w-full items-center justify-between gap-1.5">
+                                <span
+                                  className={cn(
+                                    "text-sm font-semibold truncate",
+                                    isSelected
+                                      ? "text-primary font-bold"
+                                      : "text-foreground",
+                                  )}
+                                >
+                                  {slot.professional.lastName},{" "}
+                                  {slot.professional.firstName}
+                                </span>
+                                {isSelected && (
+                                  <span className="inline-flex items-center gap-1 shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground leading-none">
+                                    <CheckIcon
+                                      className="size-3"
+                                      aria-hidden="true"
+                                    />
+                                    Elegido
+                                  </span>
+                                )}
+                              </div>
+                              <span
+                                className={cn(
+                                  "text-xs tabular-nums mt-1",
+                                  isSelected
+                                    ? "text-primary/80 font-medium"
+                                    : "text-muted-foreground",
+                                )}
+                              >
+                                {formatDate(slot.date)}, {slot.startTime}–
+                                {slot.endTime}
+                              </span>
+                            </Link>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3">
+                  {earliestSlots.length > 0 && (
+                    <p className="font-medium text-body-md">
+                      O elegí un profesional específico:
+                    </p>
+                  )}
+                  <ProfessionalPicker
+                    patientId={patient.id}
+                    serviceId={service.id}
+                    professionalId={professional?.id}
+                    professionals={options.professionals}
+                  />
+                </div>
                 {professional && !availabilityError && (
                   <div className="flex flex-col gap-3">
                     <p>Elegí una fecha disponible</p>

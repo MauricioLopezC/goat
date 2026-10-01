@@ -14,6 +14,8 @@ import {
   completeAppointment,
   expireAppointment,
   rescheduleAppointment,
+  updateAppointmentPriority,
+  listEarliestSlots,
 } from "../src/lib/dal/appointments";
 import { DomainError } from "../src/lib/actions";
 import { Role } from "../src/generated/prisma/enums";
@@ -819,6 +821,136 @@ async function main() {
         manager,
       );
     });
+
+    await verify(
+      "HU-19: turno prioritario, primeros horarios libres y cambio de prioridad",
+      async () => {
+        // 1. listEarliestSlots retorna turnos libres ordenados entre todos los profesionales
+        const earliest = await listEarliestSlots(
+          { serviceId: service.id, patientId: patients[0], limit: 4 },
+          receptionist,
+        );
+        assert.ok(
+          earliest.length > 0,
+          "Debe encontrar primeros horarios libres",
+        );
+        assert.ok(earliest.length <= 4, "Debe respetar el límite pedido");
+        // Verificar orden cronológico
+        for (let i = 1; i < earliest.length; i++) {
+          const prev = earliest[i - 1];
+          const curr = earliest[i];
+          assert.ok(
+            prev.date < curr.date ||
+              (prev.date === curr.date && prev.startTime <= curr.startTime),
+            "Los horarios deben estar ordenados cronológicamente",
+          );
+        }
+
+        // 2. Alta de turno urgente con motivo usando el primer horario libre
+        const slot = earliest[0];
+        const urgentAppt = await createAppointment(
+          {
+            patientId: patients[0],
+            professionalId: slot.professional.id,
+            serviceId: service.id,
+            date: slot.date,
+            startTime: slot.startTime,
+            priority: "URGENT",
+            priorityReason: "Urgencia traumatológica",
+          },
+          receptionist,
+        );
+
+        // 3. getAppointment refleja prioridad y motivo
+        const fetched = await getAppointment(urgentAppt.id, manager);
+        assert.equal(fetched.priority, "URGENT");
+        assert.equal(fetched.priorityReason, "Urgencia traumatológica");
+
+        // 4. El profesional no tiene permiso para cambiar la prioridad (FORBIDDEN)
+        await rejects(
+          () =>
+            updateAppointmentPriority(
+              { appointmentId: urgentAppt.id, priority: "NORMAL" },
+              professionalActor,
+            ),
+          "FORBIDDEN",
+        );
+
+        // 5. Cambio de prioridad a NORMAL por manager
+        const updatedToNormal = await updateAppointmentPriority(
+          { appointmentId: urgentAppt.id, priority: "NORMAL" },
+          manager,
+        );
+        assert.equal(updatedToNormal.priority, "NORMAL");
+
+        // Verificar evento PRIORITY_CHANGED en historial
+        const fetchedAfterNormal = await getAppointment(urgentAppt.id, manager);
+        assert.equal(fetchedAfterNormal.priority, "NORMAL");
+        assert.equal(fetchedAfterNormal.priorityReason, null);
+        const priorityEvent = fetchedAfterNormal.events.find(
+          (e) => e.type === "PRIORITY_CHANGED",
+        );
+        assert.ok(priorityEvent, "Debe registrar evento PRIORITY_CHANGED");
+        assert.equal(priorityEvent.previousPriority, "URGENT");
+        assert.equal(priorityEvent.newPriority, "NORMAL");
+
+        // 6. Rechazo de cambio a la misma prioridad
+        await rejects(
+          () =>
+            updateAppointmentPriority(
+              { appointmentId: urgentAppt.id, priority: "NORMAL" },
+              manager,
+            ),
+          "VALIDATION",
+        );
+
+        // 7. Rechazo de cambio a URGENT sin motivo
+        await rejects(
+          () =>
+            updateAppointmentPriority(
+              { appointmentId: urgentAppt.id, priority: "URGENT" },
+              manager,
+            ),
+          "VALIDATION",
+        );
+
+        // 8. Cambio a URGENT con motivo por recepcionista
+        const updatedToUrgent = await updateAppointmentPriority(
+          {
+            appointmentId: urgentAppt.id,
+            priority: "URGENT",
+            reason: "Empeoramiento del cuadro",
+          },
+          receptionist,
+        );
+        assert.equal(updatedToUrgent.priority, "URGENT");
+
+        const fetchedAfterUrgent = await getAppointment(urgentAppt.id, manager);
+        assert.equal(fetchedAfterUrgent.priority, "URGENT");
+        assert.equal(
+          fetchedAfterUrgent.priorityReason,
+          "Empeoramiento del cuadro",
+        );
+
+        // 9. No se puede cambiar prioridad de turno cancelado
+        await cancelAppointment(
+          {
+            appointmentId: urgentAppt.id,
+            reason: "Cancelación para prueba de prioridad",
+            requestedBy: "el centro",
+          },
+          manager,
+        );
+        await rejects(
+          () =>
+            updateAppointmentPriority(
+              { appointmentId: urgentAppt.id, priority: "NORMAL" },
+              manager,
+            ),
+          "INVALID_STATUS_TRANSITION",
+        );
+      },
+    );
     console.log(`${passed} grupos de verificaciones PostgreSQL correctos.`);
   } finally {
     await prisma.appointment.deleteMany({

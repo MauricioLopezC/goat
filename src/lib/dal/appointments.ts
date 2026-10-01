@@ -7,6 +7,7 @@ import { assertNoActivePayment } from "@/lib/dal/payments";
 import { serializableTransaction } from "@/lib/dal/transactions";
 import {
   AppointmentEventType,
+  AppointmentPriority,
   AppointmentStatus,
   Role,
 } from "@/generated/prisma/enums";
@@ -34,16 +35,20 @@ import {
   calendarAvailabilitySchema,
   cancelAppointmentSchema,
   createAppointmentSchema,
+  earliestSlotsSchema,
   professionalAgendaSchema,
   rescheduleAppointmentSchema,
+  updateAppointmentPrioritySchema,
   type AppointmentStatusChangeInput,
   type AvailableSlotsInput,
   type CalendarAppointmentsInput,
   type CalendarAvailabilityInput,
   type CancelAppointmentInput,
   type CreateAppointmentInput,
+  type EarliestSlotsInput,
   type ProfessionalAgendaInput,
   type RescheduleAppointmentInput,
+  type UpdateAppointmentPriorityInput,
 } from "@/lib/validation/appointments";
 
 const occupiedStatuses = [
@@ -61,6 +66,8 @@ const summarySelect = {
   startsAt: true,
   endsAt: true,
   status: true,
+  priority: true,
+  priorityReason: true,
   notes: true,
   createdAt: true,
   patient: { select: patientSelect },
@@ -85,9 +92,11 @@ const appointmentDetailSelect = {
       newStartsAt: true,
       newEndsAt: true,
       newProfessional: { select: personSelect },
+      previousPriority: true,
+      newPriority: true,
     },
     orderBy: { createdAt: "desc" as const },
-    take: 5,
+    take: 10,
   },
 } satisfies Prisma.AppointmentSelect;
 
@@ -431,6 +440,204 @@ export async function listAvailableSlots(
   );
 }
 
+export type EarliestSlot = {
+  date: string;
+  startTime: string;
+  endTime: string;
+  professional: {
+    id: number;
+    firstName: string;
+    lastName: string;
+  };
+};
+
+export async function listEarliestSlots(
+  input: EarliestSlotsInput,
+  actor: Actor,
+): Promise<EarliestSlot[]> {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  const parsed = earliestSlotsSchema.safeParse(input);
+  if (!parsed.success)
+    throw new DomainError(
+      "VALIDATION",
+      "Revisá los datos para consultar disponibilidad.",
+    );
+  const { serviceId, patientId, limit } = parsed.data;
+  const now = new Date();
+  const bounds = appointmentDateBounds(now);
+  const rangeStart = appointmentInstant(bounds.min, 0);
+  const rangeEnd = appointmentInstant(bounds.max, 1440);
+
+  return prisma.$transaction(
+    async (tx) => {
+      const [patient, service, professionals, holidays] = await Promise.all([
+        tx.patient.findFirst({
+          where: { id: patientId, active: true },
+          select: { id: true },
+        }),
+        tx.service.findFirst({
+          where: { id: serviceId, active: true },
+          select: { id: true, durationMinutes: true },
+        }),
+        tx.professional.findMany({
+          where: {
+            active: true,
+            services: { some: { id: serviceId } },
+          },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            availabilityWindows: {
+              where: {
+                OR: [
+                  { services: { none: {} } },
+                  { services: { some: { id: serviceId } } },
+                ],
+              },
+              select: { weekday: true, startMinute: true, endMinute: true },
+            },
+          },
+          orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+        }),
+        tx.holiday.findMany({
+          where: {
+            date: {
+              gte: dateToDb(bounds.min),
+              lte: dateToDb(bounds.max),
+            },
+          },
+          select: { date: true },
+        }),
+      ]);
+
+      if (!patient || !service) {
+        throw new DomainError(
+          "NOT_FOUND",
+          "El paciente o el servicio ya no está disponible.",
+        );
+      }
+
+      const activeProviders = professionals.filter(
+        (p) => p.availabilityWindows.length > 0,
+      );
+      if (activeProviders.length === 0) return [];
+
+      const providerIds = activeProviders.map((p) => p.id);
+      const [exceptions, appointments] = await Promise.all([
+        tx.availabilityException.findMany({
+          where: {
+            professionalId: { in: providerIds },
+            date: {
+              gte: dateToDb(bounds.min),
+              lte: dateToDb(bounds.max),
+            },
+          },
+          select: {
+            professionalId: true,
+            date: true,
+            startMinute: true,
+            endMinute: true,
+          },
+        }),
+        tx.appointment.findMany({
+          where: {
+            status: { in: occupiedStatuses },
+            startsAt: { lt: rangeEnd },
+            endsAt: { gt: rangeStart },
+            OR: [{ professionalId: { in: providerIds } }, { patientId }],
+          },
+          select: {
+            professionalId: true,
+            patientId: true,
+            startsAt: true,
+            endsAt: true,
+          },
+        }),
+      ]);
+
+      const holidaySet = new Set(holidays.map((h) => dateFromDb(h.date)));
+      const results: EarliestSlot[] = [];
+
+      const currentDay = new Date(`${bounds.min}T00:00:00Z`);
+      const lastDay = new Date(`${bounds.max}T00:00:00Z`);
+
+      while (currentDay <= lastDay) {
+        const dateStr = currentDay.toISOString().slice(0, 10);
+        if (!holidaySet.has(dateStr)) {
+          const dayStart = appointmentInstant(dateStr, 0);
+          const dayEnd = appointmentInstant(dateStr, 1440);
+          const dayWeekday = toLocalSlot(dayStart).weekday;
+
+          for (const professional of activeProviders) {
+            const windows = professional.availabilityWindows.filter(
+              (w) => w.weekday === dayWeekday,
+            );
+            if (windows.length === 0) continue;
+
+            const profExceptions = exceptions.filter(
+              (e) =>
+                e.professionalId === professional.id &&
+                dateFromDb(e.date) === dateStr,
+            );
+            const profAppointments = appointments.filter(
+              (a) =>
+                (a.professionalId === professional.id ||
+                  a.patientId === patientId) &&
+                a.startsAt < dayEnd &&
+                a.endsAt > dayStart,
+            );
+
+            const available = calculateAvailableSlots({
+              date: dateStr,
+              durationMinutes: service.durationMinutes,
+              windows,
+              exceptions: profExceptions,
+              appointments: profAppointments,
+              holiday: false,
+              now,
+            });
+
+            for (const slot of available) {
+              results.push({
+                date: dateStr,
+                startTime: slot.startTime,
+                endTime: slot.endTime,
+                professional: {
+                  id: professional.id,
+                  firstName: professional.firstName,
+                  lastName: professional.lastName,
+                },
+              });
+            }
+          }
+        }
+
+        if (results.length >= limit) {
+          break;
+        }
+
+        currentDay.setUTCDate(currentDay.getUTCDate() + 1);
+      }
+
+      results.sort((a, b) => {
+        const dateComp = a.date.localeCompare(b.date);
+        if (dateComp !== 0) return dateComp;
+        const timeComp = a.startTime.localeCompare(b.startTime);
+        if (timeComp !== 0) return timeComp;
+        const nameComp = a.professional.lastName.localeCompare(
+          b.professional.lastName,
+        );
+        if (nameComp !== 0) return nameComp;
+        return a.professional.firstName.localeCompare(b.professional.firstName);
+      });
+
+      return results.slice(0, limit);
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+  );
+}
+
 function overlapError(patient = false) {
   return new DomainError(
     patient ? "PATIENT_APPOINTMENT_OVERLAP" : "APPOINTMENT_OVERLAP",
@@ -502,6 +709,13 @@ export async function createAppointment(
               startsAt,
               endsAt,
               status: AppointmentStatus.SCHEDULED,
+              priority:
+                (data.priority as AppointmentPriority) ??
+                AppointmentPriority.NORMAL,
+              priorityReason:
+                data.priority === "URGENT"
+                  ? (data.priorityReason ?? null)
+                  : null,
               notes: data.notes || null,
               createdById: actor.id,
             },
@@ -846,6 +1060,8 @@ export async function getProfessionalAgenda(
         startsAt: true,
         endsAt: true,
         status: true,
+        priority: true,
+        priorityReason: true,
         notes: true,
         patient: {
           select: {
@@ -1227,4 +1443,58 @@ export async function expireAppointment(
 ) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
   return closeAppointment(input, AppointmentStatus.EXPIRED, actor);
+}
+
+export async function updateAppointmentPriority(
+  input: UpdateAppointmentPriorityInput,
+  actor: Actor,
+) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  const parsed = updateAppointmentPrioritySchema.safeParse(input);
+  if (!parsed.success)
+    throw new DomainError(
+      "VALIDATION",
+      "Revisá los datos para cambiar la prioridad.",
+    );
+  const { appointmentId, priority, reason } = parsed.data;
+
+  return prisma.$transaction(async (tx) => {
+    const appointment = await tx.appointment.findUnique({
+      where: { id: appointmentId },
+      select: { id: true, status: true, priority: true },
+    });
+    if (!appointment)
+      throw new DomainError("NOT_FOUND", "No se encontró el turno.");
+    if (appointment.status !== AppointmentStatus.SCHEDULED) {
+      throw new DomainError(
+        "INVALID_STATUS_TRANSITION",
+        "Solo se puede cambiar la prioridad de turnos programados.",
+      );
+    }
+    if (appointment.priority === priority) {
+      throw new DomainError("VALIDATION", "El turno ya tiene esa prioridad.");
+    }
+
+    const updated = await tx.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        priority: priority as AppointmentPriority,
+        priorityReason: priority === "URGENT" ? (reason ?? null) : null,
+      },
+      select: { id: true, priority: true },
+    });
+
+    await tx.appointmentEvent.create({
+      data: {
+        appointmentId,
+        type: AppointmentEventType.PRIORITY_CHANGED,
+        previousPriority: appointment.priority,
+        newPriority: priority as AppointmentPriority,
+        reason: reason || null,
+        userId: actor.id,
+      },
+    });
+
+    return updated;
+  });
 }
