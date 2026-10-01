@@ -160,7 +160,12 @@ export function calculateDaySummary(input: DaySummaryInput): DaySummary {
 /// Bloque libre (`FreeBlock`, ver glosario), en minutos del día en hora del centro.
 export type FreeBlock = MinuteRange;
 
-function subtract(ranges: MinuteRange[], cut: MinuteRange): MinuteRange[] {
+/// Quita un tramo a una lista de tramos del día. También la usan los
+/// indicadores para descontar ausencias de la franja (HU-22).
+export function subtractRange(
+  ranges: MinuteRange[],
+  cut: MinuteRange,
+): MinuteRange[] {
   return ranges.flatMap((range) => {
     if (
       cut.endMinute <= range.startMinute ||
@@ -248,7 +253,7 @@ export function calculateFreeBlocks(input: {
   const past = pastUntilMinute(input.date, input.today, input.now);
   if (past) cuts.push({ startMinute: 0, endMinute: past });
   return cuts
-    .reduce<MinuteRange[]>(subtract, [...input.windows])
+    .reduce<MinuteRange[]>(subtractRange, [...input.windows])
     .filter(
       (block) => block.endMinute - block.startMinute >= MIN_FREE_BLOCK_MINUTES,
     )

@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Clock,
   CreditCard,
+  LayoutDashboard,
   Stethoscope,
   Wallet,
   UserCog,
@@ -32,6 +33,17 @@ const STAFF: readonly Role[] = ["RECEPTIONIST", "PROFESSIONAL", "MANAGER"];
 const FRONT_DESK: readonly Role[] = ["RECEPTIONIST", "MANAGER"];
 
 export const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Gerencia",
+    items: [
+      {
+        href: "/dashboard",
+        label: "Tablero",
+        icon: LayoutDashboard,
+        roles: ["MANAGER"],
+      },
+    ],
+  },
   {
     label: "Turnos",
     items: [
