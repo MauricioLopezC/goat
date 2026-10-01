@@ -7,7 +7,7 @@
 ## Datos
 
 - **Servicio:** valor de la prestación, en pesos.
-- **Medio de pago:** nombre y estado (activo o inactivo). El seed trae efectivo, tarjeta de débito, tarjeta de crédito y transferencia.
+- **Medio de pago:** nombre y estado (activo o inactivo). El seed trae efectivo, tarjeta de débito y transferencia activos, y tarjeta de crédito inactiva (el centro no la acepta).
 
 ## Validaciones
 
