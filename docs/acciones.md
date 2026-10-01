@@ -196,7 +196,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 ### `listAvailableDates`
 
 **Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), [HU-16](hu/HU-16-reprogramar-turno.md).
-**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
 **Entrada:** `professionalId`, `serviceId`, `patientId`, `excludeAppointmentId?` (ID del turno que se reprograma, opcional).
 **Precondiciones:** entidades activas y relacionadas.
 **Efectos:** ninguno. Calcula en una lectura consistente las fechas con al menos un bloque libre entre hoy y dos meses, aplicando las mismas reglas de `listAvailableSlots` para el servicio y el paciente elegidos. Si se pasa `excludeAppointmentId`, no cuenta ese turno como ocupado.
@@ -207,7 +207,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 ### `listAvailableSlots`
 
 **Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), [HU-16](hu/HU-16-reprogramar-turno.md).
-**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
 **Entrada:** `professionalId`, `serviceId`, `patientId`, `date`, `excludeAppointmentId?` (ID del turno que se reprograma, opcional).
 **Precondiciones:** entidades activas y relacionadas, fecha válida en el horizonte permitido.
 **Efectos:** ninguno. Calcula bloques según duración del servicio desde el inicio de cada franja; descarta pasado, feriados, ausencias y ambos solapamientos. Si se pasa `excludeAppointmentId`, no cuenta ese turno como ocupado para permitir moverlo dentro del mismo día.
@@ -251,44 +251,44 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 ### `cancelAppointment`
 
 **Historia de usuario:** [HU-10 — Cancelar un turno](hu/HU-10-cancelar-turno.md)
-**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
 **Entrada:** `appointmentId` (entero positivo), `reason` (1–500 caracteres, obligatorio), `requestedBy` (1–100 caracteres, obligatorio).
-**Precondiciones:** el turno existe y está en estado `SCHEDULED`.
+**Precondiciones:** el turno existe y está en estado `SCHEDULED`. Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`).
 **Efectos:** transacción `Serializable` que actualiza `Appointment.status` a `CANCELLED` y crea un `AppointmentEvent` de tipo `CANCELLED` con `reason`, `requestedBy`, `userId` (actor) y `createdAt` (ahora). El horario queda libre de inmediato.
-**Errores:** `VALIDATION` (campo vacío o ID inválido), `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`), `REASON_REQUIRED` (falta el motivo de cancelación), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente; [HU-21](hu/HU-21-cobrar-turno.md)).
+**Errores:** `VALIDATION` (campo vacío o ID inválido), `FORBIDDEN` (rol no autorizado o profesional intentando cancelar un turno ajeno), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`), `REASON_REQUIRED` (falta el motivo de cancelación), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente; [HU-21](hu/HU-21-cobrar-turno.md)).
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`.
 **Devuelve:** `{ id }`.
 
 ### `completeAppointment`
 
 **Historia de usuario:** [HU-11](hu/HU-11-calendario-del-centro.md), cambio de estado desde el detalle del turno.
-**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
 **Entrada:** `appointmentId` (entero positivo), `reason` (hasta 500 caracteres, opcional).
-**Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya comenzó (`startsAt` no es posterior a ahora).
+**Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya comenzó (`startsAt` no es posterior a ahora). Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`).
 **Efectos:** en una transacción, actualiza `Appointment.status` a `COMPLETED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya comenzado, y crea un `AppointmentEvent` de tipo `COMPLETED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Si otro usuario cambió el turno antes, la condición no coincide y se devuelve `INVALID_STATUS_TRANSITION` sin pisar su cambio. El horario sigue ocupado.
-**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no comenzó).
+**Errores:** `VALIDATION`, `FORBIDDEN` (rol no autorizado o profesional intentando completar un turno ajeno), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no comenzó).
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`.
 **Devuelve:** `{ id }`.
 
 ### `expireAppointment`
 
 **Historia de usuario:** [HU-11](hu/HU-11-calendario-del-centro.md), cambio de estado desde el detalle del turno.
-**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
 **Entrada:** `appointmentId` (entero positivo), `reason` (hasta 500 caracteres, opcional).
-**Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya terminó (`endsAt` no es posterior a ahora). La restricción de exclusión no cubre `EXPIRED`: vencer un turno futuro liberaría su horario, por eso la DAL lo impide.
+**Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya terminó (`endsAt` no es posterior a ahora). Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`). La restricción de exclusión no cubre `EXPIRED`: vencer un turno futuro liberaría su horario, por eso la DAL lo impide.
 **Efectos:** en una transacción, actualiza `Appointment.status` a `EXPIRED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya terminado, y crea un `AppointmentEvent` de tipo `EXPIRED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Igual que al completar, un cambio concurrente no se pisa.
-**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no terminó), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente: si se cobró, el paciente vino; [HU-21](hu/HU-21-cobrar-turno.md)).
+**Errores:** `VALIDATION`, `FORBIDDEN` (rol no autorizado o profesional intentando vencer un turno ajeno), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no terminó), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente: si se cobró, el paciente vino; [HU-21](hu/HU-21-cobrar-turno.md)).
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`.
 **Devuelve:** `{ id }`.
 
 ### `rescheduleAppointment`
 
 **Historia de usuario:** [HU-16 — Reprogramar un turno](hu/HU-16-reprogramar-turno.md)
-**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
 **Entrada:** `appointmentId` (entero positivo), `newProfessionalId?` (entero positivo, opcional), `date` (AAAA-MM-DD), `startTime` (HH:MM), `reason` (1–500 caracteres, obligatorio), `requestedBy` (1–100 caracteres, obligatorio).
-**Precondiciones:** el turno existe, está en estado `SCHEDULED` y todavía no comenzó (`startsAt` posterior a ahora). El profesional elegido (el actual o el nuevo) está activo y habilitado para el servicio del turno. La fecha y hora cumplen las reglas de [HU-09](hu/HU-09-asignar-turno.md) (dentro de una franja habilitada, sin feriados ni ausencias, no pasada y dentro de los dos meses). El nuevo horario no se superpone con otros turnos del profesional ni del paciente (el horario ocupado por el mismo turno no cuenta como ocupado). Al menos la fecha, la hora o el profesional deben diferir del turno actual.
+**Precondiciones:** el turno existe, está en estado `SCHEDULED` y todavía no comenzó (`startsAt` posterior a ahora). Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`). El profesional elegido (el actual o el nuevo) está activo y habilitado para el servicio del turno. La fecha y hora cumplen las reglas de [HU-09](hu/HU-09-asignar-turno.md) (dentro de una franja habilitada, sin feriados ni ausencias, no pasada y dentro de los dos meses). El nuevo horario no se superpone con otros turnos del profesional ni del paciente (el horario ocupado por el mismo turno no cuenta como ocupado). Al menos la fecha, la hora o el profesional deben diferir del turno actual.
 **Efectos:** transacción `Serializable` que actualiza `Appointment` (`startsAt`, `endsAt`, `professionalId`) y crea un `AppointmentEvent` de tipo `RESCHEDULED` con `previousStartsAt`, `previousEndsAt`, `previousProfessionalId`, `newStartsAt`, `newEndsAt`, `newProfessionalId`, `reason`, `requestedBy`, `userId` (actor) y `createdAt` (ahora). El turno conserva su ID, autor original y fecha de creación. El horario anterior queda libre y el nuevo ocupado. Se reintenta ante conflictos de serialización. Restricciones de exclusión de PostgreSQL respaldan la no superposición concurrente.
-**Errores:** `VALIDATION` (datos inválidos o fecha/hora/profesional idéntico al actual), `FORBIDDEN`, `NOT_FOUND` (turno o profesional no encontrado), `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o ya comenzó), `REASON_REQUIRED` (motivo vacío), `OUTSIDE_AVAILABILITY_WINDOW`, `APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`.
+**Errores:** `VALIDATION` (datos inválidos o fecha/hora/profesional idéntico al actual), `FORBIDDEN` (rol no autorizado o profesional intentando reprogramar un turno ajeno), `NOT_FOUND` (turno o profesional no encontrado), `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o ya comenzó), `REASON_REQUIRED` (motivo vacío), `OUTSIDE_AVAILABILITY_WINDOW`, `APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`.
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
 **Devuelve:** `{ id }`.
 

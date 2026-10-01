@@ -304,10 +304,9 @@ async function main() {
           () => getAppointmentOptions({}, professionalActor),
           "FORBIDDEN",
         );
-        await rejects(
-          () => listAvailableSlots(input, professionalActor),
-          "FORBIDDEN",
-        );
+        // El profesional puede consultar disponibilidad para reprogramar
+        const slots = await listAvailableSlots(input, professionalActor);
+        assert.ok(Array.isArray(slots));
         const other = await createAppointment(
           {
             ...input,
@@ -539,9 +538,59 @@ async function main() {
           "FORBIDDEN",
         );
         await rejects(
+          () =>
+            expireAppointment({ appointmentId: past.id }, professionalActor),
+          "FORBIDDEN",
+        );
+        await rejects(
           () => completeAppointment({ appointmentId: 2_147_483_647 }, manager),
           "NOT_FOUND",
         );
+
+        // El profesional puede completar y vencer sus propios turnos pasados
+        const ownInsert = (day: string, minute: number) =>
+          prisma.appointment.create({
+            data: {
+              patientId: patients[0],
+              professionalId: professionals[0],
+              serviceId: service.id,
+              startsAt: appointmentInstant(day, minute),
+              endsAt: appointmentInstant(day, minute + 30),
+              createdById: manager.id,
+            },
+          });
+        const [ownPastToComplete, ownPastToExpire] = [
+          await ownInsert(yesterday, 420),
+          await ownInsert(yesterday, 480),
+        ];
+
+        await completeAppointment(
+          { appointmentId: ownPastToComplete.id },
+          professionalActor,
+        );
+        const ownCompleted = await prisma.appointment.findUniqueOrThrow({
+          where: { id: ownPastToComplete.id },
+          include: { events: true },
+        });
+        assert.equal(ownCompleted.status, "COMPLETED");
+        assert.equal(ownCompleted.events[0].type, "COMPLETED");
+        assert.equal(ownCompleted.events[0].userId, professionalActor.id);
+
+        await expireAppointment(
+          {
+            appointmentId: ownPastToExpire.id,
+            reason: "Paciente no se presentó",
+          },
+          professionalActor,
+        );
+        const ownExpired = await prisma.appointment.findUniqueOrThrow({
+          where: { id: ownPastToExpire.id },
+          include: { events: true },
+        });
+        assert.equal(ownExpired.status, "EXPIRED");
+        assert.equal(ownExpired.events[0].type, "EXPIRED");
+        assert.equal(ownExpired.events[0].userId, professionalActor.id);
+        assert.equal(ownExpired.events[0].reason, "Paciente no se presentó");
 
         await completeAppointment({ appointmentId: past.id }, receptionist);
         const completed = await prisma.appointment.findUniqueOrThrow({
@@ -633,20 +682,79 @@ async function main() {
         receptionist,
       );
 
-      // 2. Permisos: profesional no puede reprogramar
+      // 2. Permisos: profesional puede reprogramar sus turnos, pero no los ajenos
+      const otherProfessionalAppt = await createAppointment(
+        {
+          ...input,
+          professionalId: professionals[1],
+          patientId: patients[1],
+          date: rescheduleDate,
+          startTime: "11:30",
+        },
+        receptionist,
+      );
       await rejects(
         () =>
           rescheduleAppointment(
             {
-              appointmentId: appt.id,
+              appointmentId: otherProfessionalAppt.id,
               date: rescheduleDate,
-              startTime: "09:30",
-              reason: "Cambio de horario",
-              requestedBy: "el paciente",
+              startTime: "12:00",
+              reason: "Cambio ajeno",
+              requestedBy: "el profesional",
             },
             professionalActor,
           ),
         "FORBIDDEN",
+      );
+      await rejects(
+        () =>
+          cancelAppointment(
+            {
+              appointmentId: otherProfessionalAppt.id,
+              reason: "Cancelación ajena",
+              requestedBy: "el profesional",
+            },
+            professionalActor,
+          ),
+        "FORBIDDEN",
+      );
+      // El profesional puede reprogramar y cancelar sus propios turnos
+      const ownProfessionalAppt = await createAppointment(
+        {
+          ...input,
+          professionalId: professionals[0],
+          patientId: patients[0],
+          date: rescheduleDate,
+          startTime: "11:00",
+        },
+        receptionist,
+      );
+      await rescheduleAppointment(
+        {
+          appointmentId: ownProfessionalAppt.id,
+          date: rescheduleDate,
+          startTime: "11:30",
+          reason: "Cambio de horario propio",
+          requestedBy: "el profesional",
+        },
+        professionalActor,
+      );
+      await cancelAppointment(
+        {
+          appointmentId: ownProfessionalAppt.id,
+          reason: "Cancelación propia",
+          requestedBy: "el profesional",
+        },
+        professionalActor,
+      );
+      await cancelAppointment(
+        {
+          appointmentId: otherProfessionalAppt.id,
+          reason: "Limpieza",
+          requestedBy: "el centro",
+        },
+        manager,
       );
 
       // 3. Validación: motivo obligatorio
