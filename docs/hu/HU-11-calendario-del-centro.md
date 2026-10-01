@@ -34,7 +34,7 @@
 ## Permisos
 
 - `RECEPTIONIST` y `MANAGER`: ven la agenda de todos los profesionales y cambian el estado de los turnos.
-- `PROFESSIONAL`: ver [HU-12](HU-12-agenda-del-profesional.md). No completa ni vence turnos en este incremento.
+- `PROFESSIONAL`: ver [HU-12](HU-12-agenda-del-profesional.md). Puede completar y marcar vencidos sus propios turnos desde el detalle del turno (incorporado a partir de la revisión con el cliente). No puede modificar ni cambiar el estado de turnos de otros profesionales.
 
 ## Operaciones
 
@@ -48,5 +48,5 @@ Lecturas desde el Server Component de `/calendar`, y cambios de estado desde el 
 ## A conversar
 
 - **Vista mensual diferida:** Igual que en [HU-12](HU-12-agenda-del-profesional.md), para el Incremento 1 se priorizan las vistas operativas de día y semana. La vista mensual queda postergada y se informa como recorte en la revisión con el cliente.
-- **El profesional completa sus turnos:** en el Incremento 1 solo mesa de entradas y gerente cambian el estado. Queda por confirmar con el cliente si el profesional debería marcar la atención desde su agenda.
+- **El profesional completa sus turnos:** acordado en la revisión con el cliente: el profesional puede completar y vencer exclusivamente sus propios turnos desde el detalle del turno.
 - **Vencimiento automático:** en el Incremento 1 el turno se marca Vencido a mano; no hay proceso automático (ver `glossary.md`).

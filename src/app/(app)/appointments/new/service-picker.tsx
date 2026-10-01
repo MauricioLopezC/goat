@@ -54,6 +54,7 @@ export function ServicePicker({
           value={selectedServiceId ?? null}
           onChange={handleServiceChange}
           placeholder="Buscar por nombre o especialidad..."
+          showDuration={false}
         />
         {selectedService && (
           <FieldDescription>

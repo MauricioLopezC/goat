@@ -32,8 +32,16 @@ function revalidateAppointment(appointmentId: number) {
   revalidatePath("/payments");
 }
 
+// Cerrar un turno cambia la lista de turnos sin cerrar y los indicadores
+// (HU-22).
+function revalidateClosedAppointment(appointmentId: number) {
+  revalidateAppointment(appointmentId);
+  revalidatePath("/appointments/unclosed");
+  revalidatePath("/dashboard");
+}
+
 export const rescheduleAppointment = defineAction({
-  roles: ["RECEPTIONIST", "MANAGER"],
+  roles: ["RECEPTIONIST", "MANAGER", "PROFESSIONAL"],
   input: rescheduleAppointmentSchema,
   handler: async (input, actor) => {
     const result = await rescheduleInDal(input, actor);
@@ -43,7 +51,7 @@ export const rescheduleAppointment = defineAction({
 });
 
 export const cancelAppointment = defineAction({
-  roles: ["RECEPTIONIST", "MANAGER"],
+  roles: ["RECEPTIONIST", "MANAGER", "PROFESSIONAL"],
   input: cancelAppointmentSchema,
   handler: async (input, actor) => {
     const result = await cancelInDal(input, actor);
@@ -53,21 +61,21 @@ export const cancelAppointment = defineAction({
 });
 
 export const completeAppointment = defineAction({
-  roles: ["RECEPTIONIST", "MANAGER"],
+  roles: ["RECEPTIONIST", "MANAGER", "PROFESSIONAL"],
   input: appointmentStatusChangeSchema,
   handler: async (input, actor) => {
     const result = await completeInDal(input, actor);
-    revalidateAppointment(input.appointmentId);
+    revalidateClosedAppointment(input.appointmentId);
     return result;
   },
 });
 
 export const expireAppointment = defineAction({
-  roles: ["RECEPTIONIST", "MANAGER"],
+  roles: ["RECEPTIONIST", "MANAGER", "PROFESSIONAL"],
   input: appointmentStatusChangeSchema,
   handler: async (input, actor) => {
     const result = await expireInDal(input, actor);
-    revalidateAppointment(input.appointmentId);
+    revalidateClosedAppointment(input.appointmentId);
     return result;
   },
 });

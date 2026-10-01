@@ -1,11 +1,13 @@
 import {
   CalendarCheck,
+  CalendarClock,
   CalendarDays,
   CalendarOff,
   CalendarPlus,
   ClipboardList,
   Clock,
   CreditCard,
+  LayoutDashboard,
   Stethoscope,
   Wallet,
   UserCog,
@@ -32,6 +34,17 @@ const FRONT_DESK: readonly Role[] = ["RECEPTIONIST", "MANAGER"];
 
 export const NAV_GROUPS: NavGroup[] = [
   {
+    label: "Gerencia",
+    items: [
+      {
+        href: "/dashboard",
+        label: "Tablero",
+        icon: LayoutDashboard,
+        roles: ["MANAGER"],
+      },
+    ],
+  },
+  {
     label: "Turnos",
     items: [
       {
@@ -50,6 +63,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/payments",
         label: "Cobros del día",
         icon: Wallet,
+        roles: FRONT_DESK,
+      },
+      {
+        href: "/appointments/unclosed",
+        label: "Turnos sin cerrar",
+        icon: CalendarClock,
         roles: FRONT_DESK,
       },
       // Misma pantalla: el profesional ve la suya y el resto elige de quién

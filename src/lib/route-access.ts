@@ -18,7 +18,8 @@ const FRONT_DESK: readonly Role[] = ["RECEPTIONIST", "MANAGER"];
 /// sesión.
 const ROUTE_RULES: RouteRule[] = [
   { pattern: /^\/appointments\/new(\/|$)/, roles: FRONT_DESK },
-  { pattern: /^\/appointments\/[^/]+\/reschedule(\/|$)/, roles: FRONT_DESK },
+  { pattern: /^\/appointments\/unclosed(\/|$)/, roles: FRONT_DESK },
+  { pattern: /^\/appointments\/[^/]+\/reschedule(\/|$)/, roles: STAFF },
   { pattern: /^\/patients\/new(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/patients\/[^/]+\/edit(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/professionals\/new(\/|$)/, roles: ["MANAGER"] },
@@ -31,6 +32,7 @@ const ROUTE_RULES: RouteRule[] = [
   { pattern: /^\/payments(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/holidays(\/|$)/, roles: STAFF },
   { pattern: /^\/users(\/|$)/, roles: ["MANAGER"] },
+  { pattern: /^\/dashboard(\/|$)/, roles: ["MANAGER"] },
   { pattern: /^\/agenda(\/|$)/, roles: STAFF },
   { pattern: /^\/my-schedule(\/|$)/, roles: ["PROFESSIONAL"] },
   { pattern: /^\/calendar(\/|$)/, roles: FRONT_DESK },

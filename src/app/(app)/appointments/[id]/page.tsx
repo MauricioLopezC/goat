@@ -34,7 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CancelAppointmentDialog } from "./cancel-dialog";
 import { PriorityChangeDialog } from "./priority-dialog";
-import { StatusChangeDialog } from "./status-dialog";
+import { StatusChangeDialog, type StatusChangeTarget } from "./status-dialog";
 import { PaymentDialog } from "./payment-dialog";
 import { VoidPaymentDialog } from "./void-payment-dialog";
 import { AuthorizationDialog } from "./authorization-dialog";
@@ -84,11 +84,12 @@ export default async function AppointmentPage({
   // Con cobro vigente no se cancela ni se vence: primero se anula (HU-21).
   const paid = billing?.activePayment !== undefined;
   const scheduled = appointment.status === "SCHEDULED";
-  const canChangeStatus = !own && scheduled;
   const now = new Date();
-  const canReschedule = canChangeStatus && appointment.startsAt > now;
-  const canComplete = canChangeStatus && appointment.startsAt <= now;
-  const canExpire = canChangeStatus && !paid && appointment.endsAt <= now;
+  const canReschedule = scheduled && appointment.startsAt > now;
+  const canComplete = scheduled && appointment.startsAt <= now;
+  const canExpire = scheduled && !paid && appointment.endsAt <= now;
+  const canCancel = scheduled && !paid;
+  const canChangePriority = !own && scheduled;
 
   const summary = `${appointment.patient.lastName}, ${appointment.patient.firstName} · ${appointment.professional.lastName}, ${appointment.professional.firstName} · ${appointment.service.name} · ${formatDate(start.date)}, ${formatMinute(start.minute)}–${formatMinute(end.minute)}`;
   // Se vuelve al mismo calendario (vista, fecha y filtros) desde el que se
@@ -98,6 +99,11 @@ export default async function AppointmentPage({
   const billingHref = (notice: "paid" | "authorized") => {
     const search = new URLSearchParams(returnSearch);
     search.set("billing", notice);
+    return `/appointments/${appointment.id}?${search}`;
+  };
+  const changedHref = (target: StatusChangeTarget) => {
+    const search = new URLSearchParams(returnSearch);
+    search.set("changed", target);
     return `/appointments/${appointment.id}?${search}`;
   };
 
@@ -113,7 +119,7 @@ export default async function AppointmentPage({
           </AlertDescription>
         </Alert>
       )}
-      {rescheduled === "1" && !own && (
+      {rescheduled === "1" && (
         <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
           <AlertTitle>Turno reprogramado exitosamente</AlertTitle>
           <AlertDescription className="text-success-soft-foreground">
@@ -124,7 +130,7 @@ export default async function AppointmentPage({
           </AlertDescription>
         </Alert>
       )}
-      {cancelled === "1" && !own && (
+      {cancelled === "1" && (
         <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
           <AlertTitle>Turno cancelado exitosamente</AlertTitle>
           <AlertDescription className="text-success-soft-foreground">
@@ -141,7 +147,7 @@ export default async function AppointmentPage({
           </AlertDescription>
         </Alert>
       )}
-      {(changed === "COMPLETED" || changed === "EXPIRED") && !own && (
+      {(changed === "COMPLETED" || changed === "EXPIRED") && (
         <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
           <AlertTitle>
             Turno marcado como {APPOINTMENT_STATUS_LABEL[changed].toLowerCase()}
@@ -538,7 +544,7 @@ export default async function AppointmentPage({
             <Link href="/appointments/new">Dar otro turno</Link>
           </Button>
         )}
-        {canChangeStatus && (
+        {canChangePriority && (
           <PriorityChangeDialog
             appointmentId={appointment.id}
             currentPriority={appointment.priority}
@@ -560,7 +566,7 @@ export default async function AppointmentPage({
             appointmentId={appointment.id}
             target="COMPLETED"
             summary={summary}
-            returnSearch={returnSearch}
+            successHref={changedHref("COMPLETED")}
           />
         )}
         {canExpire && (
@@ -568,10 +574,10 @@ export default async function AppointmentPage({
             appointmentId={appointment.id}
             target="EXPIRED"
             summary={summary}
-            returnSearch={returnSearch}
+            successHref={changedHref("EXPIRED")}
           />
         )}
-        {canChangeStatus && !paid && (
+        {canCancel && (
           <CancelAppointmentDialog
             appointmentId={appointment.id}
             summary={summary}
@@ -579,13 +585,13 @@ export default async function AppointmentPage({
           />
         )}
       </div>
-      {canChangeStatus && paid && (
+      {!own && scheduled && paid && (
         <p className="text-muted-foreground">
           El turno tiene un cobro registrado. Para cancelarlo o marcarlo como
           vencido, primero anulá el cobro.
         </p>
       )}
-      {canChangeStatus && !paid && !canExpire && (
+      {scheduled && !paid && !canExpire && (
         <p className="text-muted-foreground">
           {canComplete
             ? "Podrás marcarlo como vencido cuando termine su horario."

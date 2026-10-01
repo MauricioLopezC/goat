@@ -101,7 +101,8 @@ export function landingPath(role: Role): string {
     case Role.PROFESSIONAL:
       return "/agenda";
     case Role.MANAGER:
-      return "/professionals";
+      // El tablero de indicadores (HU-22).
+      return "/dashboard";
     case Role.PATIENT:
       // El paciente no accede al sistema en el Inc. 1 y `createUser` no permite
       // ese rol. Devolver "/" haría un bucle, porque "/" manda acá.
