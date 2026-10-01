@@ -5,9 +5,11 @@ import { DomainError } from "@/lib/actions";
 import { assertRole, type Actor } from "@/lib/dal/auth";
 import { assertNoActivePayment } from "@/lib/dal/payments";
 import { serializableTransaction } from "@/lib/dal/transactions";
+import { paginate } from "@/lib/pagination";
 import {
   AppointmentEventType,
   AppointmentStatus,
+  PaymentStatus,
   Role,
 } from "@/generated/prisma/enums";
 import { Prisma } from "@/generated/prisma/client";
@@ -1267,4 +1269,54 @@ export async function expireAppointment(
 ) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
   return closeAppointment(input, AppointmentStatus.EXPIRED, actor);
+}
+
+/// Turno sin cerrar (`UnclosedAppointment`, HU-22): Programado y ya terminado.
+function unclosedWhere(now: Date) {
+  return {
+    status: AppointmentStatus.SCHEDULED,
+    endsAt: { lte: now },
+  } satisfies Prisma.AppointmentWhereInput;
+}
+
+/// Turnos pasados que siguen Programados, del más viejo al más nuevo, para
+/// cerrarlos desde la lista (HU-22).
+export async function listUnclosedAppointments(page: number, actor: Actor) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  const where = unclosedWhere(new Date());
+  const result = await paginate(
+    page,
+    () => prisma.appointment.count({ where }),
+    (range) =>
+      prisma.appointment.findMany({
+        where,
+        orderBy: [{ endsAt: "asc" }, { id: "asc" }],
+        ...range,
+        select: {
+          id: true,
+          startsAt: true,
+          endsAt: true,
+          patient: { select: patientSelect },
+          professional: { select: personSelect },
+          service: { select: { id: true, name: true } },
+          payments: {
+            where: { status: PaymentStatus.PAID },
+            select: { id: true },
+          },
+        },
+      }),
+  );
+  return {
+    ...result,
+    items: result.items.map(({ payments, ...appointment }) => ({
+      ...appointment,
+      hasActivePayment: payments.length > 0,
+    })),
+  };
+}
+
+/// Cantidad de turnos sin cerrar, para el acceso desde el calendario (HU-22).
+export async function countUnclosedAppointments(actor: Actor) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  return prisma.appointment.count({ where: unclosedWhere(new Date()) });
 }

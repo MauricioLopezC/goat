@@ -1,5 +1,6 @@
 import {
   CalendarCheck,
+  CalendarClock,
   CalendarDays,
   CalendarOff,
   CalendarPlus,
@@ -50,6 +51,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/payments",
         label: "Cobros del día",
         icon: Wallet,
+        roles: FRONT_DESK,
+      },
+      {
+        href: "/appointments/unclosed",
+        label: "Turnos sin cerrar",
+        icon: CalendarClock,
         roles: FRONT_DESK,
       },
       // Misma pantalla: el profesional ve la suya y el resto elige de quién

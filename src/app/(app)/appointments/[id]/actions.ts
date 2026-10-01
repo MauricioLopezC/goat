@@ -30,6 +30,14 @@ function revalidateAppointment(appointmentId: number) {
   revalidatePath("/payments");
 }
 
+// Cerrar un turno cambia la lista de turnos sin cerrar y los indicadores
+// (HU-22).
+function revalidateClosedAppointment(appointmentId: number) {
+  revalidateAppointment(appointmentId);
+  revalidatePath("/appointments/unclosed");
+  revalidatePath("/dashboard");
+}
+
 export const rescheduleAppointment = defineAction({
   roles: ["RECEPTIONIST", "MANAGER", "PROFESSIONAL"],
   input: rescheduleAppointmentSchema,
@@ -55,7 +63,7 @@ export const completeAppointment = defineAction({
   input: appointmentStatusChangeSchema,
   handler: async (input, actor) => {
     const result = await completeInDal(input, actor);
-    revalidateAppointment(input.appointmentId);
+    revalidateClosedAppointment(input.appointmentId);
     return result;
   },
 });
@@ -65,7 +73,7 @@ export const expireAppointment = defineAction({
   input: appointmentStatusChangeSchema,
   handler: async (input, actor) => {
     const result = await expireInDal(input, actor);
-    revalidateAppointment(input.appointmentId);
+    revalidateClosedAppointment(input.appointmentId);
     return result;
   },
 });
