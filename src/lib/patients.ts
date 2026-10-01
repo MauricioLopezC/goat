@@ -258,13 +258,21 @@ export function validatePatientClientForm(data: PatientFormValidationInput) {
 
   const hasEmergencyName = Boolean(data.emergencyContactName?.trim());
   const hasEmergencyPhone = Boolean(data.emergencyContactPhone?.trim());
+  const hasEmergencyRelationship = Boolean(
+    data.emergencyContactRelationship?.trim(),
+  );
 
-  if (hasEmergencyName && !hasEmergencyPhone) {
+  if ((hasEmergencyName || hasEmergencyRelationship) && !hasEmergencyPhone) {
     errors.emergencyContactPhone =
       "El teléfono es obligatorio si se indica el contacto de emergencia";
-  } else if (hasEmergencyPhone && !hasEmergencyName) {
+  }
+
+  if (hasEmergencyPhone && !hasEmergencyName) {
     errors.emergencyContactName =
       "El nombre es obligatorio si se indica el teléfono de emergencia";
+  } else if (hasEmergencyRelationship && !hasEmergencyName) {
+    errors.emergencyContactName =
+      "El nombre es obligatorio si se indica el contacto de emergencia";
   }
 
   if (data.emergencyContactName?.trim()) {

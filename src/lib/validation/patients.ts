@@ -240,6 +240,7 @@ export const refinePatient = (
 type EmergencyContactDataForRefine = {
   emergencyContactName?: string;
   emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
 };
 
 /// Regla cruzada y formato para el contacto de emergencia (HU-17).
@@ -249,8 +250,9 @@ export const refineEmergencyContact = (
 ) => {
   const hasName = Boolean(data.emergencyContactName?.trim());
   const hasPhone = Boolean(data.emergencyContactPhone?.trim());
+  const hasRelationship = Boolean(data.emergencyContactRelationship?.trim());
 
-  if (hasName && !hasPhone) {
+  if ((hasName || hasRelationship) && !hasPhone) {
     ctx.addIssue({
       code: "custom",
       message:
@@ -264,6 +266,13 @@ export const refineEmergencyContact = (
       code: "custom",
       message:
         "El nombre es obligatorio si se indica el teléfono de emergencia",
+      path: ["emergencyContactName"],
+    });
+  } else if (hasRelationship && !hasName) {
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "El nombre es obligatorio si se indica el contacto de emergencia",
       path: ["emergencyContactName"],
     });
   }

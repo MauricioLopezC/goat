@@ -148,6 +148,31 @@ test("regla cruzada: contacto de emergencia exige nombre si se carga el teléfon
   );
 });
 
+test("regla cruzada: contacto de emergencia exige nombre y teléfono si se carga el vínculo", () => {
+  const parsed = updatePatientSchema.safeParse({
+    id: 1,
+    ...editableData,
+    emergencyContactRelationship: "Padre",
+  });
+
+  assert.equal(parsed.success, false);
+  const issues = parsed.error?.issues ?? [];
+  assert.ok(
+    issues.some(
+      (i) =>
+        i.path.includes("emergencyContactName") &&
+        i.message.includes("El nombre es obligatorio"),
+    ),
+  );
+  assert.ok(
+    issues.some(
+      (i) =>
+        i.path.includes("emergencyContactPhone") &&
+        i.message.includes("El teléfono es obligatorio"),
+    ),
+  );
+});
+
 test("teléfono de emergencia debe tener formato válido", () => {
   const invalid = updatePatientSchema.safeParse({
     id: 1,
@@ -209,6 +234,22 @@ test("el validador de cliente valida la regla cruzada y formato de contacto de e
   assert.ok(
     invalidPhone.errors.emergencyContactPhone?.includes(
       "El teléfono del contacto de emergencia debe contener",
+    ),
+  );
+
+  const missingBothForRelationship = validatePatientClientForm({
+    ...editableData,
+    emergencyContactRelationship: "Padre",
+  });
+  assert.equal(missingBothForRelationship.isValid, false);
+  assert.ok(
+    missingBothForRelationship.errors.emergencyContactName?.includes(
+      "El nombre es obligatorio",
+    ),
+  );
+  assert.ok(
+    missingBothForRelationship.errors.emergencyContactPhone?.includes(
+      "El teléfono es obligatorio",
     ),
   );
 

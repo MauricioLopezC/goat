@@ -379,7 +379,10 @@ export async function updatePatient(
         emergencyContactName: input.emergencyContactName?.trim() || null,
         emergencyContactPhone: input.emergencyContactPhone?.trim() || null,
         emergencyContactRelationship:
-          input.emergencyContactRelationship?.trim() || null,
+          input.emergencyContactName?.trim() &&
+          input.emergencyContactPhone?.trim()
+            ? input.emergencyContactRelationship?.trim() || null
+            : null,
         notes: input.notes?.trim() || null,
         updatedById: actor.id,
         ...(input.coverageType === "HEALTH_INSURANCE" && input.insurancePlanId
