@@ -1634,6 +1634,10 @@ export type SeedAppointment = {
   /// `HH:MM`, dentro de una franja del profesional que habilite el servicio.
   startTime: string;
   status: AppointmentStatus;
+  /// Solo Programados de la semana actual: estado que toman si ya terminaron
+  /// al correr el seed (por defecto, Completado). `SCHEDULED` lo deja
+  /// pendiente de cierre. Ver `prisma/seed-status.ts`.
+  pastStatus?: AppointmentStatus;
   /// Motivo del cambio de estado. Obligatorio al cancelar (HU-10).
   reason?: string;
   /// Quién pidió la cancelación. Obligatorio al cancelar (HU-10).
@@ -1643,7 +1647,8 @@ export type SeedAppointment = {
   /// Observaciones que se cargan al dar el turno.
   notes?: string;
   /// Medio de pago con que se cobró (HU-21). Solo pacientes particulares en
-  /// un turno Completado; el monto es el valor del servicio.
+  /// un turno Completado; el monto es el valor del servicio. En la semana
+  /// actual, se cobra solo si el turno ya terminó al correr el seed.
   payment?: string;
   /// Número de autorización de la obra social (HU-21). Solo con obra social,
   /// un servicio que requiere orden y un turno Completado.
@@ -1655,7 +1660,9 @@ const { SCHEDULED, COMPLETED, CANCELLED, EXPIRED } = AppointmentStatus;
 /// Fechas relativas a la corrida, para que siempre haya turnos pasados que
 /// cerrar y turnos futuros que ver en el calendario. Los Programados de la
 /// semana anterior quedan pendientes de cierre a propósito: son los que
-/// prueban "Marcar completado" y "Marcar vencido".
+/// prueban "Marcar completado" y "Marcar vencido". Los de la semana actual
+/// que ya terminaron se cierran según `pastStatus`, como en un centro que
+/// cierra sus turnos al día.
 export const APPOINTMENTS: SeedAppointment[] = [
   // Semana anterior: atendidos, ausentes, cancelados y pendientes de cierre.
   {
@@ -1948,8 +1955,9 @@ export const APPOINTMENTS: SeedAppointment[] = [
     createdBy: MESA,
   },
 
-  // Semana actual: Programados (los de días ya pasados quedan pendientes de
-  // cierre) y una cancelación.
+  // Semana actual: Programados que, si ya terminaron al correr el seed, quedan
+  // Completados (la mayoría, con cobro si son particulares), Vencidos (uno por
+  // día hábil) o pendientes de cierre (dos); y dos cancelaciones.
   {
     professional: "4521",
     patient: "40123456",
@@ -1968,6 +1976,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: MONDAY,
     startTime: "16:30",
     status: SCHEDULED,
+    payment: "Efectivo",
     createdBy: MESA2,
   },
   {
@@ -1988,6 +1997,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: MONDAY,
     startTime: "15:00",
     status: SCHEDULED,
+    pastStatus: SCHEDULED,
     createdBy: MESA2,
   },
   {
@@ -2080,6 +2090,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: THURSDAY,
     startTime: "10:00",
     status: SCHEDULED,
+    payment: "Tarjeta de débito",
     createdBy: MESA,
   },
   {
@@ -2090,6 +2101,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: THURSDAY,
     startTime: "17:00",
     status: SCHEDULED,
+    payment: "Transferencia",
     createdBy: MESA2,
   },
   {
@@ -2120,6 +2132,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: SATURDAY,
     startTime: "09:00",
     status: SCHEDULED,
+    payment: "Transferencia",
     createdBy: MESA2,
   },
   {
@@ -2130,6 +2143,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: SATURDAY,
     startTime: "09:30",
     status: SCHEDULED,
+    payment: "Efectivo",
     createdBy: MESA,
   },
   {
@@ -2150,6 +2164,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: MONDAY,
     startTime: "10:00",
     status: SCHEDULED,
+    pastStatus: EXPIRED,
     createdBy: MESA2,
   },
   {
@@ -2170,6 +2185,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: MONDAY,
     startTime: "10:30",
     status: SCHEDULED,
+    payment: "Tarjeta de débito",
     createdBy: MESA,
     notes: "Viene con la madre. Retiro de yeso de muñeca.",
   },
@@ -2224,6 +2240,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: TUESDAY,
     startTime: "09:00",
     status: SCHEDULED,
+    payment: "Transferencia",
     createdBy: MESA2,
   },
   {
@@ -2265,6 +2282,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: TUESDAY,
     startTime: "18:00",
     status: SCHEDULED,
+    pastStatus: EXPIRED,
     createdBy: MESA2,
   },
   {
@@ -2275,6 +2293,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: WEDNESDAY,
     startTime: "08:00",
     status: SCHEDULED,
+    payment: "Efectivo",
     createdBy: MESA,
   },
   {
@@ -2338,6 +2357,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: WEDNESDAY,
     startTime: "14:00",
     status: SCHEDULED,
+    pastStatus: EXPIRED,
     createdBy: MESA2,
   },
   {
@@ -2348,6 +2368,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: WEDNESDAY,
     startTime: "15:00",
     status: SCHEDULED,
+    pastStatus: SCHEDULED,
     createdBy: MESA,
   },
   {
@@ -2378,6 +2399,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: THURSDAY,
     startTime: "10:00",
     status: SCHEDULED,
+    pastStatus: EXPIRED,
     createdBy: MESA,
   },
   {
@@ -2398,6 +2420,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: THURSDAY,
     startTime: "12:00",
     status: SCHEDULED,
+    payment: "Efectivo",
     createdBy: MESA,
   },
   {
@@ -2428,6 +2451,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: FRIDAY,
     startTime: "10:00",
     status: SCHEDULED,
+    payment: "Tarjeta de débito",
     createdBy: MESA2,
   },
   {
@@ -2438,6 +2462,7 @@ export const APPOINTMENTS: SeedAppointment[] = [
     weekday: FRIDAY,
     startTime: "15:00",
     status: SCHEDULED,
+    pastStatus: EXPIRED,
     createdBy: MESA,
   },
   {

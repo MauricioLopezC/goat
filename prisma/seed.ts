@@ -44,6 +44,7 @@ import {
   SPECIALTIES,
   TITLES,
 } from "./seed-data";
+import { resolveSeedStatus, statusOncePast } from "./seed-status";
 
 // Datos de prueba para lo que ya está implementado: usuarios (HU-01),
 // profesionales y su historial (HU-02 y HU-03), agenda, excepciones y
@@ -553,7 +554,7 @@ async function seedExceptions(
 /// turno que ocupa el horario del profesional o del paciente (por ejemplo, uno
 /// dado desde la UI). Así el seed se puede volver a correr cualquier día sin
 /// chocar con la restricción de la base. Para empezar de cero:
-/// `npx prisma migrate reset`.
+/// `npx prisma migrate reset && npm run db:seed`.
 async function seedAppointments(
   prisma: PrismaClient,
   userIds: Ids,
@@ -616,6 +617,17 @@ async function seedAppointments(
       );
     }
 
+    if (
+      a.pastStatus &&
+      (a.week !== 0 ||
+        a.status !== AppointmentStatus.SCHEDULED ||
+        a.pastStatus === AppointmentStatus.CANCELLED)
+    ) {
+      throw new Error(
+        `seed-data.ts: el turno ${label} solo admite pastStatus si es un Programado de la semana actual, y no puede ser Cancelado.`,
+      );
+    }
+
     const date = seedDate(now, a.week, a.weekday);
     const startsAt = appointmentInstant(date, startMinute);
     const endsAt = new Date(
@@ -630,12 +642,17 @@ async function seedAppointments(
         `seed-data.ts: el turno ${label} todavía no pasó y no puede quedar ${a.status}.`,
       );
     }
-    const cancelled = a.status === AppointmentStatus.CANCELLED;
+    // Los Programados de la semana actual se cierran si ya terminaron. Cobro y
+    // autorización se validan con el estado que toman una vez pasados, así un
+    // dato mal cargado falla cualquier día de la semana que se corra.
+    const status = resolveSeedStatus(a, endsAt, now);
+    const pastStatus = statusOncePast(a);
+    const cancelled = status === AppointmentStatus.CANCELLED;
     // Cobro y autorización (HU-21), con las mismas reglas que la DAL.
     const patientData = PATIENTS.find((p) => p.documentNumber === a.patient);
     if (
       a.payment &&
-      (a.status !== AppointmentStatus.COMPLETED ||
+      (pastStatus !== AppointmentStatus.COMPLETED ||
         patientData?.coverage !== null ||
         !PAYMENT_METHODS.some((m) => m.name === a.payment && m.active))
     ) {
@@ -645,7 +662,7 @@ async function seedAppointments(
     }
     if (
       a.authorizationNumber &&
-      (a.status !== AppointmentStatus.COMPLETED ||
+      (pastStatus !== AppointmentStatus.COMPLETED ||
         !patientData?.coverage ||
         !service.requiresReferral)
     ) {
@@ -686,8 +703,8 @@ async function seedAppointments(
     }
 
     const occupies =
-      a.status === AppointmentStatus.SCHEDULED ||
-      a.status === AppointmentStatus.COMPLETED;
+      status === AppointmentStatus.SCHEDULED ||
+      status === AppointmentStatus.COMPLETED;
     if (occupies) {
       const overlapping = await prisma.appointment.count({
         where: {
@@ -720,7 +737,9 @@ async function seedAppointments(
       [AppointmentStatus.COMPLETED]: AppointmentEventType.COMPLETED,
       [AppointmentStatus.EXPIRED]: AppointmentEventType.EXPIRED,
       [AppointmentStatus.CANCELLED]: AppointmentEventType.CANCELLED,
-    }[a.status];
+    }[status];
+    // Cobro y autorización solo si el turno quedó Completado en esta corrida.
+    const completed = status === AppointmentStatus.COMPLETED;
 
     await prisma.appointment.create({
       data: {
@@ -729,27 +748,28 @@ async function seedAppointments(
         serviceId: idOf(serviceIds, a.service, "Servicio"),
         startsAt,
         endsAt,
-        status: a.status,
+        status,
         notes: a.notes ?? null,
         createdById: userId,
         createdAt,
-        ...(a.authorizationNumber
+        ...(completed && a.authorizationNumber
           ? {
               authorizationNumber: a.authorizationNumber,
               authorizedAt: startsAt,
               authorizedById: userId,
             }
           : {}),
-        payments: a.payment
-          ? {
-              create: {
-                paymentMethod: { connect: { name: a.payment } },
-                amount: service.price,
-                createdBy: { connect: { id: userId } },
-                createdAt: startsAt,
-              },
-            }
-          : undefined,
+        payments:
+          completed && a.payment
+            ? {
+                create: {
+                  paymentMethod: { connect: { name: a.payment } },
+                  amount: service.price,
+                  createdBy: { connect: { id: userId } },
+                  createdAt: startsAt,
+                },
+              }
+            : undefined,
         updatedAt: eventType ? changedAt : createdAt,
         events: eventType
           ? {
