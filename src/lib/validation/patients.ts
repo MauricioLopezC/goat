@@ -237,6 +237,47 @@ export const refinePatient = (
   }
 };
 
+type EmergencyContactDataForRefine = {
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+};
+
+/// Regla cruzada y formato para el contacto de emergencia (HU-17).
+export const refineEmergencyContact = (
+  data: EmergencyContactDataForRefine,
+  ctx: z.RefinementCtx,
+) => {
+  const hasName = Boolean(data.emergencyContactName?.trim());
+  const hasPhone = Boolean(data.emergencyContactPhone?.trim());
+
+  if (hasName && !hasPhone) {
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "El teléfono es obligatorio si se indica el contacto de emergencia",
+      path: ["emergencyContactPhone"],
+    });
+  }
+
+  if (hasPhone && !hasName) {
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "El nombre es obligatorio si se indica el teléfono de emergencia",
+      path: ["emergencyContactName"],
+    });
+  }
+
+  if (hasPhone && !phoneRegex.test(data.emergencyContactPhone!.trim())) {
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "El teléfono del contacto de emergencia debe contener únicamente números y puede comenzar con el signo + (entre 7 y 15 dígitos)",
+      path: ["emergencyContactPhone"],
+    });
+  }
+};
+
 export const createPatientSchema = z
   .object(patientBaseFields)
   .superRefine((data, ctx) => {
@@ -246,8 +287,57 @@ export const createPatientSchema = z
 
 export type CreatePatientInput = z.infer<typeof createPatientSchema>;
 
+/// Campos opcionales de ficha completa (HU-17). El alta (HU-07) no se alarga:
+/// solo se completan con posterioridad desde la edición de la ficha.
+export const patientExtendedFields = {
+  address: z
+    .string()
+    .trim()
+    .max(120, "El domicilio debe tener como máximo 120 caracteres")
+    .optional()
+    .transform((val) => val || undefined),
+  city: z
+    .string()
+    .trim()
+    .max(60, "La localidad debe tener como máximo 60 caracteres")
+    .optional()
+    .transform((val) => val || undefined),
+  emergencyContactName: z
+    .string()
+    .trim()
+    .max(
+      120,
+      "El nombre del contacto de emergencia debe tener como máximo 120 caracteres",
+    )
+    .refine(
+      (val) => !val || nameRegex.test(val),
+      "El nombre del contacto de emergencia solo puede contener letras, espacios, tildes y apóstrofes",
+    )
+    .optional()
+    .transform((val) => val || undefined),
+  emergencyContactPhone: z
+    .string()
+    .trim()
+    .max(25)
+    .optional()
+    .transform((val) => val || undefined),
+  emergencyContactRelationship: z
+    .string()
+    .trim()
+    .max(50, "El vínculo debe tener como máximo 50 caracteres")
+    .optional()
+    .transform((val) => val || undefined),
+  notes: z
+    .string()
+    .trim()
+    .max(1000, "Las observaciones deben tener como máximo 1000 caracteres")
+    .optional()
+    .transform((val) => val || undefined),
+};
+
 /// El documento no es editable (HU-08). Se acepta opcional solo para que la DAL
 /// rechace un intento de cambiarlo en vez de que Zod lo descarte sin avisar.
+/// La ficha completa suma los campos opcionales de HU-17.
 export const updatePatientSchema = z
   .object(patientBaseFields)
   .omit({ documentType: true, documentNumber: true })
@@ -259,7 +349,11 @@ export const updatePatientSchema = z
       })
       .optional(),
     documentNumber: z.string().trim().optional(),
+    ...patientExtendedFields,
   })
-  .superRefine(refinePatient);
+  .superRefine((data, ctx) => {
+    refinePatient(data, ctx);
+    refineEmergencyContact(data, ctx);
+  });
 
 export type UpdatePatientInput = z.infer<typeof updatePatientSchema>;

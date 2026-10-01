@@ -242,7 +242,7 @@ export default async function PatientDetailPage({
           </CardContent>
         </Card>
 
-        {/* Contacto */}
+        {/* Contacto y Domicilio */}
         <Card className="rounded-xl border-border bg-card shadow-xs">
           <CardHeader className="pb-3">
             <CardTitle className="text-title-lg flex items-center gap-2 text-foreground">
@@ -250,28 +250,115 @@ export default async function PatientDetailPage({
               Información de contacto
             </CardTitle>
             <CardDescription>
-              Canales habilitados para avisos y turnos.
+              Canales habilitados para avisos, turnos y ubicación.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-1">
-            <div>
-              <p className="text-label-md text-muted-foreground uppercase">
-                Teléfono de contacto
-              </p>
-              <p className="text-body-md font-medium text-foreground mt-0.5 flex items-center gap-2">
-                <Phone className="size-3.5 text-muted-foreground" />
-                {patient.phone}
-              </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-label-md text-muted-foreground uppercase">
+                  Teléfono de contacto
+                </p>
+                <p className="text-body-md font-medium text-foreground mt-0.5 flex items-center gap-2">
+                  <Phone className="size-3.5 text-muted-foreground" />
+                  {patient.phone}
+                </p>
+              </div>
+              <div>
+                <p className="text-label-md text-muted-foreground uppercase">
+                  Correo electrónico
+                </p>
+                <p className="text-body-md font-medium text-foreground mt-0.5 flex items-center gap-2">
+                  <Mail className="size-3.5 text-muted-foreground" />
+                  {patient.email}
+                </p>
+              </div>
             </div>
-            <div>
+
+            <div className="pt-2 border-t border-border/60">
               <p className="text-label-md text-muted-foreground uppercase">
-                Correo electrónico
+                Domicilio
               </p>
-              <p className="text-body-md font-medium text-foreground mt-0.5 flex items-center gap-2">
-                <Mail className="size-3.5 text-muted-foreground" />
-                {patient.email}
-              </p>
+              {patient.address || patient.city ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
+                  <div>
+                    <p className="text-label-sm text-muted-foreground uppercase">
+                      Calle y número
+                    </p>
+                    <p className="text-body-md font-medium text-foreground mt-0.5">
+                      {patient.address ?? "No informado"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-label-sm text-muted-foreground uppercase">
+                      Localidad
+                    </p>
+                    <p className="text-body-md font-medium text-foreground mt-0.5">
+                      {patient.city ?? "No informada"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-body-sm text-muted-foreground italic mt-1">
+                  Sin domicilio registrado.
+                </p>
+              )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Contacto de Emergencia (HU-17) */}
+        <Card className="rounded-xl border-border bg-card shadow-xs">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-title-lg text-foreground">
+              Contacto de emergencia
+            </CardTitle>
+            <CardDescription>
+              Persona de referencia ante cualquier imprevisto.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-1">
+            {patient.emergencyContactName ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-label-md text-muted-foreground uppercase">
+                    Nombre
+                  </p>
+                  <p className="text-body-md font-medium text-foreground mt-0.5">
+                    {patient.emergencyContactName}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-label-md text-muted-foreground uppercase">
+                    Teléfono
+                  </p>
+                  <p className="text-body-md font-medium text-foreground mt-0.5">
+                    {patient.emergencyContactPhone ? (
+                      <a
+                        href={`tel:${patient.emergencyContactPhone}`}
+                        className="text-primary hover:underline"
+                      >
+                        {patient.emergencyContactPhone}
+                      </a>
+                    ) : (
+                      "No informado"
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-label-md text-muted-foreground uppercase">
+                    Vínculo
+                  </p>
+                  <p className="text-body-md font-medium text-foreground mt-0.5">
+                    {patient.emergencyContactRelationship ?? "No informado"}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-body-sm text-muted-foreground italic">
+                No se registró un contacto de emergencia para este paciente.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -386,6 +473,31 @@ export default async function PatientDetailPage({
             ) : (
               <p className="text-body-sm text-muted-foreground pt-1">
                 Atención particular sin obra social asociada.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Observaciones Administrativas (HU-17) */}
+        <Card className="rounded-xl border-border bg-card shadow-xs">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-title-lg text-foreground">
+              Observaciones administrativas
+            </CardTitle>
+            <CardDescription>
+              Anotaciones de gestión y mostrador. No constituyen antecedentes
+              clínicos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-1">
+            {patient.notes ? (
+              <p className="text-body-md text-foreground whitespace-pre-wrap rounded-lg bg-muted/40 p-3 border border-border/50">
+                {patient.notes}
+              </p>
+            ) : (
+              <p className="text-body-sm text-muted-foreground italic">
+                No hay observaciones administrativas registradas para este
+                paciente.
               </p>
             )}
           </CardContent>

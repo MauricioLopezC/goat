@@ -686,11 +686,11 @@ No es una Server Action: es una lectura que el Server Component de `/patients` l
 
 ### `getPatient`
 
-**Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md)
+**Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md), [HU-17 — Completar la ficha del paciente](hu/HU-17-ficha-completa-del-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`
 **Entrada:** `id` (identificador numérico del paciente) y el `actor`.
 **Precondiciones:** el actor pertenece a `STAFF_ROLES`.
-**Efectos:** ninguno. Es una lectura completa de la ficha del paciente, incluyendo su cobertura (`coverage`, plan y obra social) y la información de auditoría de creación y última actualización (`createdBy` y `updatedBy`).
+**Efectos:** ninguno. Es una lectura completa de la ficha del paciente, incluyendo sus datos personales, información de contacto, domicilio (`address`, `city`), contacto de emergencia (`emergencyContactName`, `emergencyContactPhone`, `emergencyContactRelationship`), observaciones administrativas (`notes`), cobertura médica (`coverage`, plan y obra social) y la información de auditoría de creación y última actualización (`createdBy` y `updatedBy`).
 **Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro; `NOT_FOUND` si el paciente no existe.
 **Revalida:** no aplica.
 **Devuelve:** los datos completos del paciente para renderizar su ficha.
@@ -714,12 +714,12 @@ No es una Server Action: el Server Component de `/patients/[id]` la llama direct
 
 ### `updatePatient`
 
-**Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md)
+**Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md), [HU-17 — Completar la ficha del paciente](hu/HU-17-ficha-completa-del-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`
-**Entrada:** `id`, `lastName`, `firstName`, `gender`, `birthDate`, `phone`, `email`, `coverageType`, `insurancePlanId` (si `coverageType` es `HEALTH_INSURANCE`), `memberNumber` (si `coverageType` es `HEALTH_INSURANCE`), `guardianName` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**), `guardianPhone` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**). El documento no es editable: `documentType` y `documentNumber` se aceptan solo para rechazar un intento de cambiarlos.
-**Precondiciones:** el actor es `RECEPTIONIST` o `MANAGER`. El paciente existe. Si la entrada trae `documentType` o `documentNumber`, coinciden con los guardados. Si `coverageType` es `HEALTH_INSURANCE`, el `insurancePlanId` existe y está activo. Si la edad calculada a partir de `birthDate` es menor de 16 años, `guardianName` y `guardianPhone` son obligatorios (validados por Zod tanto en cliente como en servidor).
-**Efectos:** actualiza los datos del `Patient` salvo el documento, registrando `updatedById` con el id del actor y actualizando `updatedAt`. Si `coverageType` es `HEALTH_INSURANCE`, actualiza o crea su `Coverage`. Si la cobertura pasa a `PRIVATE`, remueve la `Coverage` asociada.
-**Errores:** `VALIDATION` (campos obligatorios vacíos, formatos inválidos, menor de 16 años sin tutor, intento de cambiar el tipo o el número de documento), `FORBIDDEN` (profesionales u otros roles sin permiso), `NOT_FOUND` (paciente no encontrado).
+**Entrada:** `id`, `lastName`, `firstName`, `gender`, `birthDate`, `phone`, `email`, `coverageType`, `insurancePlanId` (si `coverageType` es `HEALTH_INSURANCE`), `memberNumber` (si `coverageType` es `HEALTH_INSURANCE`), `guardianName` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**), `guardianPhone` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**), y los campos opcionales de ficha completa: `address`, `city`, `emergencyContactName`, `emergencyContactPhone`, `emergencyContactRelationship`, `notes`. El documento no es editable: `documentType` y `documentNumber` se aceptan solo para rechazar un intento de cambiarlos.
+**Precondiciones:** el actor es `RECEPTIONIST` o `MANAGER`. El paciente existe. Si la entrada trae `documentType` o `documentNumber`, coinciden con los guardados. Si `coverageType` es `HEALTH_INSURANCE`, el `insurancePlanId` existe y está activo. Si la edad calculada a partir de `birthDate` es menor de 16 años, `guardianName` y `guardianPhone` son obligatorios. Si se envía `emergencyContactName`, `emergencyContactPhone` es obligatorio, y al revés (regla cruzada de contacto de emergencia); el teléfono de emergencia debe tener formato válido (`phoneRegex`).
+**Efectos:** actualiza los datos del `Patient` salvo el documento, incluyendo domicilio, contacto de emergencia y observaciones administrativas (o `null` si se limpian), registrando `updatedById` con el id del actor y actualizando `updatedAt`. Si `coverageType` es `HEALTH_INSURANCE`, actualiza o crea su `Coverage`. Si la cobertura pasa a `PRIVATE`, remueve la `Coverage` asociada.
+**Errores:** `VALIDATION` (campos obligatorios vacíos, formatos inválidos, menor de 16 años sin tutor, regla cruzada de contacto de emergencia incumplida, intento de cambiar el tipo o el número de documento), `FORBIDDEN` (profesionales u otros roles sin permiso), `NOT_FOUND` (paciente no encontrado).
 **Revalida:** `/patients`, `/patients/[id]` y `/patients/[id]/edit`.
 **Devuelve:** `{ id, firstName, lastName, documentType, documentNumber }`.
 

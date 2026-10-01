@@ -81,6 +81,13 @@ export type PatientFormValidationInput = {
   memberNumber?: string;
   guardianName?: string;
   guardianPhone?: string;
+  /// Ficha completa (HU-17)
+  address?: string;
+  city?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
+  notes?: string;
 };
 
 /// Validador unificado de formularios de paciente (alta y edición) en el cliente.
@@ -238,6 +245,56 @@ export function validatePatientClientForm(data: PatientFormValidationInput) {
   ) {
     errors.guardianPhone =
       "El teléfono del responsable debe contener únicamente números y puede comenzar con el signo + (entre 7 y 15 dígitos)";
+  }
+
+  // Validación de ficha completa (HU-17)
+  if (data.address?.trim() && data.address.trim().length > 120) {
+    errors.address = "El domicilio debe tener como máximo 120 caracteres";
+  }
+
+  if (data.city?.trim() && data.city.trim().length > 60) {
+    errors.city = "La localidad debe tener como máximo 60 caracteres";
+  }
+
+  const hasEmergencyName = Boolean(data.emergencyContactName?.trim());
+  const hasEmergencyPhone = Boolean(data.emergencyContactPhone?.trim());
+
+  if (hasEmergencyName && !hasEmergencyPhone) {
+    errors.emergencyContactPhone =
+      "El teléfono es obligatorio si se indica el contacto de emergencia";
+  } else if (hasEmergencyPhone && !hasEmergencyName) {
+    errors.emergencyContactName =
+      "El nombre es obligatorio si se indica el teléfono de emergencia";
+  }
+
+  if (data.emergencyContactName?.trim()) {
+    if (data.emergencyContactName.trim().length > 120) {
+      errors.emergencyContactName =
+        "El nombre del contacto de emergencia debe tener como máximo 120 caracteres";
+    } else if (!PATIENT_NAME_REGEX.test(data.emergencyContactName.trim())) {
+      errors.emergencyContactName =
+        "Solo se permiten letras, espacios, tildes y apóstrofes";
+    }
+  }
+
+  if (
+    data.emergencyContactPhone?.trim() &&
+    !PHONE_REGEX.test(data.emergencyContactPhone.trim())
+  ) {
+    errors.emergencyContactPhone =
+      "El teléfono del contacto de emergencia debe contener únicamente números y puede comenzar con el signo + (entre 7 y 15 dígitos)";
+  }
+
+  if (
+    data.emergencyContactRelationship?.trim() &&
+    data.emergencyContactRelationship.trim().length > 50
+  ) {
+    errors.emergencyContactRelationship =
+      "El vínculo debe tener como máximo 50 caracteres";
+  }
+
+  if (data.notes?.trim() && data.notes.trim().length > 1000) {
+    errors.notes = "Las observaciones deben tener como máximo 1000 caracteres";
   }
 
   return {
