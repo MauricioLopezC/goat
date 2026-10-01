@@ -84,3 +84,183 @@ test("el formulario de edición no valida el documento", () => {
   const { errors } = validatePatientClientForm({ ...editableData });
   assert.equal(errors.documentNumber, undefined);
 });
+
+// ─────────────────────────────── HU-17 ───────────────────────────────
+
+test("la edición acepta los campos nuevos de ficha completa (HU-17)", () => {
+  const fullData = {
+    id: 1,
+    ...editableData,
+    address: "Av. Belgrano 1234",
+    city: "Salta",
+    emergencyContactName: "Carlos Pérez",
+    emergencyContactPhone: "3874998877",
+    emergencyContactRelationship: "Padre",
+    notes: "Paciente suele asistir acompañado por su padre.",
+  };
+
+  const parsed = updatePatientSchema.safeParse(fullData);
+  assert.equal(parsed.success, true);
+  assert.equal(parsed.data?.address, "Av. Belgrano 1234");
+  assert.equal(parsed.data?.city, "Salta");
+  assert.equal(parsed.data?.emergencyContactName, "Carlos Pérez");
+  assert.equal(parsed.data?.emergencyContactPhone, "3874998877");
+  assert.equal(parsed.data?.emergencyContactRelationship, "Padre");
+  assert.equal(
+    parsed.data?.notes,
+    "Paciente suele asistir acompañado por su padre.",
+  );
+});
+
+test("regla cruzada: contacto de emergencia exige teléfono si se carga el nombre", () => {
+  const parsed = updatePatientSchema.safeParse({
+    id: 1,
+    ...editableData,
+    emergencyContactName: "Carlos Pérez",
+  });
+
+  assert.equal(parsed.success, false);
+  const issues = parsed.error?.issues ?? [];
+  assert.ok(
+    issues.some(
+      (i) =>
+        i.path.includes("emergencyContactPhone") &&
+        i.message.includes("El teléfono es obligatorio"),
+    ),
+  );
+});
+
+test("regla cruzada: contacto de emergencia exige nombre si se carga el teléfono", () => {
+  const parsed = updatePatientSchema.safeParse({
+    id: 1,
+    ...editableData,
+    emergencyContactPhone: "3874998877",
+  });
+
+  assert.equal(parsed.success, false);
+  const issues = parsed.error?.issues ?? [];
+  assert.ok(
+    issues.some(
+      (i) =>
+        i.path.includes("emergencyContactName") &&
+        i.message.includes("El nombre es obligatorio"),
+    ),
+  );
+});
+
+test("regla cruzada: contacto de emergencia exige nombre y teléfono si se carga el vínculo", () => {
+  const parsed = updatePatientSchema.safeParse({
+    id: 1,
+    ...editableData,
+    emergencyContactRelationship: "Padre",
+  });
+
+  assert.equal(parsed.success, false);
+  const issues = parsed.error?.issues ?? [];
+  assert.ok(
+    issues.some(
+      (i) =>
+        i.path.includes("emergencyContactName") &&
+        i.message.includes("El nombre es obligatorio"),
+    ),
+  );
+  assert.ok(
+    issues.some(
+      (i) =>
+        i.path.includes("emergencyContactPhone") &&
+        i.message.includes("El teléfono es obligatorio"),
+    ),
+  );
+});
+
+test("teléfono de emergencia debe tener formato válido", () => {
+  const invalid = updatePatientSchema.safeParse({
+    id: 1,
+    ...editableData,
+    emergencyContactName: "Carlos Pérez",
+    emergencyContactPhone: "123", // Demasiado corto
+  });
+
+  assert.equal(invalid.success, false);
+  assert.ok(
+    invalid.error?.issues.some(
+      (i) =>
+        i.path.includes("emergencyContactPhone") &&
+        i.message.includes(
+          "El teléfono del contacto de emergencia debe contener",
+        ),
+    ),
+  );
+
+  const validWithPlus = updatePatientSchema.safeParse({
+    id: 1,
+    ...editableData,
+    emergencyContactName: "Carlos Pérez",
+    emergencyContactPhone: "+5493874112233",
+  });
+
+  assert.equal(validWithPlus.success, true);
+});
+
+test("el validador de cliente valida la regla cruzada y formato de contacto de emergencia", () => {
+  const missingPhone = validatePatientClientForm({
+    ...editableData,
+    emergencyContactName: "Carlos Pérez",
+  });
+  assert.equal(missingPhone.isValid, false);
+  assert.ok(
+    missingPhone.errors.emergencyContactPhone?.includes(
+      "El teléfono es obligatorio",
+    ),
+  );
+
+  const missingName = validatePatientClientForm({
+    ...editableData,
+    emergencyContactPhone: "3874998877",
+  });
+  assert.equal(missingName.isValid, false);
+  assert.ok(
+    missingName.errors.emergencyContactName?.includes(
+      "El nombre es obligatorio",
+    ),
+  );
+
+  const invalidPhone = validatePatientClientForm({
+    ...editableData,
+    emergencyContactName: "Carlos Pérez",
+    emergencyContactPhone: "telefono-invalido",
+  });
+  assert.equal(invalidPhone.isValid, false);
+  assert.ok(
+    invalidPhone.errors.emergencyContactPhone?.includes(
+      "El teléfono del contacto de emergencia debe contener",
+    ),
+  );
+
+  const missingBothForRelationship = validatePatientClientForm({
+    ...editableData,
+    emergencyContactRelationship: "Padre",
+  });
+  assert.equal(missingBothForRelationship.isValid, false);
+  assert.ok(
+    missingBothForRelationship.errors.emergencyContactName?.includes(
+      "El nombre es obligatorio",
+    ),
+  );
+  assert.ok(
+    missingBothForRelationship.errors.emergencyContactPhone?.includes(
+      "El teléfono es obligatorio",
+    ),
+  );
+
+  const validComplete = validatePatientClientForm({
+    ...editableData,
+    address: "Av. Belgrano 1234",
+    city: "Salta",
+    emergencyContactName: "Carlos Pérez",
+    emergencyContactPhone: "+5493874112233",
+    emergencyContactRelationship: "Padre",
+    notes: "Anotación administrativa",
+  });
+  assert.equal(validComplete.isValid, true);
+});

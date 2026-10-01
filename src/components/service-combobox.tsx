@@ -29,6 +29,7 @@ export interface ServiceComboboxProps {
   name?: string;
   required?: boolean;
   className?: string;
+  showDuration?: boolean;
 }
 
 export function ServiceCombobox({
@@ -43,6 +44,7 @@ export function ServiceCombobox({
   name,
   required = false,
   className,
+  showDuration = true,
 }: ServiceComboboxProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
@@ -144,23 +146,11 @@ export function ServiceCombobox({
           {isActivelyFiltering
             ? filteredServices.length > 0
               ? filteredServices.map((service) => (
-                  <ComboboxItem
+                  <ServiceComboboxItem
                     key={service.id}
-                    value={service.id}
-                    className="flex flex-col items-start gap-0.5 py-2"
-                  >
-                    <div className="flex w-full items-center justify-between gap-2">
-                      <span className="font-medium text-foreground">
-                        {service.name}
-                      </span>
-                      <span className="text-code-sm text-muted-foreground tabular-nums">
-                        {service.durationMinutes} min
-                      </span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {service.specialty?.name ?? "Sin especialidad"}
-                    </span>
-                  </ComboboxItem>
+                    service={service}
+                    showDuration={showDuration}
+                  />
                 ))
               : null
             : groupedServices.map((group) => (
@@ -169,23 +159,11 @@ export function ServiceCombobox({
                     {group.specialtyName}
                   </ComboboxLabel>
                   {group.services.map((service) => (
-                    <ComboboxItem
+                    <ServiceComboboxItem
                       key={service.id}
-                      value={service.id}
-                      className="flex flex-col items-start gap-0.5 py-2"
-                    >
-                      <div className="flex w-full items-center justify-between gap-2">
-                        <span className="font-medium text-foreground">
-                          {service.name}
-                        </span>
-                        <span className="text-code-sm text-muted-foreground tabular-nums">
-                          {service.durationMinutes} min
-                        </span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {service.specialty?.name ?? "Sin especialidad"}
-                      </span>
-                    </ComboboxItem>
+                      service={service}
+                      showDuration={showDuration}
+                    />
                   ))}
                 </ComboboxGroup>
               ))}
@@ -202,5 +180,32 @@ export function ServiceCombobox({
         </ComboboxList>
       </ComboboxContent>
     </Combobox>
+  );
+}
+
+function ServiceComboboxItem({
+  service,
+  showDuration,
+}: {
+  service: ServiceOption;
+  showDuration: boolean;
+}) {
+  return (
+    <ComboboxItem
+      value={service.id}
+      className="flex flex-col items-start gap-0.5 py-2"
+    >
+      <div className="flex w-full items-center justify-between gap-2">
+        <span className="font-medium text-foreground">{service.name}</span>
+        {showDuration && (
+          <span className="text-code-sm text-muted-foreground tabular-nums">
+            {service.durationMinutes} min
+          </span>
+        )}
+      </div>
+      <span className="text-xs text-muted-foreground">
+        {service.specialty?.name ?? "Sin especialidad"}
+      </span>
+    </ComboboxItem>
   );
 }

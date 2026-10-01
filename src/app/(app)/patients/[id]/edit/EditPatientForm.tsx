@@ -11,6 +11,16 @@ import { CoverageType, DocumentType, Gender } from "@/generated/prisma/enums";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
   PatientFormFields,
   type HealthInsurerOption,
 } from "../../patient-form-fields";
@@ -29,6 +39,12 @@ export type PatientInitialData = {
   coverageType: CoverageType;
   guardianName?: string | null;
   guardianPhone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  emergencyContactRelationship?: string | null;
+  notes?: string | null;
   healthInsurerId?: number;
   insurancePlanId?: number;
   memberNumber?: string;
@@ -77,6 +93,17 @@ export function EditPatientForm({
   const [guardianPhone, setGuardianPhone] = useState(
     initialPatient.guardianPhone ?? "",
   );
+  const [address, setAddress] = useState(initialPatient.address ?? "");
+  const [city, setCity] = useState(initialPatient.city ?? "");
+  const [emergencyContactName, setEmergencyContactName] = useState(
+    initialPatient.emergencyContactName ?? "",
+  );
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState(
+    initialPatient.emergencyContactPhone ?? "",
+  );
+  const [emergencyContactRelationship, setEmergencyContactRelationship] =
+    useState(initialPatient.emergencyContactRelationship ?? "");
+  const [notes, setNotes] = useState(initialPatient.notes ?? "");
 
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
@@ -105,6 +132,12 @@ export function EditPatientForm({
     memberNumber,
     guardianName,
     guardianPhone,
+    address,
+    city,
+    emergencyContactName,
+    emergencyContactPhone,
+    emergencyContactRelationship,
+    notes,
   });
 
   const serverFieldErrors =
@@ -147,6 +180,12 @@ export function EditPatientForm({
         memberNumber: true,
         guardianName: true,
         guardianPhone: true,
+        address: true,
+        city: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
+        emergencyContactRelationship: true,
+        notes: true,
       });
       return;
     }
@@ -175,6 +214,13 @@ export function EditPatientForm({
             : undefined,
         guardianName: guardianName.trim() || undefined,
         guardianPhone: guardianPhone.trim() || undefined,
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        emergencyContactName: emergencyContactName.trim() || undefined,
+        emergencyContactPhone: emergencyContactPhone.trim() || undefined,
+        emergencyContactRelationship:
+          emergencyContactRelationship.trim() || undefined,
+        notes: notes.trim() || undefined,
       });
 
       setState(res);
@@ -259,6 +305,166 @@ export function EditPatientForm({
           getFieldError={getFieldError}
           getFieldBorderClass={getFieldBorderClass}
         />
+
+        {/* Domicilio (HU-17) */}
+        <Card className="rounded-xl border-border bg-card shadow-xs">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-title-lg">Domicilio</CardTitle>
+            <CardDescription>
+              Dirección de residencia del paciente (opcional).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="address">Calle y número</Label>
+                <Input
+                  id="address"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  onBlur={() => markTouched("address")}
+                  className={getFieldBorderClass("address")}
+                  placeholder="Ej: Av. Belgrano 1234"
+                  maxLength={120}
+                />
+                {getFieldError("address") && (
+                  <p className="text-xs text-destructive mt-1">
+                    {getFieldError("address")}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="city">Localidad</Label>
+                <Input
+                  id="city"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  onBlur={() => markTouched("city")}
+                  className={getFieldBorderClass("city")}
+                  placeholder="Ej: Salta"
+                  maxLength={60}
+                />
+                {getFieldError("city") && (
+                  <p className="text-xs text-destructive mt-1">
+                    {getFieldError("city")}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Contacto de emergencia (HU-17) */}
+        <Card className="rounded-xl border-border bg-card shadow-xs">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-title-lg">
+              Contacto de emergencia
+            </CardTitle>
+            <CardDescription>
+              Familiar o persona cercana a quien contactar ante un imprevisto.
+              Si se carga el nombre, el teléfono es obligatorio, y viceversa.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="emergencyContactName">Nombre y apellido</Label>
+                <Input
+                  id="emergencyContactName"
+                  value={emergencyContactName}
+                  onChange={(e) => setEmergencyContactName(e.target.value)}
+                  onBlur={() => markTouched("emergencyContactName")}
+                  className={getFieldBorderClass("emergencyContactName")}
+                  placeholder="Ej: María Gómez"
+                  maxLength={120}
+                />
+                {getFieldError("emergencyContactName") && (
+                  <p className="text-xs text-destructive mt-1">
+                    {getFieldError("emergencyContactName")}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="emergencyContactPhone">
+                  Teléfono de contacto
+                </Label>
+                <Input
+                  id="emergencyContactPhone"
+                  value={emergencyContactPhone}
+                  onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                  onBlur={() => markTouched("emergencyContactPhone")}
+                  className={getFieldBorderClass("emergencyContactPhone")}
+                  placeholder="Ej: +543871234567"
+                  maxLength={25}
+                />
+                {getFieldError("emergencyContactPhone") && (
+                  <p className="text-xs text-destructive mt-1">
+                    {getFieldError("emergencyContactPhone")}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="emergencyContactRelationship">
+                  Vínculo / Relación
+                </Label>
+                <Input
+                  id="emergencyContactRelationship"
+                  value={emergencyContactRelationship}
+                  onChange={(e) =>
+                    setEmergencyContactRelationship(e.target.value)
+                  }
+                  onBlur={() => markTouched("emergencyContactRelationship")}
+                  className={getFieldBorderClass(
+                    "emergencyContactRelationship",
+                  )}
+                  placeholder="Ej: Madre, Cónyuge, Hermano"
+                  maxLength={50}
+                />
+                {getFieldError("emergencyContactRelationship") && (
+                  <p className="text-xs text-destructive mt-1">
+                    {getFieldError("emergencyContactRelationship")}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Observaciones administrativas (HU-17) */}
+        <Card className="rounded-xl border-border bg-card shadow-xs">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-title-lg">
+              Observaciones administrativas
+            </CardTitle>
+            <CardDescription>
+              Anotaciones internas del mostrador y mesa de entrada. No
+              constituyen antecedentes clínicos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            <Label htmlFor="notes">Observaciones</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={() => markTouched("notes")}
+              className={getFieldBorderClass("notes")}
+              placeholder="Anotaciones administrativas, indicaciones de mostrador, etc."
+              rows={4}
+              maxLength={1000}
+            />
+            <div className="flex justify-between items-center text-xs text-muted-foreground mt-1">
+              {getFieldError("notes") ? (
+                <p className="text-xs text-destructive">
+                  {getFieldError("notes")}
+                </p>
+              ) : (
+                <span />
+              )}
+              <span>{notes.length} / 1000</span>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Botones de acción */}
         <div className="flex items-center justify-end gap-3 pt-2">
