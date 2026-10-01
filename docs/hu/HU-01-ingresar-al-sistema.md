@@ -20,7 +20,7 @@
 
 ## Comportamiento
 
-- Al ingresar correctamente, el sistema muestra la pantalla inicial del rol: mesa de entrada ve el calendario del día del centro; el profesional ve su propia agenda del día; el gerente ve el listado de profesionales (en el Inc. 2 pasa a ser el tablero).
+- Al ingresar correctamente, el sistema muestra la pantalla inicial del rol: mesa de entrada ve el calendario del día del centro; el profesional ve su propia agenda del día; el gerente ve el tablero de indicadores ([HU-22](HU-22-indicadores-iniciales.md); en el Inc. 1 era el listado de profesionales).
 - Toda creación, modificación o cancelación queda asociada al usuario que la ejecutó.
 - Existe opción de cerrar sesión desde cualquier pantalla.
 
