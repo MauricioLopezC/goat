@@ -41,6 +41,8 @@
 ## A conversar
 
 - El Vencido se marca a mano (Inc. 1): si nadie cierra los turnos, el ausentismo sale mal. Por eso la lista de turnos sin cerrar entra en esta historia.
+  - **Propuesta del equipo (01/10/2026)**, a conversar con el cliente ([#55](https://github.com/MauricioLopezC/goat/issues/55)): en los sistemas reales el turno se cierra como parte del flujo del día, no desde una lista. Vencer automáticamente los turnos Programados al cierre del día (con un evento a nombre del sistema), completar el turno al cobrarlo y, opcionalmente, registrar la llegada del paciente (Presente). La lista de turnos sin cerrar quedaría como vista de corrección.
+  - Preguntas: ¿un turno no cerrado al fin del día pasa solo a Vencido, y con qué tolerancia? ¿Cobrar implica que el paciente fue atendido? ¿Quieren registrar la llegada del paciente?
 - ¿Son estas las fórmulas de ocupación y ausentismo?
   - **Decisión del equipo (28/09/2026):** sí. Cada indicador muestra su fórmula como ayuda en el tablero.
 - Ingresos por período, demanda por servicio y el tablero del profesional: Inc. 3.
