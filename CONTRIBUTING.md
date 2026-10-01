@@ -19,17 +19,24 @@ de prueba realistas de un centro en Salta para lo que ya está implementado.
 También resuelve el arranque: solo un `MANAGER` crea usuarios y una base recién
 migrada no tiene ninguno. Es idempotente (al volver a correrlo, lo sembrado
 vuelve a sus valores; lo cargado desde la UI no se toca) y se niega a correr con
-`NODE_ENV=production`. `prisma migrate reset` lo corre solo.
+`NODE_ENV=production`. Prisma 7 ya no lo corre después de `prisma migrate reset`:
+hay que correr `npm run db:seed` a continuación.
 
 Los turnos se siembran desde la semana anterior a la corrida hasta tres semanas
 después, así el calendario y el horizonte para dar turnos siempre tienen datos.
-Hay turnos ya cerrados (Completado, Vencido, Cancelado) y turnos pasados que
-siguen Programados para probar "Marcar completado" y "Marcar vencido". Entre
-los Completados hay uno cobrado, uno pendiente de cobro y uno con la
-autorización de la obra social registrada (HU-21). Las
-excepciones de agenda también son relativas a la corrida. Turnos y excepciones
-solo se agregan: si ya cerraste los pendientes, `npx prisma migrate reset` deja
-todo como al principio (borra también lo cargado desde la UI).
+Hay turnos ya cerrados (Completado, Vencido, Cancelado) y unos pocos turnos
+pasados que siguen Programados para probar "Marcar completado" y "Marcar
+vencido". Los turnos de la semana actual que ya terminaron al correr el seed se
+cierran como en un centro que lleva el día al día: la mayoría Completados, uno
+Vencido por día hábil y dos que quedan pendientes; cuántos depende del día en
+que se corra. Entre los Completados hay cobrados con distintos medios,
+particulares pendientes de cobro y uno con la autorización de la obra social
+registrada (HU-21). Las excepciones de agenda también son relativas a la
+corrida. Turnos y excepciones solo se agregan: si ya cerraste los pendientes,
+`npx prisma migrate reset && npm run db:seed` deja todo como al principio
+(borra también lo cargado desde la UI). Conviene hacerlo el mismo día de la
+demo: los turnos que terminan después de la corrida quedan Programados, como
+si nadie los hubiera cerrado.
 
 Todos los usuarios tienen la contraseña `goat1234` (cambiable con `SEED_PASSWORD`):
 

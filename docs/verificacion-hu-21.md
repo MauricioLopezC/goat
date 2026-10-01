@@ -6,7 +6,7 @@
 - **Profesional (`PROFESSIONAL`):** abre sus turnos desde **Mi agenda**, pero no ve cobros ni autorizaciones, y la DAL le rechaza cualquier operación de cobro.
 - Los valores de los servicios y los medios de pago se configuran en [HU-20](hu/HU-20-aranceles-y-medios-de-pago.md) (**Servicios** y **Medios de pago**).
 
-Los usuarios de demo están en `CONTRIBUTING.md`. En una base recién sembrada (`npx prisma migrate reset`), el miércoles de la semana anterior tiene un turno particular Completado y cobrado en efectivo y otro Completado pendiente de cobro. El lunes de la semana anterior tiene un turno de kinesiología con obra social ya autorizado. Los turnos Programados de hoy sirven para probar el cobro y la autorización en vivo.
+Los usuarios de demo están en `CONTRIBUTING.md`. En una base recién sembrada (`npx prisma migrate reset && npm run db:seed`), el miércoles de la semana anterior tiene un turno particular Completado y cobrado en efectivo y otro Completado pendiente de cobro. El lunes de la semana anterior tiene un turno de kinesiología con obra social ya autorizado. Los turnos de hoy que ya terminaron se siembran cerrados (algunos cobrados); los que siguen Programados sirven para probar el cobro y la autorización en vivo.
 
 ## Recorrido manual
 
