@@ -46,6 +46,7 @@ test("cada rol ve exactamente sus links", () => {
     "Feriados",
   ]);
   assert.deepEqual(labels("MANAGER"), [
+    "Tablero",
     "Calendario",
     "Nuevo turno",
     "Cobros del día",
@@ -118,4 +119,7 @@ test("canAccess replica los permisos de las páginas", () => {
   assert.equal(canAccess("/appointments/unclosed", "PROFESSIONAL"), false);
   assert.equal(canAccess("/appointments/unclosed", "RECEPTIONIST"), true);
   assert.equal(canAccess("/appointments/unclosed", "MANAGER"), true);
+  assert.equal(canAccess("/dashboard", "MANAGER"), true);
+  assert.equal(canAccess("/dashboard", "RECEPTIONIST"), false);
+  assert.equal(canAccess("/dashboard", "PROFESSIONAL"), false);
 });
