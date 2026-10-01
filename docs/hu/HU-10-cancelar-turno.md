@@ -29,8 +29,8 @@
 
 ## Permisos
 
-- `RECEPTIONIST` y `MANAGER`: cancelan.
-- `PROFESSIONAL`: no cancela turnos.
+- `RECEPTIONIST` y `MANAGER`: cancelan cualquier turno.
+- `PROFESSIONAL`: cancela sus propios turnos (incorporado a partir de la revisión con el cliente).
 
 ## Operaciones
 

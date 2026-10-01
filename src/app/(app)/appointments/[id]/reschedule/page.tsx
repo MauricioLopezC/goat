@@ -25,7 +25,11 @@ export default async function ReschedulePage({
   params,
   searchParams,
 }: PageProps<"/appointments/[id]/reschedule">) {
-  const actor = await requirePageRole("RECEPTIONIST", "MANAGER");
+  const actor = await requirePageRole(
+    "RECEPTIONIST",
+    "MANAGER",
+    "PROFESSIONAL",
+  );
   const { id } = await params;
   const appointmentId = Number(id);
 

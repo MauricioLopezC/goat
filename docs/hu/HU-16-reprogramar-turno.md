@@ -32,8 +32,8 @@
 
 ## Permisos
 
-- `RECEPTIONIST` y `MANAGER`: reprograman.
-- `PROFESSIONAL`: no reprograma.
+- `RECEPTIONIST` y `MANAGER`: reprograman cualquier turno.
+- `PROFESSIONAL`: reprograma sus propios turnos (incorporado a partir de la revisión con el cliente).
 
 ## Operaciones
 
@@ -42,7 +42,7 @@
 
 ## Criterios de aceptación verificables
 
-1. Mesa de entradas y gerente pueden reprogramar; el profesional solo consulta sus propios turnos y no tiene acceso a reprogramar.
+1. Mesa de entradas, gerente y el profesional (sobre sus propios turnos) pueden reprogramar; el profesional no puede reprogramar turnos ajenos.
 2. Solo se puede reprogramar un turno en estado Programado (`SCHEDULED`) que todavía no haya comenzado (`startsAt > now`). Un turno cancelado, completado, vencido o ya comenzado se rechaza con `INVALID_STATUS_TRANSITION`.
 3. El paciente y el servicio quedan fijos. Se permite conservar el mismo profesional o elegir otro profesional activo que preste el servicio y tenga franjas habilitadas.
 4. El selector de fechas y horarios ofrece bloques disponibles calculados según las reglas de [HU-09](HU-09-asignar-turno.md) (franja habilitada, sin feriados ni ausencias, dentro de los dos meses y no pasado).

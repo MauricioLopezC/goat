@@ -206,7 +206,7 @@ export async function listAvailableDates(
   >,
   actor: Actor,
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
   const parsed = availableSlotsSchema.omit({ date: true }).safeParse(input);
   if (!parsed.success)
     throw new DomainError(
@@ -323,7 +323,7 @@ async function loadAvailability(
   actor: Actor,
   now: Date,
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
   validateDate(input.date, now);
   const dayStart = appointmentInstant(input.date, 0);
   const dayEnd = appointmentInstant(input.date, 1440);
@@ -415,7 +415,7 @@ export async function listAvailableSlots(
   input: AvailableSlotsInput,
   actor: Actor,
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
   const parsed = availableSlotsSchema.safeParse(input);
   if (!parsed.success)
     throw new DomainError(
@@ -951,7 +951,7 @@ export async function cancelAppointment(
   input: CancelAppointmentInput,
   actor: Actor,
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
   const parsed = cancelAppointmentSchema.safeParse(input);
   if (!parsed.success)
     throw new DomainError("VALIDATION", "Revisá los datos ingresados.");
@@ -965,9 +965,22 @@ export async function cancelAppointment(
   return serializableTransaction(async (tx) => {
     const appointment = await tx.appointment.findUnique({
       where: { id: data.appointmentId },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        professional: { select: { userId: true } },
+      },
     });
     if (!appointment) throw new DomainError("NOT_FOUND", "El turno no existe.");
+    if (
+      actor.role === Role.PROFESSIONAL &&
+      appointment.professional.userId !== actor.id
+    ) {
+      throw new DomainError(
+        "FORBIDDEN",
+        "Solo podés cancelar tus propios turnos.",
+      );
+    }
     if (appointment.status !== AppointmentStatus.SCHEDULED)
       throw new DomainError(
         "INVALID_STATUS_TRANSITION",
@@ -995,7 +1008,7 @@ export async function rescheduleAppointment(
   input: RescheduleAppointmentInput,
   actor: Actor,
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
   const parsed = rescheduleAppointmentSchema.safeParse(input);
   if (!parsed.success)
     throw new DomainError("VALIDATION", "Revisá los datos ingresados.");
@@ -1022,10 +1035,20 @@ export async function rescheduleAppointment(
               startsAt: true,
               endsAt: true,
               status: true,
+              professional: { select: { userId: true } },
             },
           });
           if (!appointment)
             throw new DomainError("NOT_FOUND", "El turno no existe.");
+          if (
+            actor.role === Role.PROFESSIONAL &&
+            appointment.professional.userId !== actor.id
+          ) {
+            throw new DomainError(
+              "FORBIDDEN",
+              "Solo podés reprogramar tus propios turnos.",
+            );
+          }
           if (appointment.status !== AppointmentStatus.SCHEDULED)
             throw new DomainError(
               "INVALID_STATUS_TRANSITION",
@@ -1180,16 +1203,33 @@ async function closeAppointment(
         id: appointmentId,
         status: AppointmentStatus.SCHEDULED,
         ...(completing ? { startsAt: { lte: now } } : { endsAt: { lte: now } }),
+        ...(actor.role === Role.PROFESSIONAL
+          ? { professional: { userId: actor.id } }
+          : {}),
       },
       data: { status: target },
     });
     if (count === 0) {
       const appointment = await tx.appointment.findUnique({
         where: { id: appointmentId },
-        select: { status: true },
+        select: {
+          status: true,
+          professional: { select: { userId: true } },
+        },
       });
       if (!appointment)
         throw new DomainError("NOT_FOUND", "El turno no existe.");
+      if (
+        actor.role === Role.PROFESSIONAL &&
+        appointment.professional.userId !== actor.id
+      ) {
+        throw new DomainError(
+          "FORBIDDEN",
+          completing
+            ? "Solo podés completar tus propios turnos."
+            : "Solo podés marcar como vencidos tus propios turnos.",
+        );
+      }
       throw new DomainError(
         "INVALID_STATUS_TRANSITION",
         appointment.status !== AppointmentStatus.SCHEDULED
@@ -1217,7 +1257,7 @@ export async function completeAppointment(
   input: AppointmentStatusChangeInput,
   actor: Actor,
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
   return closeAppointment(input, AppointmentStatus.COMPLETED, actor);
 }
 
@@ -1225,6 +1265,6 @@ export async function expireAppointment(
   input: AppointmentStatusChangeInput,
   actor: Actor,
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
   return closeAppointment(input, AppointmentStatus.EXPIRED, actor);
 }

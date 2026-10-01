@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ActionResult } from "@/lib/actions";
 
 // Diálogo de confirmación para cancelar un turno (HU-10).
-// Solo se muestra cuando el turno está SCHEDULED y el actor es RECEPTIONIST o MANAGER.
+// Solo se muestra cuando el turno está SCHEDULED y el actor es RECEPTIONIST, MANAGER o PROFESSIONAL.
 
 export function CancelAppointmentDialog({
   appointmentId,
