@@ -8,7 +8,7 @@ import {
 import { createServiceSchema } from "../src/lib/validation/service";
 import { normalizeSearchText } from "../src/lib/services";
 
-test("Invariantes del seed de medios de pago: 4 medios iniciales y todos activos (HU-20)", () => {
+test("Invariantes del seed de medios de pago: 4 medios iniciales y solo tarjeta de crédito inactiva (HU-20)", () => {
   assert.equal(
     PAYMENT_METHODS.length,
     4,
@@ -26,8 +26,8 @@ test("Invariantes del seed de medios de pago: 4 medios iniciales y todos activos
   for (const method of PAYMENT_METHODS) {
     assert.equal(
       method.active,
-      true,
-      `El medio de pago "${method.name}" debe sembrarse como activo`,
+      method.name !== "Tarjeta de crédito",
+      `El medio de pago "${method.name}" no tiene el estado esperado en el seed`,
     );
   }
 });
