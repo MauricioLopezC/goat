@@ -30,7 +30,7 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Atención registrada | `Encounter` | Lo efectivamente realizado en un turno. Base del historial. Inc. 3. |
 | Prescripción | `Prescription` | Inc. 3. |
 | Pago / cobro | `Payment` | Cobro de un turno de un paciente particular en el mostrador, con un solo medio de pago. Guarda lo que paga el paciente (`amount`) con el monto del momento, separado del valor de la prestación ([HU-21](hu/HU-21-cobrar-turno.md)). |
-| Cobros del día | `payments` | Pantalla de mesa de entradas con los turnos de hoy pendientes de cobro o de autorización y los ya resueltos (`/payments`, [HU-21](hu/HU-21-cobrar-turno.md)). No es un modelo: lee `Appointment` y `Payment`. |
+| Turnos de hoy | `today` | Pantalla de mesa de entradas con todos los turnos de hoy por horario, su estado de cobro o autorización y la acción de cobrar o autorizar en la fila (`/today`, [HU-21](hu/HU-21-cobrar-turno.md)). No es un modelo: lee `Appointment` y `Payment`. |
 | Medio de pago | `PaymentMethod` | Efectivo, débito, crédito, transferencia. Lo configura el gerente ([HU-20](hu/HU-20-aranceles-y-medios-de-pago.md)). |
 | Usuario | `User` | Cuenta con la que se ingresa al sistema. Lleva el `Role`. |
 | Título profesional | `ProfessionalTitle` | Traumatólogo, kinesiólogo. Un `Professional` puede tener más de uno. No confundir con `Specialty` (área) ni con `Service` (prestación). |

@@ -29,7 +29,7 @@ function revalidateAppointment(appointmentId: number) {
   revalidatePath("/calendar");
   revalidatePath("/agenda");
   revalidatePath(`/appointments/${appointmentId}`);
-  revalidatePath("/payments");
+  revalidatePath("/today");
 }
 
 // Cerrar un turno cambia la lista de turnos sin cerrar y los indicadores

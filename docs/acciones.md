@@ -267,7 +267,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Precondiciones:** el turno existe y está en estado `SCHEDULED`. Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`).
 **Efectos:** transacción `Serializable` que actualiza `Appointment.status` a `CANCELLED` y crea un `AppointmentEvent` de tipo `CANCELLED` con `reason`, `requestedBy`, `userId` (actor) y `createdAt` (ahora). El horario queda libre de inmediato.
 **Errores:** `VALIDATION` (campo vacío o ID inválido), `FORBIDDEN` (rol no autorizado o profesional intentando cancelar un turno ajeno), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`), `REASON_REQUIRED` (falta el motivo de cancelación), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente; [HU-21](hu/HU-21-cobrar-turno.md)).
-**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`.
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`.
 **Devuelve:** `{ id }`.
 
 ### `completeAppointment`
@@ -278,7 +278,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya comenzó (`startsAt` no es posterior a ahora). Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`).
 **Efectos:** en una transacción, actualiza `Appointment.status` a `COMPLETED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya comenzado, y crea un `AppointmentEvent` de tipo `COMPLETED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Si otro usuario cambió el turno antes, la condición no coincide y se devuelve `INVALID_STATUS_TRANSITION` sin pisar su cambio. El horario sigue ocupado.
 **Errores:** `VALIDATION`, `FORBIDDEN` (rol no autorizado o profesional intentando completar un turno ajeno), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no comenzó).
-**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`, `/appointments/unclosed`, `/dashboard`.
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`, `/appointments/unclosed`, `/dashboard`.
 **Devuelve:** `{ id }`.
 
 ### `expireAppointment`
@@ -289,7 +289,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Precondiciones:** el turno existe, está en estado `SCHEDULED` y ya terminó (`endsAt` no es posterior a ahora). Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`). La restricción de exclusión no cubre `EXPIRED`: vencer un turno futuro liberaría su horario, por eso la DAL lo impide.
 **Efectos:** en una transacción, actualiza `Appointment.status` a `EXPIRED` con un `UPDATE` condicionado a que siga `SCHEDULED` y ya haya terminado, y crea un `AppointmentEvent` de tipo `EXPIRED` con `reason` (si vino), `userId` (actor) y `createdAt` (ahora). Igual que al completar, un cambio concurrente no se pisa.
 **Errores:** `VALIDATION`, `FORBIDDEN` (rol no autorizado o profesional intentando vencer un turno ajeno), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o todavía no terminó), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente: si se cobró, el paciente vino; [HU-21](hu/HU-21-cobrar-turno.md)).
-**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`, `/appointments/unclosed`, `/dashboard`.
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`, `/appointments/unclosed`, `/dashboard`.
 **Devuelve:** `{ id }`.
 
 ### `listUnclosedAppointments`
@@ -848,7 +848,7 @@ No es una Server Action: la usa el formulario de cobro de HU-21 (ADR 0001).
 **Precondiciones:** el turno existe y está habilitado para cobrar: `SCHEDULED` con inicio hoy (hora de Argentina) o `COMPLETED`. El paciente es particular (`coverageType` `PRIVATE`). El servicio tiene `price` cargado. El medio de pago existe y está activo. El turno no tiene otro `Payment` en `PAID`.
 **Efectos:** en una transacción `Serializable`, crea un `Payment` en `PAID` con `amount` igual a `Service.price` en ese momento, `createdById` (actor) y `createdAt` (ahora). El monto no cambia si después cambia el valor del servicio. Si dos cobros llegan a la vez, el índice único parcial `Payment_one_paid_per_appointment` deja pasar uno solo.
 **Errores:** `VALIDATION` (entrada inválida, o medio de pago inexistente o inactivo, con `fieldErrors.paymentMethodId`), `FORBIDDEN`, `NOT_FOUND` (el turno no existe), `INVALID_STATUS_TRANSITION` (el turno no está habilitado para cobrar), `PATIENT_HAS_HEALTH_INSURANCE`, `SERVICE_WITHOUT_PRICE`, `APPOINTMENT_ALREADY_PAID`.
-**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`.
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`.
 **Devuelve:** `{ id, amount }`, con `amount` como texto decimal (`"15000.00"`).
 
 ### `voidPayment`
@@ -859,7 +859,7 @@ No es una Server Action: la usa el formulario de cobro de HU-21 (ADR 0001).
 **Precondiciones:** el cobro existe y está en `PAID`.
 **Efectos:** pasa el `Payment` a `VOIDED` y carga juntos `voidedAt` (ahora), `voidedById` (actor) y `voidReason`, con un `UPDATE` condicionado a que siga en `PAID`: dos anulaciones simultáneas no se pisan. El cobro no se borra. El turno queda pendiente de cobro y se puede volver a cobrar.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `REASON_REQUIRED` (falta el motivo), `INVALID_STATUS_TRANSITION` (el cobro ya estaba anulado).
-**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`.
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`.
 **Devuelve:** `{ id, appointmentId }`.
 
 ### `registerAuthorization`
@@ -870,7 +870,7 @@ No es una Server Action: la usa el formulario de cobro de HU-21 (ADR 0001).
 **Precondiciones:** el turno existe y está habilitado (`SCHEDULED` con inicio hoy o `COMPLETED`). El paciente tiene obra social y el servicio requiere orden.
 **Efectos:** en una transacción, carga juntos `authorizationNumber`, `authorizedAt` (ahora) y `authorizedById` (actor). Si el turno ya tenía una autorización con otro número, la corrige y crea un `AppointmentEvent` `UPDATED` con el número anterior en `reason`, para que quede en el historial del turno.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está habilitado), `AUTHORIZATION_NOT_REQUIRED` (paciente particular o servicio sin orden).
-**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`.
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`.
 **Devuelve:** `{ id, authorizationNumber }`.
 
 ### `getAppointmentBilling`
@@ -899,7 +899,7 @@ No es una Server Action: la llama el detalle del turno (ADR 0001).
 
 No es una Server Action: la usa el calendario del centro para la marca de cada turno (ADR 0001).
 
-### `listTodayBilling`
+### `listTodayAppointments`
 
 **Historia de usuario:** [HU-21 — Cobrar un turno en el mostrador](hu/HU-21-cobrar-turno.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`.
@@ -908,9 +908,9 @@ No es una Server Action: la usa el calendario del centro para la marca de cada t
 **Efectos:** ninguno.
 **Errores:** `FORBIDDEN`.
 **Revalida:** no aplica; lectura desde Server Component.
-**Devuelve:** los turnos `SCHEDULED` o `COMPLETED` que empiezan hoy y en los que el estado de cobro aplica, ordenados por horario. Cada uno con `id`, `status`, `startsAt`, `endsAt`, paciente (nombre y documento), profesional, servicio, `price` como texto decimal o `null`, `state`, `authorizationNumber` y `activePayment` (monto y medio) si lo tiene.
+**Devuelve:** los turnos `SCHEDULED` o `COMPLETED` que empiezan hoy, ordenados por horario. Cada uno con `id`, `status`, `startsAt`, `endsAt`, paciente (nombre y documento), profesional, servicio, `price` como texto decimal o `null`, `state` (`null` si el cobro y la autorización no aplican), `authorizationNumber` y `activePayment` (monto y medio) si lo tiene.
 
-No es una Server Action: la usa la pantalla *Cobros del día* (ADR 0001).
+No es una Server Action: la usa la pantalla *Turnos de hoy* (ADR 0001).
 
 ### `getCenterIndicators`
 
