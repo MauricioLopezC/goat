@@ -106,18 +106,20 @@ export function DayView({
         </Empty>
       )}
       {day.professionals.length > 0 && (
-        <div className="bg-card overflow-x-auto rounded-lg border p-4">
+        // El contenedor scrollea en los dos ejes para que el encabezado y la
+        // columna de horas queden fijos (sticky) con muchos profesionales.
+        <div className="bg-card max-h-[calc(100svh-6rem)] overflow-auto rounded-lg border">
           <div
-            className="grid gap-x-2"
+            className="grid gap-x-2 px-4 pb-4"
             style={{
               gridTemplateColumns: `3.5rem repeat(${day.professionals.length}, minmax(11rem, 1fr))`,
             }}
           >
-            <div />
+            <div className="bg-card sticky top-0 left-0 z-40 -mr-2" />
             {day.professionals.map((item) => (
               <div
                 key={item.professional.id}
-                className="flex flex-col gap-0.5 pb-2"
+                className="bg-card sticky top-0 z-30 flex flex-col gap-0.5 pt-4 pb-2"
               >
                 <p className="text-label-md truncate uppercase">
                   {item.professional.lastName}, {item.professional.firstName}
@@ -147,11 +149,14 @@ export function DayView({
               </div>
             ))}
 
-            <div className="relative" style={{ height }}>
+            <div
+              className="bg-card sticky left-0 z-30 -mr-2"
+              style={{ height }}
+            >
               {hours.map((hour) => (
                 <span
                   key={hour}
-                  className="text-label-sm text-muted-foreground absolute right-1.5 tabular-nums"
+                  className="text-label-sm text-muted-foreground absolute right-3.5 tabular-nums"
                   style={{ top: offset(hour * 60) }}
                 >
                   {formatMinute(hour * 60)}
