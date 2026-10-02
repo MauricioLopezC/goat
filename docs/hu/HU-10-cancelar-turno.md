@@ -6,7 +6,7 @@
 
 ## Datos
 
-- **Obligatorios:** observación en texto libre con el motivo de la cancelación y quién la solicitó.
+- **Obligatorios:** observación en texto libre con el motivo de la cancelación, y quién la solicitó (el paciente, el profesional, el centro), elegido de una lista.
 - **Registrados por el sistema:** usuario que cancela, fecha y hora.
 
 ## Validaciones

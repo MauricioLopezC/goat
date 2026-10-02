@@ -16,9 +16,13 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import type { ActionResult } from "@/lib/actions";
+import { REQUESTED_BY_OPTIONS } from "@/lib/appointment-requested-by";
 
 // Diálogo de confirmación para cancelar un turno (HU-10).
 // Solo se muestra cuando el turno está SCHEDULED y el actor es RECEPTIONIST, MANAGER o PROFESSIONAL.
@@ -81,14 +85,23 @@ export function CancelAppointmentDialog({
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="requestedBy">Quién solicitó la cancelación *</Label>
-            <Input
+            <NativeSelect
               id="requestedBy"
               name="requestedBy"
               required
-              maxLength={100}
-              placeholder="Ej.: el paciente, el profesional, el centro"
+              defaultValue=""
               disabled={pending}
-            />
+              className="w-full"
+            >
+              <NativeSelectOption value="">
+                Seleccioná quién solicitó la cancelación…
+              </NativeSelectOption>
+              {REQUESTED_BY_OPTIONS.map((option) => (
+                <NativeSelectOption key={option} value={option}>
+                  {option}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
           </div>
           {state?.ok === false && (
             <Alert
