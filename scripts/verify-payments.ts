@@ -7,7 +7,7 @@ import { DomainError } from "../src/lib/actions";
 import {
   getAppointmentBilling,
   getPaymentStates,
-  listTodayBilling,
+  listTodayAppointments,
   registerAuthorization,
   registerPayment,
   voidPayment,
@@ -486,7 +486,7 @@ async function main() {
     );
 
     await verify(
-      "cobros del día: solo turnos de hoy donde el cobro aplica",
+      "turnos de hoy: todos los de hoy, con el estado de cobro si aplica",
       async () => {
         const pendingId = await appointment({});
         const paidId = await appointment({});
@@ -498,14 +498,14 @@ async function main() {
         const insuredNoReferral = await appointment({
           patientId: insuredPatient,
         });
-        const rows = await listTodayBilling(receptionist);
+        const rows = await listTodayAppointments(receptionist);
         const byId = new Map(rows.map((row) => [row.id, row]));
         assert.equal(byId.get(pendingId)?.state, "PENDING_PAYMENT");
         assert.equal(byId.get(pendingId)?.price, "15000.00");
         assert.equal(byId.get(paidId)?.state, "PAID");
         assert.equal(byId.get(paidId)?.activePayment?.amount, "15000.00");
         assert.equal(byId.has(tomorrowId), false);
-        assert.equal(byId.has(insuredNoReferral), false);
+        assert.equal(byId.get(insuredNoReferral)?.state, null);
       },
     );
 
@@ -539,7 +539,10 @@ async function main() {
         () => getPaymentStates([id], professionalActor),
         "FORBIDDEN",
       );
-      await rejects(() => listTodayBilling(professionalActor), "FORBIDDEN");
+      await rejects(
+        () => listTodayAppointments(professionalActor),
+        "FORBIDDEN",
+      );
     });
 
     console.log(`\n${passed} verificaciones de HU-21 pasaron.`);

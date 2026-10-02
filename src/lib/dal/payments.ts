@@ -162,9 +162,10 @@ export async function getPaymentStates(
   return states;
 }
 
-/// Turnos de hoy (Programados y Completados) en los que aplica el cobro o la
-/// autorización, para la pantalla Cobros del día.
-export async function listTodayBilling(actor: Actor, now = new Date()) {
+/// Turnos de hoy (Programados y Completados) con su estado de cobro o
+/// autorización, para la pantalla Turnos de hoy. `state` es `null` cuando no
+/// aplica (obra social y servicio sin orden).
+export async function listTodayAppointments(actor: Actor, now = new Date()) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
   const today = toLocalSlot(now).date;
   const appointments = await prisma.appointment.findMany({
@@ -201,28 +202,24 @@ export async function listTodayBilling(actor: Actor, now = new Date()) {
     },
     orderBy: [{ startsAt: "asc" }, { id: "asc" }],
   });
-  return appointments.flatMap(({ payments, service, ...appointment }) => {
+  return appointments.map(({ payments, service, ...appointment }) => {
     const [activePayment] = payments;
-    const state = paymentState({
-      coverageType: appointment.patient.coverageType,
-      requiresReferral: service.requiresReferral,
-      hasActivePayment: activePayment !== undefined,
-      authorizationNumber: appointment.authorizationNumber,
-    });
-    if (!state) return [];
-    return [
-      {
-        ...appointment,
-        state,
-        service: { name: service.name },
-        // Decimal no cruza a componentes cliente: va como texto ("15000.00").
-        price: service.price?.toFixed(2) ?? null,
-        activePayment: activePayment && {
-          amount: activePayment.amount.toFixed(2),
-          paymentMethod: activePayment.paymentMethod.name,
-        },
+    return {
+      ...appointment,
+      state: paymentState({
+        coverageType: appointment.patient.coverageType,
+        requiresReferral: service.requiresReferral,
+        hasActivePayment: activePayment !== undefined,
+        authorizationNumber: appointment.authorizationNumber,
+      }),
+      service: { name: service.name },
+      // Decimal no cruza a componentes cliente: va como texto ("15000.00").
+      price: service.price?.toFixed(2) ?? null,
+      activePayment: activePayment && {
+        amount: activePayment.amount.toFixed(2),
+        paymentMethod: activePayment.paymentMethod.name,
       },
-    ];
+    };
   });
 }
 
