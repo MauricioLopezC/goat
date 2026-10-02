@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ActionErrorAlert } from "@/components/action-error-alert";
 import type { ActionResult } from "@/lib/actions";
+import { REQUESTED_BY_OPTIONS } from "@/lib/appointment-requested-by";
 import type { AvailableSlot } from "@/lib/appointment-slots";
 import {
   dateToDb,
@@ -56,12 +57,6 @@ type ServiceInfo = {
   id: number;
   name: string;
 };
-
-const REQUESTED_BY_OPTIONS = [
-  "El paciente",
-  "El profesional",
-  "El centro",
-] as const;
 
 export function RescheduleForm({
   appointmentId,
