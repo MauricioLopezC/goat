@@ -19,6 +19,7 @@ import {
 } from "@/lib/schedule";
 import {
   APPOINTMENT_EVENT_LABEL,
+  APPOINTMENT_PRIORITY_LABEL,
   APPOINTMENT_STATUS_BADGE_CLASS,
   APPOINTMENT_STATUS_LABEL,
 } from "@/lib/appointment-status";
@@ -32,6 +33,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CancelAppointmentDialog } from "./cancel-dialog";
+import { PriorityChangeDialog } from "./priority-dialog";
 import { StatusChangeDialog, type StatusChangeTarget } from "./status-dialog";
 import { PaymentDialog } from "./payment-dialog";
 import { VoidPaymentDialog } from "./void-payment-dialog";
@@ -53,6 +55,7 @@ export default async function AppointmentPage({
     cancelled,
     changed,
     rescheduled,
+    priorityChanged,
     billing: billingNotice,
   } = query;
   let appointment;
@@ -86,6 +89,7 @@ export default async function AppointmentPage({
   const canComplete = scheduled && appointment.startsAt <= now;
   const canExpire = scheduled && !paid && appointment.endsAt <= now;
   const canCancel = scheduled && !paid;
+  const canChangePriority = !own && scheduled;
 
   const summary = `${appointment.patient.lastName}, ${appointment.patient.firstName} · ${appointment.professional.lastName}, ${appointment.professional.firstName} · ${appointment.service.name} · ${formatDate(start.date)}, ${formatMinute(start.minute)}–${formatMinute(end.minute)}`;
   // Se vuelve al mismo calendario (vista, fecha y filtros) desde el que se
@@ -180,15 +184,35 @@ export default async function AppointmentPage({
           </AlertDescription>
         </Alert>
       )}
+      {priorityChanged && !own && (
+        <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
+          <AlertTitle>Prioridad actualizada</AlertTitle>
+          <AlertDescription className="text-success-soft-foreground">
+            El turno ahora tiene prioridad{" "}
+            {APPOINTMENT_PRIORITY_LABEL[
+              priorityChanged as keyof typeof APPOINTMENT_PRIORITY_LABEL
+            ]?.toLowerCase() ?? priorityChanged}
+            .
+          </AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardHeader>
-          <CardTitle>
+          <CardTitle className="flex flex-wrap items-center gap-2">
             <Badge
               variant="outline"
               className={APPOINTMENT_STATUS_BADGE_CLASS[appointment.status]}
             >
               {APPOINTMENT_STATUS_LABEL[appointment.status]}
             </Badge>
+            {appointment.priority === "URGENT" && (
+              <Badge
+                variant="outline"
+                className="border-destructive-soft-border bg-destructive-soft text-destructive-soft-foreground"
+              >
+                Urgente
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -240,6 +264,29 @@ export default async function AppointmentPage({
                 {formatInstant(appointment.createdAt)}
               </dd>
             </div>
+            <div>
+              <dt className="text-muted-foreground">Prioridad</dt>
+              <dd className="flex items-center gap-2">
+                <span>{APPOINTMENT_PRIORITY_LABEL[appointment.priority]}</span>
+                {appointment.priority === "URGENT" && (
+                  <Badge
+                    variant="outline"
+                    className="border-destructive-soft-border bg-destructive-soft text-destructive-soft-foreground"
+                  >
+                    Urgente
+                  </Badge>
+                )}
+              </dd>
+            </div>
+            {appointment.priority === "URGENT" &&
+              appointment.priorityReason && (
+                <div>
+                  <dt className="text-muted-foreground">Motivo de urgencia</dt>
+                  <dd className="whitespace-pre-wrap break-words font-medium text-destructive-soft-foreground">
+                    {appointment.priorityReason}
+                  </dd>
+                </div>
+              )}
             {appointment.notes && (
               <div>
                 <dt className="text-muted-foreground">Observación</dt>
@@ -445,6 +492,15 @@ export default async function AppointmentPage({
                         </p>
                       </div>
                     )}
+                  {event.type === "PRIORITY_CHANGED" &&
+                    event.previousPriority &&
+                    event.newPriority && (
+                      <p className="text-muted-foreground">
+                        Prioridad:{" "}
+                        {APPOINTMENT_PRIORITY_LABEL[event.previousPriority]} →{" "}
+                        {APPOINTMENT_PRIORITY_LABEL[event.newPriority]}
+                      </p>
+                    )}
                   {event.reason && (
                     <p className="text-muted-foreground">
                       Motivo: {event.reason}
@@ -487,6 +543,14 @@ export default async function AppointmentPage({
           <Button asChild>
             <Link href="/appointments/new">Dar otro turno</Link>
           </Button>
+        )}
+        {canChangePriority && (
+          <PriorityChangeDialog
+            appointmentId={appointment.id}
+            currentPriority={appointment.priority}
+            summary={summary}
+            returnSearch={returnSearch}
+          />
         )}
         {canReschedule && (
           <Button asChild variant="outline">
