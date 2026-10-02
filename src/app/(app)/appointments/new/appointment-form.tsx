@@ -14,6 +14,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { ActionErrorAlert } from "@/components/action-error-alert";
 import type { ActionResult } from "@/lib/actions";
@@ -40,11 +41,19 @@ export function AppointmentForm({
   const router = useRouter();
   const [startTime, setStartTime] = useState(initialStartTime ?? "");
   const [notes, setNotes] = useState("");
+  const [priority, setPriority] = useState<"NORMAL" | "URGENT">("NORMAL");
+  const [priorityReason, setPriorityReason] = useState("");
   const [state, action, pending] = useActionState<
     ActionResult<{ id: number }> | null,
     FormData
   >(async () => {
-    const result = await createAppointment({ ...input, startTime, notes });
+    const result = await createAppointment({
+      ...input,
+      startTime,
+      notes,
+      priority,
+      priorityReason: priority === "URGENT" ? priorityReason : undefined,
+    });
     if (result.ok) router.push(`/appointments/${result.data.id}?created=1`);
     else {
       setStartTime("");
@@ -93,6 +102,53 @@ export function AppointmentForm({
           </RadioGroup>
         </FieldSet>
       )}
+
+      <FieldSet disabled={pending}>
+        <FieldLegend>Prioridad</FieldLegend>
+        <RadioGroup
+          aria-label="Prioridad del turno"
+          value={priority}
+          onValueChange={(val) => setPriority(val as "NORMAL" | "URGENT")}
+          className="grid grid-cols-2 gap-3 sm:max-w-md"
+        >
+          <Field orientation="horizontal" className="rounded-lg border p-3">
+            <RadioGroupItem id="priority-normal" value="NORMAL" />
+            <FieldLabel htmlFor="priority-normal">Normal</FieldLabel>
+          </Field>
+          <Field orientation="horizontal" className="rounded-lg border p-3">
+            <RadioGroupItem id="priority-urgent" value="URGENT" />
+            <FieldLabel
+              htmlFor="priority-urgent"
+              className="font-medium text-destructive"
+            >
+              Urgente
+            </FieldLabel>
+          </Field>
+        </RadioGroup>
+      </FieldSet>
+
+      {priority === "URGENT" && (
+        <FieldGroup>
+          <Field data-invalid={Boolean(error?.fieldErrors?.priorityReason)}>
+            <FieldLabel htmlFor="appointment-priority-reason">
+              Motivo de la urgencia (obligatorio)
+            </FieldLabel>
+            <Textarea
+              id="appointment-priority-reason"
+              maxLength={500}
+              value={priorityReason}
+              onChange={(event) => setPriorityReason(event.target.value)}
+              disabled={pending}
+              placeholder="Indicá el motivo por el cual el turno no puede esperar..."
+              aria-invalid={Boolean(error?.fieldErrors?.priorityReason)}
+            />
+            <FieldError>
+              {error?.fieldErrors?.priorityReason?.join(" ")}
+            </FieldError>
+          </Field>
+        </FieldGroup>
+      )}
+
       <FieldGroup>
         <Field data-invalid={Boolean(error?.fieldErrors?.notes)}>
           <FieldLabel htmlFor="appointment-notes">
@@ -109,12 +165,29 @@ export function AppointmentForm({
           <FieldError>{error?.fieldErrors?.notes?.join(" ")}</FieldError>
         </Field>
       </FieldGroup>
+
       {chosenSlot && (
-        <Alert>
+        <Alert
+          className={
+            priority === "URGENT"
+              ? "border-destructive-soft-border bg-destructive-soft text-destructive-soft-foreground"
+              : undefined
+          }
+        >
           <AlertDescription>
-            <p>
-              <strong>{patientName}</strong> · {serviceName} ·{" "}
-              {professionalName}
+            <p className="flex items-center gap-2">
+              <span>
+                <strong>{patientName}</strong> · {serviceName} ·{" "}
+                {professionalName}
+              </span>
+              {priority === "URGENT" && (
+                <Badge
+                  variant="outline"
+                  className="border-destructive-soft-border bg-destructive-soft text-destructive-soft-foreground"
+                >
+                  Urgente
+                </Badge>
+              )}
             </p>
             <p>
               {formatDate(input.date)}, de {chosenSlot.startTime} a{" "}

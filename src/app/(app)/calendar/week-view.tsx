@@ -219,6 +219,11 @@ export function WeekView({
                                 toLocalSlot(appointment.startsAt).minute,
                               )}
                             </span>{" "}
+                            {appointment.priority === "URGENT" && (
+                              <span className="mr-1 inline-block rounded-xs border border-destructive-soft-border bg-destructive-soft px-1 py-0.2 text-[10px] font-semibold uppercase tracking-wider text-destructive-soft-foreground">
+                                Urgente
+                              </span>
+                            )}
                             {appointment.patient.lastName}
                             {paymentStates[appointment.id] && (
                               <PaymentStateIcon

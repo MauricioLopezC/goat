@@ -173,11 +173,11 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 ### `createAppointment`
 
-**Historia de usuario:** [HU-09 — Asignar un turno](hu/HU-09-asignar-turno.md)
+**Historia de usuario:** [HU-09 — Asignar un turno](hu/HU-09-asignar-turno.md), [HU-19 — Dar un turno prioritario](hu/HU-19-turno-prioritario.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`.
-**Entrada:** `patientId`, `professionalId`, `serviceId` (enteros positivos), `date` (AAAA-MM-DD), `startTime` (HH:MM), `notes` (hasta 500 caracteres, opcional).
-**Precondiciones:** paciente, servicio y profesional activos; profesional asociado al servicio. Fecha desde hoy hasta dos meses inclusive y hora futura. El bloque calculado entra en una franja habilitada, sin feriados ni ausencias. No se superpone con turnos Programados o Completados del profesional ni del paciente.
-**Efectos:** transacción Serializable que relee todas las reglas y crea un `Appointment` Programado con autor y fecha. Restricciones de exclusión de PostgreSQL respaldan los dos solapamientos. Se reintenta ante conflictos de serialización; nunca se envía un aviso antes de confirmar la transacción.
+**Entrada:** `patientId`, `professionalId`, `serviceId` (enteros positivos), `date` (AAAA-MM-DD), `startTime` (HH:MM), `notes` (hasta 500 caracteres, opcional), `priority` (`"NORMAL" | "URGENT"`, opcional, por defecto `"NORMAL"`), `priorityReason` (hasta 500 caracteres, obligatorio si `priority === "URGENT"`).
+**Precondiciones:** paciente, servicio y profesional activos; profesional asociado al servicio. Fecha desde hoy hasta dos meses inclusive y hora futura. El bloque calculado entra en una franja habilitada, sin feriados ni ausencias. No se superpone con turnos Programados o Completados del profesional ni del paciente. Si la prioridad es `URGENT`, debe indicarse el motivo de la urgencia.
+**Efectos:** transacción Serializable que relee todas las reglas y crea un `Appointment` Programado con autor, fecha, prioridad y motivo de urgencia (si aplica). Restricciones de exclusión y de validación de PostgreSQL (`Appointment_urgent_has_reason`) respaldan la integridad concurrente. Se reintenta ante conflictos de serialización; nunca se envía un aviso antes de confirmar la transacción.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `OUTSIDE_AVAILABILITY_WINDOW`, `APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`. Un conflicto refresca la grilla en el cliente.
 **Revalida:** `/calendar`, `/agenda`, `/appointments/new`, ficha del profesional.
 **Devuelve:** `{ id }` para consultar el resumen autorizado.
@@ -214,6 +214,17 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Errores:** `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`.
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** `{ startTime, endTime }[]` en hora del centro.
+
+### `listEarliestSlots`
+
+**Historia de usuario:** [HU-19 — Dar un turno prioritario](hu/HU-19-turno-prioritario.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `serviceId` (entero positivo), `patientId` (entero positivo), `limit?` (entero de 1 a 20, por defecto 5).
+**Precondiciones:** paciente y servicio activos; existan profesionales activos asociados al servicio con franjas habilitadas.
+**Efectos:** ninguno. Calcula en lectura consistente los primeros horarios libres a partir de hoy (en hora de Argentina) entre todos los profesionales habilitados que prestan el servicio. Descarta horarios pasados, feriados, ausencias de cada profesional y solapamientos con turnos existentes tanto del profesional como del paciente. Devuelve hasta el límite solicitado en estricto orden cronológico.
+**Errores:** `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ date, startTime, endTime, professional: { id, firstName, lastName } }[]` ordenado por fecha y hora ascendente.
 
 ### `listAppointments`
 
@@ -317,6 +328,17 @@ No es una Server Action: la usa el calendario para mostrar el acceso a la lista 
 **Errores:** `VALIDATION` (datos inválidos o fecha/hora/profesional idéntico al actual), `FORBIDDEN` (rol no autorizado o profesional intentando reprogramar un turno ajeno), `NOT_FOUND` (turno o profesional no encontrado), `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o ya comenzó), `REASON_REQUIRED` (motivo vacío), `OUTSIDE_AVAILABILITY_WINDOW`, `APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`.
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
 **Devuelve:** `{ id }`.
+
+### `updateAppointmentPriority`
+
+**Historia de usuario:** [HU-19 — Dar un turno prioritario](hu/HU-19-turno-prioritario.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `appointmentId` (entero positivo), `priority` (`"NORMAL" | "URGENT"`), `reason` (hasta 500 caracteres, opcional; obligatorio si `priority === "URGENT"`).
+**Precondiciones:** el turno existe y está en estado `SCHEDULED`. La nueva prioridad debe diferir de la actual (`previousPriority <> newPriority`). Si la nueva prioridad es `URGENT`, debe indicarse el motivo de la urgencia.
+**Efectos:** transacción que actualiza `priority` y `priorityReason` en `Appointment` (si vuelve a `NORMAL`, `priorityReason` se limpia a `null`) y crea un `AppointmentEvent` de tipo `PRIORITY_CHANGED` con `previousPriority`, `newPriority`, `reason`, `userId` (actor) y `createdAt` (ahora). Respaldado por la restricción `AppointmentEvent_priority_fields` de PostgreSQL.
+**Errores:** `VALIDATION` (datos inválidos, falta de motivo en urgencia o misma prioridad que la actual), `FORBIDDEN`, `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/payments`.
+**Devuelve:** `{ appointmentId, priority }`.
 
 ## Catálogo
 

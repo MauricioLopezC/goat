@@ -285,7 +285,7 @@ export function DayView({
                       <Link
                         key={appointment.id}
                         href={`/appointments/${appointment.id}?${detailSearch}`}
-                        title={`${formatMinute(start.minute)} · ${patient} · ${appointment.service.name} · ${APPOINTMENT_STATUS_LABEL[appointment.status]}${paymentState ? ` · ${PAYMENT_STATE_LABEL[paymentState]}` : ""}`}
+                        title={`${formatMinute(start.minute)} · ${patient} · ${appointment.service.name} · ${APPOINTMENT_STATUS_LABEL[appointment.status]}${appointment.priority === "URGENT" ? " · Urgente" : ""}${paymentState ? ` · ${PAYMENT_STATE_LABEL[paymentState]}` : ""}`}
                         className={cn(
                           "focus-visible:ring-ring absolute z-10 flex flex-col overflow-hidden rounded-sm border border-l-4 px-1.5 py-0.5 text-xs shadow-sm outline-none hover:shadow-md focus-visible:ring-2",
                           APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
@@ -308,6 +308,11 @@ export function DayView({
                           <span className="font-semibold tabular-nums">
                             {formatMinute(start.minute)}
                           </span>{" "}
+                          {appointment.priority === "URGENT" && (
+                            <span className="mr-1 inline-block rounded-xs border border-destructive-soft-border bg-destructive-soft px-1 py-0.2 text-[10px] font-semibold uppercase tracking-wider text-destructive-soft-foreground">
+                              Urgente
+                            </span>
+                          )}
                           <span
                             className={cn(
                               "font-medium",

@@ -17,12 +17,50 @@ export const availableSlotsSchema = z.object({
   date: appointmentDateSchema,
   excludeAppointmentId: z.number().int().positive().optional(),
 });
-export const createAppointmentSchema = availableSlotsSchema.extend({
-  startTime: z.string().regex(TIME_PATTERN, "Elegí un horario disponible."),
-  notes: z.string().trim().max(500).default(""),
-});
+export const createAppointmentSchema = availableSlotsSchema
+  .extend({
+    startTime: z.string().regex(TIME_PATTERN, "Elegí un horario disponible."),
+    notes: z.string().trim().max(500).default(""),
+    priority: z.enum(["NORMAL", "URGENT"]).default("NORMAL"),
+    priorityReason: z.string().trim().max(500).optional(),
+  })
+  .refine(
+    (data) =>
+      data.priority !== "URGENT" ||
+      Boolean(data.priorityReason && data.priorityReason.length > 0),
+    {
+      message: "Indicá el motivo de la urgencia.",
+      path: ["priorityReason"],
+    },
+  );
 export type AvailableSlotsInput = z.infer<typeof availableSlotsSchema>;
-export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
+export type CreateAppointmentInput = z.input<typeof createAppointmentSchema>;
+
+export const updateAppointmentPrioritySchema = z
+  .object({
+    appointmentId: z.number().int().positive(),
+    priority: z.enum(["NORMAL", "URGENT"]),
+    reason: z.string().trim().max(500).optional(),
+  })
+  .refine(
+    (data) =>
+      data.priority !== "URGENT" ||
+      Boolean(data.reason && data.reason.length > 0),
+    {
+      message: "Indicá el motivo de la urgencia.",
+      path: ["reason"],
+    },
+  );
+export type UpdateAppointmentPriorityInput = z.infer<
+  typeof updateAppointmentPrioritySchema
+>;
+
+export const earliestSlotsSchema = z.object({
+  serviceId: z.number().int().positive(),
+  patientId: z.number().int().positive(),
+  limit: z.number().int().min(1).max(20).default(5),
+});
+export type EarliestSlotsInput = z.infer<typeof earliestSlotsSchema>;
 
 export const cancelAppointmentSchema = z.object({
   appointmentId: z.number().int().positive(),

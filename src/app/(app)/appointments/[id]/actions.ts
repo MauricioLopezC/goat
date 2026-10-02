@@ -6,6 +6,7 @@ import {
   completeAppointment as completeInDal,
   expireAppointment as expireInDal,
   rescheduleAppointment as rescheduleInDal,
+  updateAppointmentPriority as updatePriorityInDal,
 } from "@/lib/dal/appointments";
 import {
   registerAuthorization as registerAuthorizationInDal,
@@ -16,6 +17,7 @@ import {
   appointmentStatusChangeSchema,
   cancelAppointmentSchema,
   rescheduleAppointmentSchema,
+  updateAppointmentPrioritySchema,
 } from "@/lib/validation/appointments";
 import {
   registerAuthorizationSchema,
@@ -103,6 +105,16 @@ export const registerAuthorization = defineAction({
   input: registerAuthorizationSchema,
   handler: async (input, actor) => {
     const result = await registerAuthorizationInDal(input, actor);
+    revalidateAppointment(input.appointmentId);
+    return result;
+  },
+});
+
+export const updateAppointmentPriority = defineAction({
+  roles: ["RECEPTIONIST", "MANAGER"],
+  input: updateAppointmentPrioritySchema,
+  handler: async (input, actor) => {
+    const result = await updatePriorityInDal(input, actor);
     revalidateAppointment(input.appointmentId);
     return result;
   },
