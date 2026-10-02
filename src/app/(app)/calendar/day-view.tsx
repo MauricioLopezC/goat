@@ -17,6 +17,7 @@ import { PaymentStateIcon } from "@/components/payment-state-icon";
 import { formatMinute, toLocalSlot } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { hourRange, type CalendarDay } from "./calendar-model";
+import { NowLine } from "./now-line";
 
 // Vista día del calendario del centro (HU-11): una columna por profesional.
 
@@ -158,7 +159,7 @@ export function DayView({
               ))}
             </div>
 
-            {day.professionals.map((item) => {
+            {day.professionals.map((item, column) => {
               const hasSideLane = item.appointments.some(
                 (appointment) => !occupiesSlot(appointment.status),
               );
@@ -265,6 +266,13 @@ export function DayView({
                       </Link>
                     );
                   })}
+                  <NowLine
+                    date={query.date}
+                    firstHour={firstHour}
+                    lastHour={lastHour}
+                    hourHeight={HOUR_HEIGHT}
+                    withDot={column === 0}
+                  />
                   {item.appointments.map((appointment) => {
                     const start = toLocalSlot(appointment.startsAt);
                     const end = toLocalSlot(appointment.endsAt);
