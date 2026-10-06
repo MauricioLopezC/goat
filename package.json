@@ -24,7 +24,8 @@
     "test:patient-history:db": "node --env-file=.env --import ./scripts/server-only-test-loader.mjs --import tsx scripts/verify-patient-history.ts",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run db:validate && npm test",
     "db:validate": "prisma validate",
-    "test:payments:db": "node --env-file=.env --import ./scripts/server-only-test-loader.mjs --import tsx scripts/verify-payments.ts"
+    "test:payments:db": "node --env-file=.env --import ./scripts/server-only-test-loader.mjs --import tsx scripts/verify-payments.ts",
+    "test:schema:db": "tsx scripts/verify-schema-increment-3.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

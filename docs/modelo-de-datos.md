@@ -1,6 +1,6 @@
 # Modelo de datos (DER)
 
-Diagrama entidad-relación del schema vigente (Incrementos 1 y 2). La fuente de verdad es [`prisma/schema.prisma`](../prisma/schema.prisma) y la migración a mano de `prisma/migrations/`: este documento es un mapa para entenderlas, no las reemplaza. Si discrepan, gana el schema y se corrige este documento.
+Diagrama entidad-relación del schema vigente (Incrementos 1 a 3). La fuente de verdad es [`prisma/schema.prisma`](../prisma/schema.prisma) y la migración a mano de `prisma/migrations/`: este documento es un mapa para entenderlas, no las reemplaza. Si discrepan, gana el schema y se corrige este documento.
 
 Los nombres son los de [`glossary.md`](glossary.md). El diagrama muestra claves y los campos que definen a cada entidad; la lista completa de campos está en el schema.
 
@@ -9,6 +9,11 @@ Los nombres son los de [`glossary.md`](glossary.md). El diagrama muestra claves 
 ```mermaid
 erDiagram
     User |o--o| Professional : "cuenta de acceso"
+    User |o--o| Patient : "acceso al portal"
+    User ||--o{ CashClosing : "cierra"
+    Professional ||--o{ Encounter : "es autor"
+    Appointment ||--o| Encounter : "registra atención"
+    CashClosing |o--o{ Payment : "incluye al cerrar"
     User ||--o{ Appointment : "crea"
     User ||--o{ AppointmentEvent : "registra"
     User ||--o{ ProfessionalEvent : "registra"
@@ -42,6 +47,7 @@ erDiagram
         int id PK
         string email UK "identificador de ingreso"
         string passwordHash "argon2id"
+        boolean mustChangePassword "credencial temporal"
         Role role
         boolean active
     }
@@ -102,7 +108,8 @@ erDiagram
     AvailabilityException {
         int id PK
         int professionalId FK
-        date date
+        date startDate "inclusive"
+        date endDate "inclusive"
         int startMinute "nulo = día entero"
         int endMinute
         string reason
@@ -110,7 +117,10 @@ erDiagram
 
     Holiday {
         int id PK
-        date date UK
+        date startDate "inclusive"
+        date endDate "inclusive"
+        int startMinute "nulo = días completos"
+        int endMinute
         string description
         int createdById FK
         timestamptz createdAt
@@ -118,6 +128,7 @@ erDiagram
 
     Patient {
         int id PK
+        int userId FK "opcional, único"
         string documentNumber "único con documentType"
         string lastName
         string firstName
@@ -178,6 +189,29 @@ erDiagram
         timestamptz createdAt
     }
 
+    Encounter {
+        int id PK
+        int appointmentId FK "único"
+        int professionalId FK "autor"
+        string notes "obligatorias"
+        string indications "opcionales"
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    CashClosing {
+        int id PK
+        date date UK "día local de los cobros"
+        int paymentCount "vigentes al cierre"
+        decimal totalAmount "original al cierre"
+        decimal expectedCashAmount "efectivo original"
+        decimal countedCashAmount "efectivo contado"
+        decimal difference "contado menos esperado"
+        string notes "obligatorias si hay diferencia"
+        int closedById FK
+        datetime closedAt
+    }
+
     PaymentMethod {
         int id PK
         string name UK
@@ -186,6 +220,8 @@ erDiagram
 
     Payment {
         int id PK
+        int receiptNumber UK "secuencia no reutilizable"
+        int cashClosingId FK "opcional hasta el cierre"
         int appointmentId FK "un solo PAID por turno"
         int paymentMethodId FK
         decimal amount "monto del momento"
@@ -196,7 +232,7 @@ erDiagram
     }
 ```
 
-**Cómo leerlo.** `||` es "uno y solo uno", `|o` es "cero o uno", `o{` es "cero o muchos". `PK` es clave primaria, `FK` clave foránea y `UK` valor único. `Holiday` no se relaciona con ninguna entidad: el centro cierra ese día para todos y la DAL lo consulta por fecha.
+**Cómo leerlo.** `||` es "uno y solo uno", `|o` es "cero o uno", `o{` es "cero o muchos". `PK` es clave primaria, `FK` clave foránea y `UK` valor único. `Holiday` registra a su autor en `User`; el cierre afecta a todos los profesionales y no pertenece a uno en particular.
 
 ## Grupos de entidades
 
@@ -208,7 +244,8 @@ erDiagram
 | Agenda | `AvailabilityWindow`, `AvailabilityException`, `Holiday`, `Room` | Cuándo y dónde atiende cada profesional, y cuándo el centro no atiende (HU-05). |
 | Pacientes y cobertura | `Patient`, `Coverage`, `InsurancePlan`, `HealthInsurer` | Quién es el paciente y cómo se cubre (HU-07, HU-08). |
 | Turnos | `Appointment`, `AppointmentEvent` | La reserva, su prioridad y su traza de cambios (HU-09, HU-10, HU-16, HU-19; se consultan en HU-11, HU-12 y HU-18). |
-| Cobros | `Payment`, `PaymentMethod` | Qué se cobró de cada turno, con qué medio y quién, y su anulación (HU-20, HU-21). |
+| Cobros | `Payment`, `PaymentMethod`, `CashClosing` | Cobros, comprobantes y foto original del cierre diario (HU-20, HU-21, HU-24, HU-27). |
+| Atención | `Encounter` | Notas e indicaciones de una atención por turno, con profesional autor (HU-25, HU-26). |
 
 ## Relaciones que conviene explicar
 
@@ -227,7 +264,7 @@ erDiagram
 
 ## Reglas que garantiza la base de datos
 
-Prisma no las declara, así que están escritas a mano en las migraciones `20260921194607_modelo_inicial` e `20260928120000_incremento_2` de `prisma/migrations/`. Son la garantía real de la regla "no hay turnos superpuestos": se cumplen aunque dos usuarios reserven a la vez (ver [ADR 0001](adr/0001-server-actions-y-capa-de-acceso-a-datos.md), "Concurrencia en turnos").
+Prisma no las declara, así que están escritas a mano en las migraciones `20260921194607_modelo_inicial`, `20260928120000_incremento_2` y `20261006120000_incremento_3` de `prisma/migrations/`. Son la garantía real de la regla "no hay turnos superpuestos": se cumplen aunque dos usuarios reserven a la vez (ver [ADR 0001](adr/0001-server-actions-y-capa-de-acceso-a-datos.md), "Concurrencia en turnos").
 
 | Restricción | Regla |
 |---|---|
@@ -236,7 +273,15 @@ Prisma no las declara, así que están escritas a mano en las migraciones `20260
 | `Appointment_ends_after_start` | `endsAt` es posterior a `startsAt`. |
 | `AvailabilityWindow_no_overlap` | Un profesional no puede tener dos franjas que se pisen el mismo día (HU-05). |
 | `AvailabilityWindow_minutes_valid` | La franja va de 0 a 1440 minutos y empieza antes de terminar. |
-| `AvailabilityException_minutes_valid` | Los dos minutos de una excepción van juntos: ambos nulos significa el día entero. |
+| `AvailabilityException_minutes_valid`, `Holiday_minutes_valid` | Ambos minutos nulos o ambos presentes, entre 0 y 1440, con inicio menor que fin. Se rechaza también un solo extremo nulo. |
+| `AvailabilityException_dates_valid`, `Holiday_dates_valid` | Inicio menor o igual al fin; ambas fechas incluidas. |
+| `AvailabilityException_no_overlap` | No se superponen fechas y horas de ausencias del mismo profesional. |
+| `Holiday_no_overlap` | No se superponen fechas y horas de cierres del centro. Tramos contiguos sí se permiten. |
+| `Encounter_notes_not_blank` | La atención tiene notas con contenido. |
+| `Payment_receipt_number_positive` | El número de comprobante es positivo. |
+| `CashClosing_amounts_valid` | Cantidad e importes no negativos; efectivo esperado no mayor que total. |
+| `CashClosing_difference_valid` | Diferencia = efectivo contado menos efectivo esperado. |
+| `CashClosing_difference_has_notes` | Una diferencia distinta de cero exige observaciones con contenido. |
 | `Service_duration_positive` | La duración de una prestación es mayor que cero. |
 | `Service_price_not_negative` | El valor de una prestación no es negativo. |
 | `Payment_one_paid_per_appointment` | Índice único parcial: un turno tiene como máximo un cobro `PAID`. Los anulados no cuentan (HU-21). |
@@ -248,7 +293,7 @@ Prisma no las declara, así que están escritas a mano en las migraciones `20260
 | `AppointmentEvent_priority_fields` | Un evento `PRIORITY_CHANGED` tiene la prioridad anterior y la nueva, distintas; los demás tipos no las usan (HU-19). |
 | `Patient_emergency_contact_pair` | Nombre y teléfono del contacto de emergencia van juntos (HU-17). |
 
-También hay unicidad en el email de ingreso (`User.email`), en la identificación de las personas (`documentType` + `documentNumber` en `Patient` y en `Professional`), en la matrícula (`Professional.licenseNumber`), en `Holiday.date`, en el plan dentro de su obra social, en `Coverage.patientId` y en el nombre del medio de pago (`PaymentMethod.name`).
+También hay unicidad en el email de ingreso (`User.email`), en la identificación de las personas (`documentType` + `documentNumber` en `Patient` y en `Professional`), en la matrícula (`Professional.licenseNumber`), en `Patient.userId`, `Encounter.appointmentId`, `Payment.receiptNumber`, `CashClosing.date`, en el plan dentro de su obra social, en `Coverage.patientId` y en el nombre del medio de pago (`PaymentMethod.name`).
 
 ## Reglas que hace cumplir la DAL
 
@@ -268,9 +313,22 @@ No se pueden expresar en el schema: las hace cumplir la DAL (`src/lib/dal/`) al 
 - Un usuario inactivo no puede ingresar ni sostener una sesión abierta: `getSession()` relee `active` en cada request ([ADR 0002](adr/0002-autenticacion-y-sesion.md)).
 - El formato de la matrícula y el resto de la validación de entrada lo hace Zod en cada acción.
 
-## Todavía no modelado
+## Contrato del schema del incremento 3
 
-Están en el glosario pero no en el schema, porque pertenecen a incrementos posteriores: `Encounter` (atención registrada), `Prescription` y `Copay` (coseguro), del Inc. 3, y `Overbooking` (sobreturno), que el equipo decidió no construir en el Inc. 2. Cuando entren, se agregan al diagrama en el mismo cambio.
+- **Cierres y ausencias:** `startDate` y `endDate` son fechas locales inclusivas. Los minutos describen el mismo tramo de cada día, no un único intervalo continuo entre dos instantes. La migración conserva cada fecha anterior como un rango de un día, sin cambiar IDs ni autoría.
+- **Compatibilidad hasta HU-23:** las operaciones existentes conservan su entrada y salida `date`; escriben inicio = fin. Las lecturas actuales usan `startDate` como esa fecha. HU-23 debe adaptar consultas, cálculos y UI al período completo y a los cierres parciales antes de habilitar su carga. Esta migración prepara el modelo, no entrega HU-23.
+- **Atención:** `Encounter.professionalId` identifica al profesional autor; la unicidad de `appointmentId` impide dos atenciones por turno. HU-25 implementará pertenencia, estados permitidos, transición a Completado y plazo de edición. HU-26 controlará quién puede leer los textos.
+- **Comprobante:** `receiptNumber` se asigna mediante una secuencia de PostgreSQL, incluso en los cobros actuales. Los anteriores se numeran por `createdAt` e `id`, incluidos los anulados. No se reutiliza al anular; puede haber saltos por transacciones abortadas. HU-24 agrega su presentación.
+- **Caja:** solo existe un `CashClosing` cuando se cierra el día. Los cobros quedan con `cashClosingId = null` hasta entonces. HU-27 debe vincular los cobros del día de cobro, registrar los importes originales y coordinar cierre/cobro/anulación dentro de transacciones. Una fecha solo puede cerrarse una vez.
+- **Correcciones posteriores:** se reutilizan `Payment.voidedAt`, `voidedById` y `voidReason`. Un cobro vinculado a una caja, anulado después de `closedAt`, es un ajuste posterior. Los originales `paymentCount`, `totalAmount`, `expectedCashAmount`, `countedCashAmount` y `difference` no se reescriben. HU-27 calculará el total corregido y exigirá gerente para esa anulación. No se duplica la auditoría en campos nuevos.
+- **Portal:** `Patient.userId` es opcional y único. HU-31 comprobará el rol `PATIENT`, la pertenencia y la desactivación conjunta. `User.mustChangePassword` comienza en `false` para usuarios existentes; al habilitar un acceso temporal se marcará en `true` y HU-31 exigirá cambiar la contraseña.
+- **Configuración:** los datos del centro y el 15 % de comisión no crean tablas: se incorporarán como configuración en HU-24/HU-28. `Prescription`, `Copay` y sobreturnos quedan fuera del alcance acordado.
+
+## Verificación de la migración
+
+`npm run test:schema:db` crea dos bases temporales en PostgreSQL local: una vacía y otra con datos del incremento 2. Aplica las migraciones, verifica conservación de datos, numeración, límites, superposiciones, unicidades, importes y vínculos; elimina únicamente esas bases al terminar. Requiere permiso `CREATEDB`, como la base shadow de Prisma. No cambia las tablas de la base configurada en `DATABASE_URL`.
+
+Si existen ausencias antiguas superpuestas, la nueva exclusión detiene la migración entera (transaccional). Se deben revisar esos registros antes de reintentar; la migración no los borra ni los fusiona.
 
 ## Mantenimiento
 

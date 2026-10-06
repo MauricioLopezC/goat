@@ -59,6 +59,21 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Comisión del centro | `centerCommissionRate` | 15 % de lo cobrado por los turnos de un profesional, por el uso de las instalaciones. Cálculo informativo, no liquidación de honorarios ([HU-28](hu/HU-28-rendicion-por-profesional.md)). Inc. 3. |
 | Portal del paciente | `/portal` | Pantallas del rol `PATIENT`: sus turnos, cancelación y comprobantes ([HU-31](hu/HU-31-portal-del-paciente.md)). El acceso es un `User` vinculado al `Patient` (`Patient.userId`). Inc. 3. |
 
+## Campos compartidos del incremento 3
+
+| Español | En código | Nota |
+|---|---|---|
+| Período del cierre o ausencia | `startDate`, `endDate` | Fechas inclusivas de `Holiday` y `AvailabilityException`. |
+| Tramo diario del cierre o ausencia | `startMinute`, `endMinute` | Minutos desde medianoche; ambos nulos = días completos. El tramo se repite en cada fecha. |
+| Autor de la atención | `Encounter.professionalId` | Profesional que registra las notas. |
+| Cambio de contraseña pendiente | `User.mustChangePassword` | Acceso con contraseña temporal; HU-31 exige cambiarla al ingresar. |
+| Caja del cobro | `Payment.cashClosingId` | Nulo hasta cerrar el día de cobro. |
+| Cantidad y total originales al cierre | `CashClosing.paymentCount`, `totalAmount` | Foto de los cobros vigentes al cerrar; no cambia ante anulaciones posteriores. |
+| Efectivo esperado y contado | `CashClosing.expectedCashAmount`, `countedCashAmount` | Original del sistema frente al conteo físico. |
+| Diferencia de caja | `CashClosing.difference` | Contado menos esperado. Si no es cero exige `notes`. |
+| Autor e instante del cierre | `CashClosing.closedById`, `closedAt` | Quién cerró y cuándo. `CashClosing.date` es el día local de los cobros. |
+| Ajuste posterior al cierre | `Payment.voidedAt`, `voidedById`, `voidReason` | Misma auditoría de anulación; posterior a `CashClosing.closedAt`. No es otra entidad. |
+
 ## Enums
 
 **Estado del turno** (`AppointmentStatus`): `SCHEDULED` (Programado) → `COMPLETED` (Completado: el paciente vino), o `CANCELLED` (Cancelado), o `EXPIRED` (Vencido). Se usa `CANCELLED` (grafía británica) en todo el código.

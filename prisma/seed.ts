@@ -328,11 +328,30 @@ async function seedSchedule(
   for (const holiday of HOLIDAYS) {
     const input = createHolidaySchema.parse(holiday);
     const date = new Date(`${input.date}T00:00:00.000Z`);
-    await prisma.holiday.upsert({
-      where: { date },
-      create: { date, description: input.description, createdById: managerId },
-      update: { description: input.description },
+    const existing = await prisma.holiday.findFirst({
+      where: {
+        startDate: date,
+        endDate: date,
+        startMinute: null,
+        endMinute: null,
+      },
+      select: { id: true },
     });
+    if (existing) {
+      await prisma.holiday.update({
+        where: { id: existing.id },
+        data: { description: input.description },
+      });
+    } else {
+      await prisma.holiday.create({
+        data: {
+          startDate: date,
+          endDate: date,
+          description: input.description,
+          createdById: managerId,
+        },
+      });
+    }
   }
 
   return { rooms: roomIds.size, windows };
@@ -507,7 +526,8 @@ async function seedExceptions(
     const existing = await prisma.availabilityException.count({
       where: {
         professionalId,
-        date,
+        startDate: date,
+        endDate: date,
         startMinute: input.startMinute,
         endMinute: input.endMinute,
       },
@@ -535,7 +555,8 @@ async function seedExceptions(
     await prisma.availabilityException.create({
       data: {
         professionalId,
-        date,
+        startDate: date,
+        endDate: date,
         startMinute: input.startMinute,
         endMinute: input.endMinute,
         reason: input.reason,
@@ -686,7 +707,7 @@ async function seedAppointments(
 
     // Una excepción cargada desde la UI también deja el horario sin atención.
     const exceptions = await prisma.availabilityException.findMany({
-      where: { professionalId, date: dateToDb(date) },
+      where: { professionalId, startDate: dateToDb(date) },
       select: { startMinute: true, endMinute: true },
     });
     if (exceptions.some((x) => overlapsException(x, startMinute, endMinute))) {

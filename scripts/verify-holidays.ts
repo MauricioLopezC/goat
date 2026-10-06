@@ -56,8 +56,8 @@ async function main() {
     let date = addDays(toLocalSlot(new Date()).date, 400);
     while (dates.length < count) {
       const busy =
-        (await prisma.holiday.findUnique({
-          where: { date: dateToDb(date) },
+        (await prisma.holiday.findFirst({
+          where: { startDate: dateToDb(date) },
         })) ||
         (await prisma.appointment.findFirst({
           where: {
@@ -223,7 +223,9 @@ async function main() {
           },
         );
         assert.equal(
-          await prisma.holiday.count({ where: { date: dateToDb(busyDate) } }),
+          await prisma.holiday.count({
+            where: { startDate: dateToDb(busyDate) },
+          }),
           0,
         );
 
