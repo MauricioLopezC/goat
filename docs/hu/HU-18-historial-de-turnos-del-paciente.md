@@ -33,6 +33,6 @@
 ## A conversar
 
 - **Supuesto del equipo (29/09/2026):** la asistencia no depende del filtro de estado, porque con él dejaría de describir al paciente; sí respeta el filtro de profesional. A confirmar.
-- **Decisión del equipo:** en el Inc. 2 el historial es la cronología de turnos. La atención registrada (`Encounter`) y las prescripciones entran en el Inc. 3 y completan este historial con el contenido clínico.
+- **Decisión del equipo:** en el Inc. 2 el historial es la cronología de turnos. La atención registrada (`Encounter`) y las prescripciones entran en el Inc. 3 y completan este historial con el contenido clínico. Con la devolución del Inc. 2, el contenido es una bitácora en texto libre, no una historia clínica: [HU-25](HU-25-registrar-la-atencion.md) y [HU-26](HU-26-bitacora-del-paciente.md).
 - ¿El profesional ve los turnos del paciente con otros profesionales?
   - **Decisión del equipo (28/09/2026):** no, para simplificar. Ve solo los turnos del paciente con él. Se puede ampliar en el Inc. 3, junto con la atención registrada.

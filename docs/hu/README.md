@@ -41,6 +41,16 @@ El repositorio guarda la especificación, que es estable. Trello guarda el estad
 | [HU-20](HU-20-aranceles-y-medios-de-pago.md) | Configurar valores y medios de pago | Pagos | 2 |
 | [HU-21](HU-21-cobrar-turno.md) | Cobrar un turno en el mostrador | Pagos | 2 |
 | [HU-22](HU-22-indicadores-iniciales.md) | Ver la ocupación y el ausentismo del centro | Indicadores | 2 |
+| [HU-23](HU-23-cerrar-el-centro-por-horas-o-dias.md) | Cerrar el centro por horas o por varios días | Profesionales | 3 |
+| [HU-24](HU-24-comprobante-de-cobro.md) | Emitir el comprobante de un cobro | Pagos | 3 |
+| [HU-25](HU-25-registrar-la-atencion.md) | Registrar la atención | Atención e historial | 3 |
+| [HU-26](HU-26-bitacora-del-paciente.md) | Ver la bitácora del paciente | Atención e historial | 3 |
+| [HU-27](HU-27-cierre-de-caja.md) | Cerrar la caja del día | Pagos | 3 |
+| [HU-28](HU-28-rendicion-por-profesional.md) | Ver la rendición por profesional | Pagos | 3 |
+| [HU-29](HU-29-indicadores-del-centro.md) | Ver los indicadores del centro | Indicadores | 3 |
+| [HU-30](HU-30-tablero-del-profesional.md) | Ver mi tablero de profesional | Indicadores | 3 |
+| [HU-31](HU-31-portal-del-paciente.md) | Ingresar como paciente y ver o cancelar mis turnos | Portal del paciente | 3 |
+| [HU-32](HU-32-sacar-turno-desde-el-portal.md) | Sacar un turno desde el portal | Portal del paciente | 3 |
 
 Las historias se agregan al final, ordenadas por número. No se reordena la tabla: el orden de trabajo lo decide Trello.
 
