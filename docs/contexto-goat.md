@@ -153,6 +153,14 @@ Dejar el "fuera de alcance" escrito es importante: el cliente evalúa equilibrio
 | D-06 | El turno considera **servicio, prioridad/urgencia y obra social**. Esto ya no es una duda. | Pantalla clave |
 | D-07 | El **historial incluye prescripciones médicas**. Aparece en la pantalla clave y no estaba en el audio. | Pantalla clave |
 | D-08 | La guía del cliente **no** incluye historias de usuario: las define el equipo. | 08:07–12:35 |
+| D-09 | La última entrega tiene que incluir la **gestión de cobros completa** y el **cierre de caja o rendición por profesional**. | Devolución del Inc. 2 |
+| D-10 | El **historial** es una bitácora: asistencia, cancelaciones y una o dos notas de texto por visita. **No** una historia clínica con tipificación de prácticas o prescripciones. | Devolución del Inc. 2 |
+| D-11 | Se tiene que poder **registrar la asistencia** al turno. En GOAT, el turno Completado es el paciente que vino. | Devolución del Inc. 2 |
+| D-12 | Calendario: **colores para los estados** e **íconos para el resto** (por ejemplo, cobrado). Los bloques libres se tienen que notar. | Devolución del Inc. 2 |
+| D-13 | Los indicadores tienen que permitir **tomar decisiones**, y el equipo explica sus conclusiones. | Devolución del Inc. 2 |
+| D-14 | **Comprobante de cobro** en la última entrega. | Devolución del Inc. 2 (particular) |
+| D-15 | El cierre del centro también es **por franja horaria o por varios días**. | Devolución del Inc. 2 (particular) |
+| D-16 | El **portal del paciente** es importante. El Inc. 3 dura **dos semanas**. | Devolución del Inc. 2 |
 
 ---
 
@@ -167,12 +175,12 @@ Tres entregas de **una semana** cada una.
 | Turnos | Inicial | Completa | Completa |
 | Calendario | Sí (base) | Completo | Completo |
 | Pagos | — | Se inicia | Completa |
-| Indicadores | — | Iniciales | Completos |
-| Historial / prescripciones | — | Cronología de turnos | Completo (atención y prescripciones) |
+| Indicadores | — | Iniciales | Completos, orientados a decidir (D-13) |
+| Historial / prescripciones | — | Cronología de turnos | Bitácora: asistencia y atención en texto libre (D-10) |
 
 Criterio del cliente para el Incremento 1: **algo funcional y útil de punta a punta**, antes que muchas pantallas a medias. Y advertencia explícita: si en el Inc. 1 sólo hacemos el alta del paciente, en el Inc. 2 va a pedir la ficha completa (10:54).
 
-**Historial y prescripciones** no figuraban en la grilla de la pantalla clave, pero sí en los procesos principales. Decisión del equipo al planificar el Inc. 2: en el Inc. 2 el historial es la cronología de turnos del paciente; la atención registrada (`Encounter`) y las prescripciones entran en el Inc. 3 y lo completan.
+**Historial y prescripciones** no figuraban en la grilla de la pantalla clave, pero sí en los procesos principales. Decisión del equipo al planificar el Inc. 2: en el Inc. 2 el historial es la cronología de turnos del paciente; la atención registrada (`Encounter`) y las prescripciones entran en el Inc. 3 y lo completan. Con la devolución del Inc. 2 (D-10), la prescripción queda como texto libre dentro de la atención. Plan del Inc. 3: [`incrementos/3.md`](incrementos/3.md).
 
 ---
 
@@ -214,10 +222,10 @@ De la entrega:
 
 ## 14. Preguntas abiertas para el cliente
 
-1. ¿Qué nivel de detalle espera en **prescripciones médicas**? ¿Texto libre, o receta/pedido de estudios/indicaciones/reposo separados?
+1. ~~¿Qué nivel de detalle espera en **prescripciones médicas**?~~ Respondida (D-10): texto libre.
 2. ¿Se contemplan **sobreturnos** para urgencias, o la urgencia sólo marca prioridad dentro de la grilla normal?
 3. ¿La **kinesiología** entra como servicio del centro, con sesiones en serie?
-4. ¿El **historial** debe estar disponible desde el Incremento 2 o recién en el 3?
+4. ~~¿El **historial** debe estar disponible desde el Incremento 2 o recién en el 3?~~ Respondida: cronología en el Inc. 2, bitácora completa en el Inc. 3.
 5. ¿Qué se espera del acceso **opcional del paciente**? ¿Sólo sacar turno, o también cancelar y ver su historial?
 6. ¿La **imagen o diapositiva mencionada en ~01:11** del audio aporta requisitos adicionales?
 7. ¿Necesita el centro manejar **valores/aranceles por prestación**, o alcanza con registrar el importe cobrado?

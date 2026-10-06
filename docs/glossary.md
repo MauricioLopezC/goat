@@ -26,25 +26,25 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Obra social | `HealthInsurer` | |
 | Plan | `InsurancePlan` | |
 | Afiliación del paciente | `Coverage` | Plan más número de afiliado. |
-| Coseguro | `Copay` | Lo que paga el paciente aunque tenga cobertura. Fuera del Inc. 2: se modela en el Inc. 3. El campo `Coverage.copayAmount` del Inc. 1 se elimina. |
-| Atención registrada | `Encounter` | Lo efectivamente realizado en un turno. Base del historial. Inc. 3. |
-| Prescripción | `Prescription` | Inc. 3. |
+| Coseguro | `Copay` | Lo que paga el paciente aunque tenga cobertura. No se construye: el centro solo cobra a pacientes particulares (decisión del equipo, Inc. 3). El campo `Coverage.copayAmount` del Inc. 1 se eliminó en el Inc. 2. |
+| Atención registrada | `Encounter` | Notas e indicaciones en texto libre que el profesional deja de un turno, una por turno. Base de la bitácora del paciente. No es una historia clínica ([HU-25](hu/HU-25-registrar-la-atencion.md)). |
+| Prescripción | `Encounter.indications` | Texto libre dentro de la atención registrada. No hay modelo `Prescription` ni tipificación, por la devolución del cliente del Inc. 2 ([HU-25](hu/HU-25-registrar-la-atencion.md)). |
 | Pago / cobro | `Payment` | Cobro de un turno de un paciente particular en el mostrador, con un solo medio de pago. Guarda lo que paga el paciente (`amount`) con el monto del momento, separado del valor de la prestación ([HU-21](hu/HU-21-cobrar-turno.md)). |
 | Turnos de hoy | `today` | Pantalla de mesa de entradas con todos los turnos de hoy por horario, su estado de cobro o autorización y la acción de cobrar o autorizar en la fila (`/today`, [HU-21](hu/HU-21-cobrar-turno.md)). No es un modelo: lee `Appointment` y `Payment`. |
 | Medio de pago | `PaymentMethod` | Efectivo, débito, crédito, transferencia. Lo configura el gerente ([HU-20](hu/HU-20-aranceles-y-medios-de-pago.md)). |
 | Usuario | `User` | Cuenta con la que se ingresa al sistema. Lleva el `Role`. |
 | Título profesional | `ProfessionalTitle` | Traumatólogo, kinesiólogo. Un `Professional` puede tener más de uno. No confundir con `Specialty` (área) ni con `Service` (prestación). |
 | Horarios de atención | `schedule` | Franjas y excepciones de agenda de un profesional, juntas ([HU-05](hu/HU-05-franjas-de-atencion.md)). Es el nombre de la pantalla (`/professionals/[id]/schedule`, y `/my-schedule` para el propio profesional). No confundir con la agenda del profesional ([HU-12](hu/HU-12-agenda-del-profesional.md)), que son sus turnos. |
-| Excepción de agenda | `AvailabilityException` | Día u horario en que el profesional no atiende, contra su patrón de `AvailabilityWindow`. |
+| Excepción de agenda / ausencia | `AvailabilityException` | Día u horario en que el profesional no atiende, contra su patrón de `AvailabilityWindow`. Desde el Inc. 3 se carga por rango de días, con un tramo horario opcional, como el cierre del centro ([HU-23](hu/HU-23-cerrar-el-centro-por-horas-o-dias.md)). |
 | Consultorio / box | `Room` | En el Incremento 1 cada profesional tiene el suyo. |
-| Feriado / día excepcional | `Holiday` | Día completo en que el centro permanece cerrado. No genera disponibilidad para nadie. Lo cargan gerente y mesa de entradas, y no se carga sobre un día con turnos Programados ([HU-14](hu/HU-14-cerrar-el-centro.md)). No existe un modelo aparte para el día excepcional. |
+| Feriado / día excepcional / cierre del centro | `Holiday` | Período en que el centro permanece cerrado: un día completo ([HU-14](hu/HU-14-cerrar-el-centro.md)) y, desde el Inc. 3, un rango de días, con un tramo horario opcional que se repite en cada día ([HU-23](hu/HU-23-cerrar-el-centro-por-horas-o-dias.md)). No genera disponibilidad para nadie. Lo cargan gerente y mesa de entradas, y no se carga sobre un día con turnos Programados ([HU-14](hu/HU-14-cerrar-el-centro.md)). No existe un modelo aparte para el día excepcional. |
 | Traza de cambios de un turno | `AppointmentEvent` | Qué cambió en un turno ya creado, quién, cuándo y por qué. El alta no genera evento: su autoría vive en `Appointment.createdById`. |
 | Traza de cambios de un profesional | `ProfessionalEvent` | Edición, baja o reactivación con autor, fecha y motivo. |
 | Reprogramar | `rescheduleAppointment` | Mover un turno Programado a otro horario o profesional, conservando el mismo `Appointment`. Deja un `AppointmentEvent` de tipo `RESCHEDULED` con el horario anterior y el nuevo ([HU-16](hu/HU-16-reprogramar-turno.md)). |
 | Valor de la prestación | `Service.price` | Lo que vale un servicio, antes de la cobertura. |
 | Número de autorización | `authorizationNumber` | Orden o autorización de la obra social para un turno. Se registra al llegar el paciente, cuando el servicio requiere orden y hay obra social, con quién (`authorizedById`) y cuándo (`authorizedAt`) ([HU-21](hu/HU-21-cobrar-turno.md)). |
 | Primer horario libre | `listEarliestSlots` | Los próximos `AvailableSlot` de un servicio entre todos los profesionales que lo prestan ([HU-19](hu/HU-19-turno-prioritario.md)). |
-| Historial del paciente | `getPatientAppointmentHistory` | En el Inc. 2, la cronología de turnos del paciente con sus cambios ([HU-18](hu/HU-18-historial-de-turnos-del-paciente.md)). En el Inc. 3 suma `Encounter` y `Prescription`. |
+| Historial del paciente | `getPatientAppointmentHistory` | En el Inc. 2, la cronología de turnos del paciente con sus cambios ([HU-18](hu/HU-18-historial-de-turnos-del-paciente.md)). En el Inc. 3 suma la atención registrada y pasa a ser la bitácora del paciente ([HU-26](hu/HU-26-bitacora-del-paciente.md)). |
 | Tablero del gerente | `/dashboard` | Indicadores del centro: ocupación, ausentismo y cancelaciones ([HU-22](hu/HU-22-indicadores-iniciales.md)). |
 | Ocupación | `occupancyRate` | Minutos ocupados por turnos Programados y Completados sobre los minutos de franja disponibles, en un período. |
 | Ausentismo | `absenteeismRate` | Turnos Vencidos sobre Completados más Vencidos, en un período. |
@@ -52,13 +52,19 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Domicilio | `address`, `city` | Del `Patient` ([HU-17](hu/HU-17-ficha-completa-del-paciente.md)). |
 | Observaciones administrativas | `Patient.notes` | Notas del mostrador sobre el paciente ([HU-17](hu/HU-17-ficha-completa-del-paciente.md)). No son datos clínicos. |
 | Contacto de emergencia | `emergencyContactName`, `emergencyContactPhone`, `emergencyContactRelationship` | Del `Patient`. Distinto del responsable o tutor (`guardianName`). |
+| Comprobante | `receiptNumber` | Constancia no fiscal de un cobro, con la marca del centro y número correlativo (`Payment.receiptNumber`). No es una factura ([HU-24](hu/HU-24-comprobante-de-cobro.md)). Inc. 3. |
+| Datos del centro | `centerProfile` | Nombre, razón social, CUIT, dirección y teléfono del centro, configurados en un solo lugar. Los usa el comprobante ([HU-24](hu/HU-24-comprobante-de-cobro.md)). Inc. 3. |
+| Cierre de caja | `CashClosing` | Cierre de los cobros de un día del centro, con el detalle por medio y por profesional, el efectivo contado y la diferencia ([HU-27](hu/HU-27-cierre-de-caja.md)). Inc. 3. |
+| Rendición por profesional | `getProfessionalStatement` | Producido (pacientes atendidos), cobrado (lo pagado por particulares), comisión del centro y neto de un profesional en un período ([HU-28](hu/HU-28-rendicion-por-profesional.md)). Inc. 3. |
+| Comisión del centro | `centerCommissionRate` | 15 % de lo cobrado por los turnos de un profesional, por el uso de las instalaciones. Cálculo informativo, no liquidación de honorarios ([HU-28](hu/HU-28-rendicion-por-profesional.md)). Inc. 3. |
+| Portal del paciente | `/portal` | Pantallas del rol `PATIENT`: sus turnos, cancelación y comprobantes ([HU-31](hu/HU-31-portal-del-paciente.md)). El acceso es un `User` vinculado al `Patient` (`Patient.userId`). Inc. 3. |
 
 ## Enums
 
-**Estado del turno** (`AppointmentStatus`): `SCHEDULED` (Programado) → `COMPLETED` (Completado), o `CANCELLED` (Cancelado), o `EXPIRED` (Vencido). Se usa `CANCELLED` (grafía británica) en todo el código.
+**Estado del turno** (`AppointmentStatus`): `SCHEDULED` (Programado) → `COMPLETED` (Completado: el paciente vino), o `CANCELLED` (Cancelado), o `EXPIRED` (Vencido). Se usa `CANCELLED` (grafía británica) en todo el código.
 
 - `SCHEDULED` es el único estado desde el que se puede transicionar: los otros tres son finales.
-- `EXPIRED` es el turno cuya hora pasó sin que se registrara la atención. En el Incremento 1 lo marca el usuario desde el detalle del turno; no hay proceso automático.
+- `EXPIRED` es el turno cuya hora pasó sin que se registrara la atención. Lo marca el usuario desde el detalle del turno o desde la lista de turnos sin cerrar; no hay proceso automático (decisión del equipo, Inc. 3).
 - No existen `CONFIRMED` ni `NO_SHOW`: el equipo los reemplazó por este juego de cuatro estados.
 
 **Rol** (`Role`): `RECEPTIONIST` (mesa de entradas), `PROFESSIONAL`, `MANAGER` (gerente), `PATIENT` (opcional).

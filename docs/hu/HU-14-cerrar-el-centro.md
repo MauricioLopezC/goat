@@ -44,5 +44,6 @@
 
 - Revisión del Inc. 1 (25/09/2026): el cliente pidió que mesa de entradas marque feriados y días excepcionales en una sola acción, pintados en el calendario y sin turnos. Responde la pregunta de [HU-05](HU-05-franjas-de-atencion.md) *¿Quién carga los feriados?*
 - **Supuesto del equipo:** un día excepcional es siempre el día completo, no un cierre parcial. A confirmar.
+  - **Respuesta del cliente (devolución del Inc. 2):** no; también se cierra por franjas horarias o por varios días. Se planifica en [HU-23](HU-23-cerrar-el-centro-por-horas-o-dias.md).
 - ¿Qué pasa al cerrar un día que ya tiene turnos?
   - **Decisión del equipo (28/09/2026):** no se permite. Se maneja con la misma lógica que eliminar o acortar una franja de un profesional ([HU-05](HU-05-franjas-de-atencion.md)): el sistema lista los turnos afectados y hay que cancelarlos o reprogramarlos antes. Como el aviso por email sigue pendiente ([HU-09](HU-09-asignar-turno.md)), la lista incluye el teléfono del paciente para avisarle.
