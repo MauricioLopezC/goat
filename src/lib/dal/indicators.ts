@@ -57,14 +57,14 @@ export async function getCenterIndicators(
             select: { weekday: true, startMinute: true, endMinute: true },
           },
           exceptions: {
-            where: { date: { gte: dateToDb(first), lte: dateToDb(last) } },
-            select: { date: true, startMinute: true, endMinute: true },
+            where: { startDate: { gte: dateToDb(first), lte: dateToDb(last) } },
+            select: { startDate: true, startMinute: true, endMinute: true },
           },
         },
       }),
       prisma.holiday.findMany({
-        where: { date: { gte: dateToDb(first), lte: dateToDb(last) } },
-        select: { date: true },
+        where: { startDate: { gte: dateToDb(first), lte: dateToDb(last) } },
+        select: { startDate: true },
       }),
       // Un turno pertenece al período por su inicio, en hora del centro.
       prisma.appointment.findMany({
@@ -91,7 +91,7 @@ export async function getCenterIndicators(
     throw new DomainError("NOT_FOUND", "El profesional no existe.");
 
   const closedDays = new Set(
-    holidays.map((holiday) => dateFromDb(holiday.date)),
+    holidays.map((holiday) => dateFromDb(holiday.startDate)),
   );
   const now = new Date();
   const rows = professionals.flatMap(
@@ -105,7 +105,7 @@ export async function getCenterIndicators(
         windows: availabilityWindows,
         exceptions: exceptions.map((exception) => ({
           ...exception,
-          date: dateFromDb(exception.date),
+          date: dateFromDb(exception.startDate),
         })),
         // La baja tiene fecha efectiva: desde ese día no atiende (HU-03).
         deactivatedOn:

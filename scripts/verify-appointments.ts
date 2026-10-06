@@ -112,8 +112,8 @@ async function main() {
     let day = new Date();
     day.setUTCDate(day.getUTCDate() + 1);
     while (
-      await prisma.holiday.findUnique({
-        where: { date: dateToDb(toLocalSlot(day).date) },
+      await prisma.holiday.findFirst({
+        where: { startDate: dateToDb(toLocalSlot(day).date) },
       })
     )
       day = new Date(day.getTime() + 86_400_000);
@@ -209,7 +209,8 @@ async function main() {
       const exception = await prisma.availabilityException.create({
         data: {
           professionalId: professionals[0],
-          date: dateToDb(date),
+          startDate: dateToDb(date),
+          endDate: dateToDb(date),
           startMinute: 555,
           endMinute: 585,
           reason: tag,
@@ -231,7 +232,8 @@ async function main() {
       });
       const holiday = await prisma.holiday.create({
         data: {
-          date: dateToDb(date),
+          startDate: dateToDb(date),
+          endDate: dateToDb(date),
           description: tag,
           createdById: manager.id,
         },
@@ -657,8 +659,8 @@ async function main() {
     await verify("HU-16 reprogramación de turnos", async () => {
       let testDay = addDays(date, 7);
       while (
-        await prisma.holiday.findUnique({
-          where: { date: dateToDb(testDay) },
+        await prisma.holiday.findFirst({
+          where: { startDate: dateToDb(testDay) },
         })
       ) {
         testDay = addDays(testDay, 7);

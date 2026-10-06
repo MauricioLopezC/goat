@@ -4,6 +4,12 @@ Contrato de las Server Actions de GOAT y catálogo de operaciones. La decisión 
 
 Los nombres de código (modelos, roles, estados, funciones) siguen [`glossary.md`](glossary.md). La documentación va en español y el código en inglés.
 
+## Compatibilidad con el schema del incremento 3
+
+El `chore/schema-incremento-3` conserva los contratos actuales de las operaciones: `createHoliday` y `createAvailabilityException` reciben `date` y guardan `startDate = endDate`; los listados devuelven la fecha con el nombre anterior. Las lecturas de turnos, agenda e indicadores se adaptan al nombre de la columna. La carga e interpretación de rangos y cierres parciales, con sus fichas actualizadas, pertenece a HU-23.
+
+`registerPayment` obtiene `receiptNumber` por defecto desde una secuencia de PostgreSQL. Las operaciones y reglas nuevas de atención, caja y portal se especifican e implementan en las historias respectivas; el [contrato del schema](modelo-de-datos.md#contrato-del-schema-del-incremento-3) deja sus campos preparados.
+
 ## Estructura
 
 ```

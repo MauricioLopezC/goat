@@ -270,15 +270,15 @@ export async function listAvailableDates(
         tx.availabilityException.findMany({
           where: {
             professionalId,
-            date: { gte: dateToDb(bounds.min), lte: dateToDb(bounds.max) },
+            startDate: { gte: dateToDb(bounds.min), lte: dateToDb(bounds.max) },
           },
-          select: { date: true, startMinute: true, endMinute: true },
+          select: { startDate: true, startMinute: true, endMinute: true },
         }),
         tx.holiday.findMany({
           where: {
-            date: { gte: dateToDb(bounds.min), lte: dateToDb(bounds.max) },
+            startDate: { gte: dateToDb(bounds.min), lte: dateToDb(bounds.max) },
           },
-          select: { date: true },
+          select: { startDate: true },
         }),
         tx.appointment.findMany({
           where: {
@@ -309,10 +309,10 @@ export async function listAvailableDates(
             durationMinutes: service.durationMinutes,
             windows: windows.filter((window) => window.weekday === weekday),
             exceptions: exceptions.filter(
-              (exception) => dateFromDb(exception.date) === date,
+              (exception) => dateFromDb(exception.startDate) === date,
             ),
             holiday: holidays.some(
-              (holiday) => dateFromDb(holiday.date) === date,
+              (holiday) => dateFromDb(holiday.startDate) === date,
             ),
             appointments,
             now,
@@ -377,12 +377,12 @@ async function loadAvailability(
     tx.availabilityException.findMany({
       where: {
         professionalId: input.professionalId,
-        date: dateToDb(input.date),
+        startDate: dateToDb(input.date),
       },
       select: { startMinute: true, endMinute: true },
     }),
-    tx.holiday.findUnique({
-      where: { date: dateToDb(input.date) },
+    tx.holiday.findFirst({
+      where: { startDate: dateToDb(input.date) },
       select: { id: true },
     }),
     tx.appointment.findMany({
@@ -504,12 +504,12 @@ export async function listEarliestSlots(
         }),
         tx.holiday.findMany({
           where: {
-            date: {
+            startDate: {
               gte: dateToDb(bounds.min),
               lte: dateToDb(bounds.max),
             },
           },
-          select: { date: true },
+          select: { startDate: true },
         }),
       ]);
 
@@ -530,14 +530,14 @@ export async function listEarliestSlots(
         tx.availabilityException.findMany({
           where: {
             professionalId: { in: providerIds },
-            date: {
+            startDate: {
               gte: dateToDb(bounds.min),
               lte: dateToDb(bounds.max),
             },
           },
           select: {
             professionalId: true,
-            date: true,
+            startDate: true,
             startMinute: true,
             endMinute: true,
           },
@@ -558,7 +558,7 @@ export async function listEarliestSlots(
         }),
       ]);
 
-      const holidaySet = new Set(holidays.map((h) => dateFromDb(h.date)));
+      const holidaySet = new Set(holidays.map((h) => dateFromDb(h.startDate)));
       const results: EarliestSlot[] = [];
 
       const currentDay = new Date(`${bounds.min}T00:00:00Z`);
@@ -580,7 +580,7 @@ export async function listEarliestSlots(
             const profExceptions = exceptions.filter(
               (e) =>
                 e.professionalId === professional.id &&
-                dateFromDb(e.date) === dateStr,
+                dateFromDb(e.startDate) === dateStr,
             );
             const profAppointments = appointments.filter(
               (a) =>
@@ -833,15 +833,15 @@ export async function listAvailabilityWindows(
           orderBy: [{ weekday: "asc" }, { startMinute: "asc" }],
         },
         exceptions: {
-          where: { date: dateRange },
+          where: { startDate: dateRange },
           select: {
             id: true,
-            date: true,
+            startDate: true,
             startMinute: true,
             endMinute: true,
             reason: true,
           },
-          orderBy: [{ date: "asc" }, { startMinute: "asc" }],
+          orderBy: [{ startDate: "asc" }, { startMinute: "asc" }],
         },
         // Turnos que ocupan, de cualquier servicio: el filtro de servicio del
         // calendario no debe hacer aparecer libre un horario tomado.
@@ -857,9 +857,9 @@ export async function listAvailabilityWindows(
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
     }),
     prisma.holiday.findMany({
-      where: { date: dateRange },
-      select: { id: true, date: true, description: true },
-      orderBy: { date: "asc" },
+      where: { startDate: dateRange },
+      select: { id: true, startDate: true, description: true },
+      orderBy: { startDate: "asc" },
     }),
   ]);
   return {
@@ -869,7 +869,7 @@ export async function listAvailabilityWindows(
         windows: availabilityWindows,
         exceptions: exceptions.map((exception) => ({
           ...exception,
-          date: dateFromDb(exception.date),
+          date: dateFromDb(exception.startDate),
         })),
         busy: appointments,
       }),
@@ -877,7 +877,7 @@ export async function listAvailabilityWindows(
     holidays: holidays.map((holiday) => ({
       // El id permite quitar el cierre desde el calendario (HU-14).
       id: holiday.id,
-      date: dateFromDb(holiday.date),
+      date: dateFromDb(holiday.startDate),
       description: holiday.description,
     })),
     serviceDurationMinutes: service?.durationMinutes,
@@ -1085,34 +1085,34 @@ export async function getProfessionalAgenda(
     }),
     prisma.holiday.findMany({
       where: {
-        date: {
+        startDate: {
           gte: dateToDb(fromDateStr),
           lte: dateToDb(toDateStr),
         },
       },
       select: {
         id: true,
-        date: true,
+        startDate: true,
         description: true,
       },
-      orderBy: { date: "asc" },
+      orderBy: { startDate: "asc" },
     }),
     prisma.availabilityException.findMany({
       where: {
         professionalId: professional.id,
-        date: {
+        startDate: {
           gte: dateToDb(fromDateStr),
           lte: dateToDb(toDateStr),
         },
       },
       select: {
         id: true,
-        date: true,
+        startDate: true,
         startMinute: true,
         endMinute: true,
         reason: true,
       },
-      orderBy: [{ date: "asc" }, { startMinute: "asc" }],
+      orderBy: [{ startDate: "asc" }, { startMinute: "asc" }],
     }),
   ]);
 
@@ -1152,12 +1152,12 @@ export async function getProfessionalAgenda(
     summary,
     holidays: holidays.map((h) => ({
       id: h.id,
-      date: dateFromDb(h.date),
+      date: dateFromDb(h.startDate),
       description: h.description,
     })),
     exceptions: exceptions.map((e) => ({
       id: e.id,
-      date: dateFromDb(e.date),
+      date: dateFromDb(e.startDate),
       startMinute: e.startMinute,
       endMinute: e.endMinute,
       reason: e.reason,

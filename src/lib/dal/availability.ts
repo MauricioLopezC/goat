@@ -422,7 +422,8 @@ export async function createAvailabilityException(
     return tx.availabilityException.create({
       data: {
         professionalId: input.professionalId,
-        date: dateToDb(input.date),
+        startDate: dateToDb(input.date),
+        endDate: dateToDb(input.date),
         startMinute,
         endMinute,
         reason: input.reason,
@@ -480,16 +481,16 @@ export async function getProfessionalSchedule(
         orderBy: [{ weekday: "asc" }, { startMinute: "asc" }],
       },
       exceptions: {
-        where: { date: { gte: dateToDb(getTodayDateString()) } },
+        where: { startDate: { gte: dateToDb(getTodayDateString()) } },
         select: {
           id: true,
-          date: true,
+          startDate: true,
           startMinute: true,
           endMinute: true,
           reason: true,
           createdBy: { select: { firstName: true, lastName: true } },
         },
-        orderBy: [{ date: "asc" }, { startMinute: "asc" }],
+        orderBy: [{ startDate: "asc" }, { startMinute: "asc" }],
       },
     },
   });
@@ -514,7 +515,7 @@ export async function getProfessionalSchedule(
     windows: professional.availabilityWindows,
     exceptions: professional.exceptions.map((exception) => ({
       ...exception,
-      date: dateFromDb(exception.date),
+      date: dateFromDb(exception.startDate),
     })),
     services: professional.services,
     rooms,
@@ -543,16 +544,16 @@ export async function getOwnProfessionalId(actor: Actor) {
 /// Cierres de hoy en adelante, paginados y ordenados por fecha (HU-05, HU-14).
 export async function listHolidays(page: number, actor: Actor) {
   assertRole(actor, ...STAFF_ROLES);
-  const where = { date: { gte: dateToDb(getTodayDateString()) } };
+  const where = { startDate: { gte: dateToDb(getTodayDateString()) } };
   const holidays = await paginate(
     page,
     () => prisma.holiday.count({ where }),
-    // La fecha es única: no hace falta desempatar.
+    // El id desempata cierres con la misma fecha de inicio.
     (range) =>
       prisma.holiday.findMany({
         where,
-        select: { id: true, date: true, description: true },
-        orderBy: { date: "asc" },
+        select: { id: true, startDate: true, description: true },
+        orderBy: [{ startDate: "asc" }, { id: "asc" }],
         ...range,
       }),
   );
@@ -560,7 +561,7 @@ export async function listHolidays(page: number, actor: Actor) {
     ...holidays,
     items: holidays.items.map((holiday) => ({
       ...holiday,
-      date: dateFromDb(holiday.date),
+      date: dateFromDb(holiday.startDate),
     })),
   };
 }
@@ -572,8 +573,8 @@ export async function createHoliday(input: HolidayInput, actor: Actor) {
   assertRole(actor, Role.MANAGER, Role.RECEPTIONIST);
   assertNotPast(input.date);
   return prisma.$transaction(async (tx) => {
-    const existing = await tx.holiday.findUnique({
-      where: { date: dateToDb(input.date) },
+    const existing = await tx.holiday.findFirst({
+      where: { startDate: dateToDb(input.date) },
       select: { id: true },
     });
     if (existing)
@@ -589,13 +590,14 @@ export async function createHoliday(input: HolidayInput, actor: Actor) {
 
     const holiday = await tx.holiday.create({
       data: {
-        date: dateToDb(input.date),
+        startDate: dateToDb(input.date),
+        endDate: dateToDb(input.date),
         description: input.description,
         createdById: actor.id,
       },
-      select: { id: true, date: true, description: true },
+      select: { id: true, startDate: true, description: true },
     });
-    return { ...holiday, date: dateFromDb(holiday.date) };
+    return { ...holiday, date: dateFromDb(holiday.startDate) };
   }, SERIALIZABLE);
 }
 

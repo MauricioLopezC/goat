@@ -1,4 +1,4 @@
-// Modelo de datos vigente (Incrementos 1 y 2).
+// Modelo de datos vigente (Incrementos 1 a 3).
 //
 // Nombres de dominio: docs/glossary.md. Historias: docs/hu/.
 // Documentación en español, código en inglés (AGENTS.md).
@@ -112,20 +112,23 @@ model User {
   id Int @id @default(autoincrement())
 
   /// Identificador de ingreso (ADR 0002): obligatorio y único.
-  email        String   @unique
+  email              String   @unique
   /// argon2id, con sus parámetros incluidos. Nunca la contraseña en claro.
-  passwordHash String
-  lastName     String
-  firstName    String
+  passwordHash       String
+  /// HU-31: el acceso temporal exige cambiar la contraseña al primer ingreso.
+  mustChangePassword Boolean  @default(false)
+  lastName           String
+  firstName          String
   /// Teléfono de contacto interno.
-  phone        String?
-  role         Role
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  phone              String?
+  role               Role
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   /// Ficha del profesional, cuando el usuario atiende en el centro.
   professional Professional? @relation("ProfessionalUser")
+  patient      Patient?      @relation("PatientUser")
 
   createdProfessionals     Professional[]          @relation("ProfessionalCreatedBy")
   updatedProfessionals     Professional[]          @relation("ProfessionalUpdatedBy")
@@ -140,6 +143,7 @@ model User {
   professionalEvents       ProfessionalEvent[]
   createdPayments          Payment[]               @relation("PaymentCreatedBy")
   voidedPayments           Payment[]               @relation("PaymentVoidedBy")
+  cashClosings             CashClosing[]           @relation("CashClosingClosedBy")
 
   @@index([lastName, firstName])
 }
@@ -213,6 +217,7 @@ model Professional {
   exceptions          AvailabilityException[]
   appointments        Appointment[]
   events              ProfessionalEvent[]
+  encounters          Encounter[]
 
   /// Reprogramaciones que movieron un turno desde o hacia este profesional.
   rescheduledFromEvents AppointmentEvent[] @relation("AppointmentEventPreviousProfessional")
@@ -300,7 +305,8 @@ model AvailabilityException {
   id             Int          @id @default(autoincrement())
   professionalId Int
   professional   Professional @relation(fields: [professionalId], references: [id])
-  date           DateTime     @db.Date
+  startDate      DateTime     @db.Date
+  endDate        DateTime     @db.Date
   /// Minutos desde la medianoche. Ambos nulos = el día entero.
   startMinute    Int?
   endMinute      Int?
@@ -311,25 +317,34 @@ model AvailabilityException {
 
   createdAt DateTime @default(now())
 
-  @@index([professionalId, date])
+  @@index([professionalId, startDate, endDate])
 }
 
-/// Feriado o día excepcional: el centro permanece cerrado el día completo y
-/// no genera disponibilidad para ningún profesional (HU-05, HU-14).
+/// Cierre del centro: fechas inclusivas, con tramo opcional repetido cada día
+/// (HU-23). Ambos minutos nulos significan días completos.
 model Holiday {
   id          Int      @id @default(autoincrement())
-  date        DateTime @unique @db.Date
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date
+  startMinute Int?
+  endMinute   Int?
   description String
 
   createdById Int
   createdBy   User @relation("HolidayCreatedBy", fields: [createdById], references: [id])
 
   createdAt DateTime @default(now())
+
+  @@index([startDate, endDate])
 }
 
 // ──────────────────────────── Pacientes ──────────────────────────────
 
 model Patient {
+  /// Acceso opcional al portal (HU-31). La DAL exige un User de rol PATIENT.
+  userId Int?  @unique
+  user   User? @relation("PatientUser", fields: [userId], references: [id], onDelete: Restrict)
+
   id             Int          @id @default(autoincrement())
   lastName       String
   firstName      String
@@ -396,8 +411,7 @@ model InsurancePlan {
   @@unique([healthInsurerId, name])
 }
 
-/// Afiliación del paciente: plan y número de afiliado. El coseguro se modela
-/// en el Inc. 3 (`Copay`, ver glosario).
+/// Afiliación del paciente: plan y número de afiliado. Sin coseguro (Inc. 3).
 model Coverage {
   id        Int     @id @default(autoincrement())
   patientId Int     @unique
@@ -450,9 +464,10 @@ model Appointment {
 
   /// Todo cambio posterior al alta (cancelación, cierre, vencimiento,
   /// reprogramación, prioridad).
-  events   AppointmentEvent[]
+  events    AppointmentEvent[]
   /// Cobros del turno: a lo sumo uno `PAID`, más los anulados.
-  payments Payment[]
+  payments  Payment[]
+  encounter Encounter?
 
   @@index([professionalId, startsAt])
   @@index([patientId, startsAt])
@@ -498,6 +513,39 @@ model AppointmentEvent {
 
 // ────────────────────────────── Cobros ───────────────────────────────
 
+/// Una atención por turno (HU-25). Autor y plazo de edición se verifican en
+/// la DAL. Los textos no se exponen a mesa de entradas, gerente ni paciente.
+model Encounter {
+  id             Int          @id @default(autoincrement())
+  appointmentId  Int          @unique
+  appointment    Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  professionalId Int
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Restrict)
+  notes          String
+  indications    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([professionalId, createdAt])
+}
+
+/// Foto del cierre de un día local del centro (HU-27). No se reabre ni se
+/// reescriben sus importes al anular un cobro: se muestra un total corregido.
+model CashClosing {
+  id                 Int       @id @default(autoincrement())
+  date               DateTime  @unique @db.Date
+  paymentCount       Int
+  totalAmount        Decimal   @db.Decimal(12, 2)
+  expectedCashAmount Decimal   @db.Decimal(12, 2)
+  countedCashAmount  Decimal   @db.Decimal(12, 2)
+  difference         Decimal   @db.Decimal(12, 2)
+  notes              String?
+  closedById         Int
+  closedBy           User      @relation("CashClosingClosedBy", fields: [closedById], references: [id], onDelete: Restrict)
+  closedAt           DateTime  @default(now())
+  payments           Payment[]
+}
+
 /// Medio de pago que acepta el centro (HU-20). No se borra: se desactiva.
 model PaymentMethod {
   id     Int     @id @default(autoincrement())
@@ -515,9 +563,14 @@ model PaymentMethod {
 /// fila nueva. Un turno tiene como máximo un cobro `PAID` (índice único
 /// parcial en la migración).
 model Payment {
-  id            Int         @id @default(autoincrement())
+  id            Int          @id @default(autoincrement())
+  /// Secuencia única; no se reutiliza al anular y puede tener saltos por rollback.
+  receiptNumber Int          @unique @default(autoincrement())
+  /// Nulo mientras el día está abierto. Se vincula al cerrar la caja (HU-27).
+  cashClosingId Int?
+  cashClosing   CashClosing? @relation(fields: [cashClosingId], references: [id], onDelete: Restrict)
   appointmentId Int
-  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  appointment   Appointment  @relation(fields: [appointmentId], references: [id])
 
   paymentMethodId Int
   paymentMethod   PaymentMethod @relation(fields: [paymentMethodId], references: [id])
@@ -540,4 +593,5 @@ model Payment {
 
   @@index([appointmentId])
   @@index([createdAt])
+  @@index([cashClosingId])
 }
