@@ -855,7 +855,7 @@ No es una Server Action: la usa el formulario de cobro de HU-21 (ADR 0001).
 **Efectos:** en una transacción `Serializable`, crea un `Payment` en `PAID` con `amount` igual a `Service.price` en ese momento, `createdById` (actor) y `createdAt` (ahora). El monto no cambia si después cambia el valor del servicio. Si dos cobros llegan a la vez, el índice único parcial `Payment_one_paid_per_appointment` deja pasar uno solo.
 **Errores:** `VALIDATION` (entrada inválida, o medio de pago inexistente o inactivo, con `fieldErrors.paymentMethodId`), `FORBIDDEN`, `NOT_FOUND` (el turno no existe), `INVALID_STATUS_TRANSITION` (el turno no está habilitado para cobrar), `PATIENT_HAS_HEALTH_INSURANCE`, `SERVICE_WITHOUT_PRICE`, `APPOINTMENT_ALREADY_PAID`.
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`.
-**Devuelve:** `{ id, amount }`, con `amount` como texto decimal (`"15000.00"`).
+**Devuelve:** `{ id, receiptNumber, amount }`, con `amount` como texto decimal (`"15000.00"`).
 
 ### `voidPayment`
 
@@ -914,9 +914,36 @@ No es una Server Action: la usa el calendario del centro para la marca de cada t
 **Efectos:** ninguno.
 **Errores:** `FORBIDDEN`.
 **Revalida:** no aplica; lectura desde Server Component.
-**Devuelve:** los turnos `SCHEDULED` o `COMPLETED` que empiezan hoy, ordenados por horario. Cada uno con `id`, `status`, `startsAt`, `endsAt`, paciente (nombre y documento), profesional, servicio, `price` como texto decimal o `null`, `state` (`null` si el cobro y la autorización no aplican), `authorizationNumber` y `activePayment` (monto y medio) si lo tiene.
+**Devuelve:** los turnos `SCHEDULED` o `COMPLETED` que empiezan hoy, ordenados por horario. Cada uno con `id`, `status`, `startsAt`, `endsAt`, paciente (nombre y documento), profesional, servicio, `price` como texto decimal o `null`, `state` (`null` si el cobro y la autorización no aplican), `authorizationNumber` y `activePayment` (`id`, `receiptNumber`, monto y medio) si lo tiene.
 
 No es una Server Action: la usa la pantalla *Turnos de hoy* (ADR 0001).
+
+### `getPaymentReceipt`
+
+**Historia de usuario:** [HU-24 — Emitir el comprobante de un cobro](hu/HU-24-comprobante-de-cobro.md)
+**Roles:** `RECEPTIONIST`, `MANAGER` (y `PATIENT` para sus propios turnos en HU-31). `PROFESSIONAL` sin acceso.
+**Entrada:** `paymentId` (entero positivo).
+**Precondiciones:** el cobro existe. Si el actor es `PATIENT`, el turno debe pertenecer al paciente. Si es `PROFESSIONAL`, se rechaza con `FORBIDDEN`.
+**Efectos:** ninguno.
+**Errores:** `VALIDATION` (ID inválido), `FORBIDDEN` (rol no autorizado o paciente ajeno), `NOT_FOUND` (cobro inexistente).
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** los datos completos del comprobante: `receiptNumber`, `paymentId`, `status` (`PAID` o `VOIDED`), `amount` como texto decimal, `paymentMethod`, `createdAt`, `createdBy` (`{ id, firstName, lastName }`), datos de anulación si está anulado (`voidedAt`, `voidReason`, `voidedBy`), datos del turno (`appointment`: `{ id, startsAt, endsAt, service, professional }`), datos del paciente (`patient`: `{ id, firstName, lastName, documentType, documentNumber, email, coverageType, healthInsurer, healthPlan, affiliateNumber }`) y datos del centro (`centerProfile`).
+
+No es una Server Action: la usa la página del comprobante (ADR 0001).
+
+### `getAttendanceCertificate`
+
+**Historia de usuario:** [HU-24 — Emitir el comprobante de un cobro](hu/HU-24-comprobante-de-cobro.md)
+**Roles:** `RECEPTIONIST`, `MANAGER` (y `PATIENT` para sus propios turnos en HU-31). `PROFESSIONAL` sin acceso.
+**Entrada:** `appointmentId` (entero positivo).
+**Precondiciones:** el turno existe y no está cancelado (`CANCELLED`). Si el actor es `PATIENT`, el turno debe pertenecer al paciente. Si es `PROFESSIONAL`, se rechaza con `FORBIDDEN`.
+**Efectos:** ninguno.
+**Errores:** `VALIDATION` (ID inválido o turno cancelado), `FORBIDDEN` (rol no autorizado o paciente ajeno), `NOT_FOUND` (turno inexistente).
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** los datos institucionales de la constancia de atención: `appointmentId`, `startsAt`, `endsAt`, `status`, datos de autorización si existen (`authorization`: `{ number, authorizedAt }`), servicio (`service`: `{ id, name, durationMinutes, requiresReferral }`), profesional (`professional`: `{ id, firstName, lastName, licenseNumber }`), paciente (`patient`: `{ id, firstName, lastName, documentType, documentNumber, email, coverageType, healthInsurer, healthPlan, affiliateNumber }`) y datos del centro (`centerProfile`).
+
+No es una Server Action: la usa la página de constancia de atención (ADR 0001).
+
 
 ### `getCenterIndicators`
 

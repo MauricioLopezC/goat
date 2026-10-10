@@ -5,6 +5,7 @@ import { DomainError } from "@/lib/actions";
 import { assertRole, type Actor } from "@/lib/dal/auth";
 import { assertNoActivePayment } from "@/lib/dal/payments";
 import { serializableTransaction } from "@/lib/dal/transactions";
+import { centerProfile } from "@/lib/center-profile";
 import { paginate } from "@/lib/pagination";
 import {
   AppointmentEventType,
@@ -901,6 +902,125 @@ export async function getAppointment(id: number, actor: Actor) {
     throw new DomainError("NOT_FOUND", "El turno no existe o no tenés acceso.");
   return appointment;
 }
+
+export async function getAttendanceCertificate(
+  appointmentId: number,
+  actor: Actor,
+) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PATIENT);
+  if (!Number.isSafeInteger(appointmentId) || appointmentId <= 0) {
+    throw new DomainError(
+      "VALIDATION",
+      "El identificador de turno no es válido.",
+    );
+  }
+
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: {
+      id: true,
+      startsAt: true,
+      endsAt: true,
+      status: true,
+      authorizationNumber: true,
+      authorizedAt: true,
+      service: {
+        select: {
+          id: true,
+          name: true,
+          durationMinutes: true,
+          requiresReferral: true,
+        },
+      },
+      professional: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          licenseNumber: true,
+        },
+      },
+      patient: {
+        select: {
+          id: true,
+          userId: true,
+          firstName: true,
+          lastName: true,
+          documentType: true,
+          documentNumber: true,
+          email: true,
+          coverageType: true,
+          coverage: {
+            select: {
+              memberNumber: true,
+              insurancePlan: {
+                select: {
+                  name: true,
+                  healthInsurer: {
+                    select: {
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!appointment) {
+    throw new DomainError("NOT_FOUND", "El turno no existe.");
+  }
+
+  if (appointment.status === AppointmentStatus.CANCELLED) {
+    throw new DomainError(
+      "VALIDATION",
+      "No se puede emitir una constancia de atención para un turno cancelado.",
+    );
+  }
+
+  if (actor.role === Role.PATIENT && appointment.patient.userId !== actor.id) {
+    throw new DomainError(
+      "FORBIDDEN",
+      "No podés consultar constancias de otros pacientes.",
+    );
+  }
+
+  return {
+    appointmentId: appointment.id,
+    startsAt: appointment.startsAt,
+    endsAt: appointment.endsAt,
+    status: appointment.status,
+    authorization: appointment.authorizationNumber
+      ? {
+          number: appointment.authorizationNumber,
+          authorizedAt: appointment.authorizedAt,
+        }
+      : null,
+    service: appointment.service,
+    professional: appointment.professional,
+    patient: {
+      id: appointment.patient.id,
+      firstName: appointment.patient.firstName,
+      lastName: appointment.patient.lastName,
+      documentType: appointment.patient.documentType,
+      documentNumber: appointment.patient.documentNumber,
+      email: appointment.patient.email,
+      coverageType: appointment.patient.coverageType,
+      healthInsurer:
+        appointment.patient.coverage?.insurancePlan.healthInsurer.name ?? null,
+      healthPlan: appointment.patient.coverage?.insurancePlan.name ?? null,
+      affiliateNumber: appointment.patient.coverage?.memberNumber ?? null,
+    },
+    center: centerProfile,
+  };
+}
+
+export type AttendanceCertificate = Awaited<
+  ReturnType<typeof getAttendanceCertificate>
+>;
 
 export async function cancelProfessionalAppointment(
   input: {
