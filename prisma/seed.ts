@@ -35,6 +35,7 @@ import {
   HOLIDAYS,
   MANAGER_EMAIL,
   PATIENTS,
+  PATIENT_PORTAL_ACCOUNTS,
   PAYMENT_METHODS,
   PROFESSIONAL_HISTORY,
   PROFESSIONALS,
@@ -45,6 +46,7 @@ import {
   TITLES,
 } from "./seed-data";
 import { resolveSeedStatus, statusOncePast } from "./seed-status";
+import { seedDemoHistory } from "./seed-demo";
 
 // Datos de prueba para lo que ya está implementado: usuarios (HU-01),
 // profesionales y su historial (HU-02 y HU-03), agenda, excepciones y
@@ -398,6 +400,9 @@ async function seedPatients(
       throw new Error(`seed-data.ts: Plan "${key}" no existe en el seed.`);
     }
     const insurancePlanId = plan?.id;
+    const portalAccount = PATIENT_PORTAL_ACCOUNTS.find(
+      (account) => account.documentNumber === p.documentNumber,
+    );
 
     // Mismo schema que el alta desde la UI: si un dato del seed deja de ser
     // válido (ej. un menor sin tutor), el seed falla en vez de sembrarlo.
@@ -427,6 +432,9 @@ async function seedPatients(
       active: true,
       createdById: idOf(userIds, p.createdBy, "Usuario"),
       updatedById: p.updatedBy ? idOf(userIds, p.updatedBy, "Usuario") : null,
+      ...(portalAccount
+        ? { userId: idOf(userIds, portalAccount.email, "Usuario") }
+        : {}),
     };
 
     const { id: patientId } = await prisma.patient.upsert({
@@ -884,6 +892,11 @@ async function main() {
     );
     console.log(
       `✓ ${appointments.created} turnos nuevos (${appointments.existing} ya estaban, ${appointments.skipped} salteados por feriado u horario ocupado)`,
+    );
+
+    const demo = await seedDemoHistory(prisma, userIds, patientIds);
+    console.log(
+      `✓ Demo: ${demo.appointments} turnos, ${demo.payments} cobros, ${demo.encounters} atenciones y ${demo.closings} cajas nuevas (${demo.today} turnos de hoy)`,
     );
 
     console.log(`\nContraseña de todos los usuarios: ${password}`);
