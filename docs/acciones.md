@@ -931,6 +931,20 @@ No es una Server Action: la usa la pantalla *Turnos de hoy* (ADR 0001).
 
 No es una Server Action: la usa la página del comprobante (ADR 0001).
 
+### `getAttendanceCertificate`
+
+**Historia de usuario:** [HU-24 — Emitir el comprobante de un cobro](hu/HU-24-comprobante-de-cobro.md)
+**Roles:** `RECEPTIONIST`, `MANAGER` (y `PATIENT` para sus propios turnos en HU-31). `PROFESSIONAL` sin acceso.
+**Entrada:** `appointmentId` (entero positivo).
+**Precondiciones:** el turno existe y no está cancelado (`CANCELLED`). Si el actor es `PATIENT`, el turno debe pertenecer al paciente. Si es `PROFESSIONAL`, se rechaza con `FORBIDDEN`.
+**Efectos:** ninguno.
+**Errores:** `VALIDATION` (ID inválido o turno cancelado), `FORBIDDEN` (rol no autorizado o paciente ajeno), `NOT_FOUND` (turno inexistente).
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** los datos institucionales de la constancia de atención: `appointmentId`, `startsAt`, `endsAt`, `status`, datos de autorización si existen (`authorization`: `{ number, authorizedAt }`), servicio (`service`: `{ id, name, durationMinutes, requiresReferral }`), profesional (`professional`: `{ id, firstName, lastName, licenseNumber }`), paciente (`patient`: `{ id, firstName, lastName, documentType, documentNumber, email, coverageType, healthInsurer, healthPlan, affiliateNumber }`) y datos del centro (`centerProfile`).
+
+No es una Server Action: la usa la página de constancia de atención (ADR 0001).
+
+
 ### `getCenterIndicators`
 
 **Historia de usuario:** [HU-22 — Ver la ocupación y el ausentismo del centro](hu/HU-22-indicadores-iniciales.md)

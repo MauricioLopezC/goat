@@ -101,7 +101,19 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
       )}
       {authorizedRow?.authorizationNumber && (
         <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
-          <AlertTitle>Autorización registrada</AlertTitle>
+          <AlertTitle className="flex flex-wrap items-center justify-between gap-2">
+            <span>Autorización registrada</span>
+            <Button
+              size="sm"
+              variant="outline"
+              asChild
+              className="bg-card text-foreground"
+            >
+              <Link href={`/appointments/${authorizedRow.id}/certificate`}>
+                Ver constancia
+              </Link>
+            </Button>
+          </AlertTitle>
           <AlertDescription className="text-success-soft-foreground">
             {authorizedRow.patient.lastName}, {authorizedRow.patient.firstName}{" "}
             · número de autorización: {authorizedRow.authorizationNumber}.
@@ -246,6 +258,15 @@ function RowAction({
         <Link href={`/payments/${row.activePayment.id}/receipt`}>
           Comprobante
         </Link>
+      </Button>
+    );
+  if (
+    row.state === "AUTHORIZED" ||
+    (row.state === null && row.status !== "CANCELLED")
+  )
+    return (
+      <Button variant="outline" size="sm" className="h-8" asChild>
+        <Link href={`/appointments/${row.id}/certificate`}>Constancia</Link>
       </Button>
     );
   if (row.state !== "PENDING_PAYMENT") return null;

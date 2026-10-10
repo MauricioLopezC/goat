@@ -20,6 +20,7 @@ const ROUTE_RULES: RouteRule[] = [
   { pattern: /^\/appointments\/new(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/appointments\/unclosed(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/appointments\/[^/]+\/reschedule(\/|$)/, roles: STAFF },
+  { pattern: /^\/appointments\/[^/]+\/certificate(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/patients\/new(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/patients\/[^/]+\/edit(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/professionals\/new(\/|$)/, roles: ["MANAGER"] },

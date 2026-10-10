@@ -7,6 +7,7 @@ import {
   voidPaymentSchema,
 } from "../src/lib/validation/payments";
 import { centerProfile, formatReceiptNumber } from "../src/lib/center-profile";
+import { canAccess } from "../src/lib/route-access";
 
 const base = {
   coverageType: "PRIVATE" as const,
@@ -116,4 +117,10 @@ test("Comprobante de cobro: formato correlativo y datos del centro (HU-24)", () 
   assert.ok(centerProfile.cuit.length > 0);
   assert.ok(centerProfile.address.length > 0);
   assert.ok(centerProfile.phone.length > 0);
+});
+
+test("Constancia de atención: acceso por rol (HU-24)", () => {
+  assert.equal(canAccess("/appointments/1/certificate", "RECEPTIONIST"), true);
+  assert.equal(canAccess("/appointments/1/certificate", "MANAGER"), true);
+  assert.equal(canAccess("/appointments/1/certificate", "PROFESSIONAL"), false);
 });

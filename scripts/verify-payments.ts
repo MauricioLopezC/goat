@@ -18,6 +18,7 @@ import {
   cancelProfessionalAppointment,
   completeAppointment,
   expireAppointment,
+  getAttendanceCertificate,
 } from "../src/lib/dal/appointments";
 import { appointmentInstant } from "../src/lib/appointment-slots";
 import { addDays, dateToDb, toLocalSlot } from "../src/lib/schedule";
@@ -611,6 +612,56 @@ async function main() {
         assert.equal(voidedReceipt.voidReason, "Error de carga para prueba");
         assert.ok(voidedReceipt.voidedAt !== null);
         assert.equal(voidedReceipt.voidedBy?.id, manager.id);
+      },
+    );
+
+    await verify(
+      "constancia de atención: emite con datos del centro y paciente, rechaza cancelados y profesionales",
+      async () => {
+        const apptId = await appointment({
+          patientId: insuredPatient,
+          serviceId: referral.id,
+        });
+
+        const cert = await getAttendanceCertificate(apptId, receptionist);
+        assert.equal(cert.appointmentId, apptId);
+        assert.equal(cert.patient.id, insuredPatient);
+        assert.ok(cert.patient.lastName.length > 0);
+        assert.ok(cert.service.name.length > 0);
+        assert.ok(cert.professional.lastName.length > 0);
+        assert.equal(cert.center.name, "GOAT Policonsultorio");
+
+        // Manager también puede emitir
+        const certMgr = await getAttendanceCertificate(apptId, manager);
+        assert.equal(certMgr.appointmentId, apptId);
+
+        // Profesional no tiene permiso
+        await rejects(
+          () => getAttendanceCertificate(apptId, professionalActor),
+          "FORBIDDEN",
+        );
+
+        // Inexistente da NOT_FOUND
+        await rejects(
+          () => getAttendanceCertificate(99999999, receptionist),
+          "NOT_FOUND",
+        );
+
+        // Cancelar el turno
+        await cancelAppointment(
+          {
+            appointmentId: apptId,
+            reason: "Cancelado de prueba",
+            requestedBy: "PACIENTE",
+          },
+          receptionist,
+        );
+
+        // Turno cancelado rechaza con VALIDATION
+        await rejects(
+          () => getAttendanceCertificate(apptId, receptionist),
+          "VALIDATION",
+        );
       },
     );
 
