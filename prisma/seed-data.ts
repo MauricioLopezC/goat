@@ -60,6 +60,20 @@ export const SEED_USERS = [
     role: Role.PROFESSIONAL,
     active: true,
   },
+  {
+    email: "elena.choque@example.com",
+    firstName: "Elena",
+    lastName: "Choque",
+    role: Role.PATIENT,
+    active: true,
+  },
+  {
+    email: "maria.guaymas@example.com",
+    firstName: "María Eugenia",
+    lastName: "Guaymás",
+    role: Role.PATIENT,
+    active: true,
+  },
   // Inactivo: para probar que el login lo rechaza (HU-01).
   {
     email: "exmesa@goat.local",
@@ -71,6 +85,25 @@ export const SEED_USERS = [
 ];
 
 export const MANAGER_EMAIL = "gerente@goat.local";
+
+export const PATIENT_PORTAL_ACCOUNTS = [
+  { documentNumber: "35678210", email: "elena.choque@example.com" },
+  { documentNumber: "28456123", email: "maria.guaymas@example.com" },
+];
+
+// Demanda desigual para que los rankings de la demo cuenten una historia.
+// Un valor mayor genera más turnos por jornada y más pacientes distintos.
+export const HISTORY_DEMAND: Record<string, number> = {
+  "4521": 3,
+  "2873": 2,
+  "5610": 2,
+  "6344": 1,
+  "3312": 1,
+  "8120": 4,
+  "7985": 3,
+  "9054": 1,
+  "6891": 2,
+};
 
 // ─────────────────────── Catálogos del centro ────────────────────────
 

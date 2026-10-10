@@ -22,8 +22,15 @@ vuelve a sus valores; lo cargado desde la UI no se toca) y se niega a correr con
 `NODE_ENV=production`. Prisma 7 ya no lo corre después de `prisma migrate reset`:
 hay que correr `npm run db:seed` a continuación.
 
-Los turnos se siembran desde la semana anterior a la corrida hasta tres semanas
-después, así el calendario y el horizonte para dar turnos siempre tienen datos.
+Los turnos se siembran desde 92 días antes de la corrida hasta tres semanas
+después. La historia de demo se genera de forma determinista: los mismos
+profesionales, horarios y fechas producen los mismos turnos, y una segunda
+corrida no duplica los existentes. Los días con caja ya cerrada se respetan.
+Hay profesionales, servicios, días y pacientes con distinta demanda para que
+los indicadores muestren tendencias; los turnos pasados quedan cerrados y
+pueden tener cobro, caja cerrada y una nota de atención.
+
+El calendario y el horizonte para dar turnos siempre tienen datos.
 Hay turnos ya cerrados (Completado, Vencido, Cancelado) y unos pocos turnos
 pasados que siguen Programados para probar "Marcar completado" y "Marcar
 vencido". Los turnos de la semana actual que ya terminaron al correr el seed se
@@ -48,6 +55,8 @@ Todos los usuarios tienen la contraseña `goat1234` (cambiable con `SEED_PASSWOR
 | `profesional@goat.local` | `PROFESSIONAL` | Julia Ferrari, con ficha de profesional |
 | `rarias@goat.local` | `PROFESSIONAL` | Ricardo Arias, con ficha de profesional |
 | `lzerpa@goat.local` | `PROFESSIONAL` | Lucía Zerpa, con ficha de profesional |
+| `elena.choque@example.com` | `PATIENT` | Elena Choque, paciente particular con portal |
+| `maria.guaymas@example.com` | `PATIENT` | María Guaymás, paciente con obra social y portal |
 | `exmesa@goat.local` | `RECEPTIONIST` | Inactivo: el login lo rechaza |
 
 Además siembra:
@@ -58,6 +67,7 @@ Además siembra:
 - **Pacientes:** 35, particulares y con obra social. Incluye menores con tutor, uno de 16 años sin tutor, adultos mayores con LE, LC o CI, un extranjero con pasaporte y uno con género "Otro". Dos tienen modificaciones posteriores al alta.
 - **Agenda:** 7 consultorios, franjas semanales para los 9 profesionales que atienden (varias por día, una restringida a ciertos servicios), feriados hasta marzo de 2027 y 5 excepciones (de día completo y de una parte de la franja) en las semanas siguientes.
 - **Turnos:** unos 120 en cinco semanas, en los cuatro estados, algunos con observaciones. Incluyen series de kinesiología del mismo paciente, cancelaciones pedidas por el paciente y por el profesional, y reprogramaciones.
+- **Demo del incremento 3:** tres meses móviles de turnos Completados, Vencidos y Cancelados; cobros particulares vinculados a cajas cerradas y atenciones con notas de los profesionales que tienen cuenta. También intenta completar los cuatro estados en el día actual cuando hay franja y ya transcurrieron horarios suficientes. Dos pacientes tienen cuenta de portal vinculada a su ficha.
 
 Las convenciones de código, arquitectura y dominio están en [`AGENTS.md`](AGENTS.md).
 
