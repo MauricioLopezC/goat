@@ -16,6 +16,7 @@ import { COVERAGE_TYPE_LABEL } from "@/lib/patients";
 import { formatDate, formatMinute, toLocalSlot } from "@/lib/schedule";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -77,8 +78,20 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
 
       {paidRow?.activePayment && (
         <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
-          <AlertTitle>
-            Cobro registrado: {formatAmount(paidRow.activePayment.amount)}
+          <AlertTitle className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              Cobro registrado: {formatAmount(paidRow.activePayment.amount)}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              asChild
+              className="bg-card text-foreground"
+            >
+              <Link href={`/payments/${paidRow.activePayment.id}/receipt`}>
+                Ver comprobante
+              </Link>
+            </Button>
           </AlertTitle>
           <AlertDescription className="text-success-soft-foreground">
             {paidRow.patient.lastName}, {paidRow.patient.firstName} · se cobró
@@ -226,6 +239,14 @@ function RowAction({
         summary={summary}
         currentNumber={null}
       />
+    );
+  if (row.state === "PAID" && row.activePayment)
+    return (
+      <Button variant="outline" size="sm" className="h-8" asChild>
+        <Link href={`/payments/${row.activePayment.id}/receipt`}>
+          Comprobante
+        </Link>
+      </Button>
     );
   if (row.state !== "PENDING_PAYMENT") return null;
   if (row.price === null)
