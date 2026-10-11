@@ -111,9 +111,13 @@ export async function createAvailabilityException(
   _previous: ScheduleMutationState,
   formData: FormData,
 ): Promise<ScheduleMutationState> {
+  const date = formData.get("date");
+  const startDate = formData.get("startDate") ?? date;
+  const endDate = formData.get("endDate") ?? date ?? startDate;
   return createException({
     professionalId: Number(formData.get("professionalId")),
-    date: formData.get("date"),
+    startDate,
+    endDate,
     allDay: formData.get("allDay"),
     startTime: formData.get("startTime") || null,
     endTime: formData.get("endTime") || null,

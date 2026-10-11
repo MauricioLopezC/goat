@@ -105,6 +105,12 @@ export type ProfessionalIndicatorsInput = {
   days: string[];
   /// Días en que el centro cerró (`Holiday`), en `AAAA-MM-DD`.
   holidays: ReadonlySet<string>;
+  /// Cierres parciales del centro por tramos horarios.
+  holidayRanges?: {
+    date: string;
+    startMinute: number | null;
+    endMinute: number | null;
+  }[];
   /// Patrón semanal vigente: no hay historial de franjas (supuesto de HU-22).
   windows: { weekday: Weekday; startMinute: number; endMinute: number }[];
   /// Ausencias del período. Sin horario, el día entero.
@@ -138,7 +144,7 @@ export function availableRangesByDay(
       .filter((window) => window.weekday === weekday)
       .map(({ startMinute, endMinute }) => ({ startMinute, endMinute }));
     if (windows.length === 0) continue;
-    const ranges = input.exceptions
+    const dayExceptions = input.exceptions
       .filter((exception) => exception.date === day)
       .map((exception) =>
         exception.startMinute === null || exception.endMinute === null
@@ -147,8 +153,19 @@ export function availableRangesByDay(
               startMinute: exception.startMinute,
               endMinute: exception.endMinute,
             },
-      )
-      .reduce(subtractRange, windows);
+      );
+    const dayHolidays = (input.holidayRanges ?? [])
+      .filter((holiday) => holiday.date === day)
+      .map((holiday) =>
+        holiday.startMinute === null || holiday.endMinute === null
+          ? { startMinute: 0, endMinute: 1440 }
+          : {
+              startMinute: holiday.startMinute,
+              endMinute: holiday.endMinute,
+            },
+      );
+    const cuts = [...dayExceptions, ...dayHolidays];
+    const ranges = cuts.reduce(subtractRange, windows);
     if (ranges.length > 0) byDay.set(day, ranges);
   }
   return byDay;

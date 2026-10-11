@@ -43,8 +43,15 @@ export async function createHoliday(
   _previous: HolidayMutationState,
   formData: FormData,
 ): Promise<HolidayMutationState> {
+  const date = formData.get("date");
+  const startDate = formData.get("startDate") ?? date;
+  const endDate = formData.get("endDate") ?? date ?? startDate;
   return create({
-    date: formData.get("date"),
+    startDate,
+    endDate,
+    allDay: formData.get("allDay"),
+    startTime: formData.get("startTime") || null,
+    endTime: formData.get("endTime") || null,
     description: formData.get("description"),
   });
 }

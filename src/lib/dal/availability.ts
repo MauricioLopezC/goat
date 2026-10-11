@@ -146,24 +146,29 @@ function futureScheduled(where: Prisma.AppointmentWhereInput) {
   } satisfies Prisma.AppointmentFindManyArgs;
 }
 
-/// Turnos de un día local. Se consulta un rango holgado en UTC y se filtra
-/// por la fecha en hora del centro.
-async function scheduledOnDate(
+/// Turnos en un rango de fechas local inclusivo [startDate, endDate].
+async function scheduledInDateRange(
   tx: Tx,
-  date: string,
+  startDate: string,
+  endDate: string,
   where: Prisma.AppointmentWhereInput = {},
 ) {
-  const day = dateToDb(date).getTime();
+  const startDay = dateToDb(startDate).getTime();
+  const endDay = dateToDb(endDate).getTime();
   const oneDay = 24 * 60 * 60 * 1000;
   const appointments = await tx.appointment.findMany(
     futureScheduled({
       ...where,
-      startsAt: { gte: new Date(day - oneDay), lt: new Date(day + 2 * oneDay) },
+      startsAt: {
+        gte: new Date(startDay - oneDay),
+        lt: new Date(endDay + 2 * oneDay),
+      },
     }),
   );
-  return appointments.filter(
-    (appointment) => toLocalSlot(appointment.startsAt).date === date,
-  );
+  return appointments.filter((appointment) => {
+    const slotDate = toLocalSlot(appointment.startsAt).date;
+    return slotDate >= startDate && slotDate <= endDate;
+  });
 }
 
 /// Rechaza el cambio si algún turno que entraba en las franjas `before` deja
@@ -388,8 +393,22 @@ export async function deleteAvailabilityWindow(
 function assertNotPast(date: string) {
   if (date < getTodayDateString())
     throw new DomainError("VALIDATION", "La fecha no puede ser pasada.", {
+      startDate: ["La fecha no puede ser pasada"],
       date: ["La fecha no puede ser pasada"],
     });
+}
+
+function assertValidDateRange(startDate: string, endDate: string) {
+  assertNotPast(startDate);
+  if (endDate < startDate) {
+    throw new DomainError(
+      "VALIDATION",
+      "La fecha de fin no puede ser anterior a la de inicio.",
+      {
+        endDate: ["La fecha de fin no puede ser anterior a la de inicio"],
+      },
+    );
+  }
 }
 
 export async function createAvailabilityException(
@@ -397,7 +416,14 @@ export async function createAvailabilityException(
   actor: Actor,
 ) {
   assertRole(actor, Role.MANAGER);
-  assertNotPast(input.date);
+  const startDate = input.startDate ?? input.date;
+  const endDate = input.endDate ?? input.date ?? startDate;
+  if (!startDate || !endDate) {
+    throw new DomainError("VALIDATION", "Fecha requerida");
+  }
+  assertValidDateRange(startDate, endDate);
+  const startMinute = input.startMinute ?? null;
+  const endMinute = input.endMinute ?? null;
   return prisma.$transaction(async (tx) => {
     const professional = await tx.professional.findUnique({
       where: { id: input.professionalId },
@@ -406,10 +432,44 @@ export async function createAvailabilityException(
     if (!professional)
       throw new DomainError("NOT_FOUND", "El profesional no existe.");
 
-    const appointments = await scheduledOnDate(tx, input.date, {
+    const existingExceptions = await tx.availabilityException.findMany({
+      where: {
+        professionalId: input.professionalId,
+        startDate: { lte: dateToDb(endDate) },
+        endDate: { gte: dateToDb(startDate) },
+      },
+      select: {
+        id: true,
+        startMinute: true,
+        endMinute: true,
+      },
+    });
+
+    const isOverlap = existingExceptions.some((e) => {
+      if (
+        startMinute === null ||
+        endMinute === null ||
+        e.startMinute === null ||
+        e.endMinute === null
+      ) {
+        return true;
+      }
+      return startMinute < e.endMinute && e.startMinute < endMinute;
+    });
+
+    if (isOverlap) {
+      throw new DomainError(
+        "DUPLICATE",
+        "El profesional ya tiene una ausencia cargada en ese período y horario.",
+        {
+          startDate: ["Ya hay una ausencia cargada en ese período"],
+        },
+      );
+    }
+
+    const appointments = await scheduledInDateRange(tx, startDate, endDate, {
       professionalId: input.professionalId,
     });
-    const { startMinute, endMinute } = input;
     rejectAffected(
       appointments.filter((appointment) => {
         if (startMinute === null || endMinute === null) return true;
@@ -422,8 +482,8 @@ export async function createAvailabilityException(
     return tx.availabilityException.create({
       data: {
         professionalId: input.professionalId,
-        startDate: dateToDb(input.date),
-        endDate: dateToDb(input.date),
+        startDate: dateToDb(startDate),
+        endDate: dateToDb(endDate),
         startMinute,
         endMinute,
         reason: input.reason,
@@ -481,10 +541,11 @@ export async function getProfessionalSchedule(
         orderBy: [{ weekday: "asc" }, { startMinute: "asc" }],
       },
       exceptions: {
-        where: { startDate: { gte: dateToDb(getTodayDateString()) } },
+        where: { endDate: { gte: dateToDb(getTodayDateString()) } },
         select: {
           id: true,
           startDate: true,
+          endDate: true,
           startMinute: true,
           endMinute: true,
           reason: true,
@@ -515,6 +576,8 @@ export async function getProfessionalSchedule(
     windows: professional.availabilityWindows,
     exceptions: professional.exceptions.map((exception) => ({
       ...exception,
+      startDate: dateFromDb(exception.startDate),
+      endDate: dateFromDb(exception.endDate),
       date: dateFromDb(exception.startDate),
     })),
     services: professional.services,
@@ -541,10 +604,10 @@ export async function getOwnProfessionalId(actor: Actor) {
 
 // ─────────────────────────── Feriados ──────────────────────────────────
 
-/// Cierres de hoy en adelante, paginados y ordenados por fecha (HU-05, HU-14).
+/// Cierres de hoy en adelante, paginados y ordenados por fecha (HU-05, HU-14, HU-23).
 export async function listHolidays(page: number, actor: Actor) {
   assertRole(actor, ...STAFF_ROLES);
-  const where = { startDate: { gte: dateToDb(getTodayDateString()) } };
+  const where = { endDate: { gte: dateToDb(getTodayDateString()) } };
   const holidays = await paginate(
     page,
     () => prisma.holiday.count({ where }),
@@ -552,7 +615,14 @@ export async function listHolidays(page: number, actor: Actor) {
     (range) =>
       prisma.holiday.findMany({
         where,
-        select: { id: true, startDate: true, description: true },
+        select: {
+          id: true,
+          startDate: true,
+          endDate: true,
+          startMinute: true,
+          endMinute: true,
+          description: true,
+        },
         orderBy: [{ startDate: "asc" }, { id: "asc" }],
         ...range,
       }),
@@ -561,43 +631,97 @@ export async function listHolidays(page: number, actor: Actor) {
     ...holidays,
     items: holidays.items.map((holiday) => ({
       ...holiday,
+      startDate: dateFromDb(holiday.startDate),
+      endDate: dateFromDb(holiday.endDate),
       date: dateFromDb(holiday.startDate),
     })),
   };
 }
 
-/// Cierra el centro el día completo, por feriado o día excepcional (HU-14).
-/// No se carga sobre un día con turnos programados que todavía no comenzaron:
+/// Cierra el centro por rango de fechas y tramo diario opcional (HU-14, HU-23).
+/// No se carga sobre un período con turnos programados que todavía no comenzaron:
 /// se listan para cancelarlos o reprogramarlos antes.
 export async function createHoliday(input: HolidayInput, actor: Actor) {
   assertRole(actor, Role.MANAGER, Role.RECEPTIONIST);
-  assertNotPast(input.date);
+  const startDate = input.startDate ?? input.date;
+  const endDate = input.endDate ?? input.date ?? startDate;
+  if (!startDate || !endDate) {
+    throw new DomainError("VALIDATION", "Fecha requerida");
+  }
+  assertValidDateRange(startDate, endDate);
+  const startMinute = input.startMinute ?? null;
+  const endMinute = input.endMinute ?? null;
   return prisma.$transaction(async (tx) => {
-    const existing = await tx.holiday.findFirst({
-      where: { startDate: dateToDb(input.date) },
-      select: { id: true },
+    const existing = await tx.holiday.findMany({
+      where: {
+        startDate: { lte: dateToDb(endDate) },
+        endDate: { gte: dateToDb(startDate) },
+      },
+      select: {
+        id: true,
+        startMinute: true,
+        endMinute: true,
+      },
     });
-    if (existing)
-      throw new DomainError("DUPLICATE", "El centro ya está cerrado ese día.", {
-        date: ["Ya hay un cierre cargado ese día"],
-      });
 
+    const isOverlap = existing.some((h) => {
+      if (
+        startMinute === null ||
+        endMinute === null ||
+        h.startMinute === null ||
+        h.endMinute === null
+      ) {
+        return true;
+      }
+      return startMinute < h.endMinute && h.startMinute < endMinute;
+    });
+
+    if (isOverlap) {
+      throw new DomainError(
+        "DUPLICATE",
+        "El centro ya tiene un cierre programado en esas fechas y horarios.",
+        {
+          startDate: ["Ya hay un cierre cargado en ese período"],
+          date: ["Ya hay un cierre cargado ese día"],
+        },
+      );
+    }
+
+    const appointments = await scheduledInDateRange(tx, startDate, endDate);
     rejectAffected(
-      await scheduledOnDate(tx, input.date),
+      appointments.filter((appointment) => {
+        if (startMinute === null || endMinute === null) return true;
+        const range = localRange(appointment);
+        return range.minute < endMinute && startMinute < range.endMinute;
+      }),
       "El cierre cae sobre",
       "Cancelalos o reprogramalos antes de cerrar el centro.",
     );
 
     const holiday = await tx.holiday.create({
       data: {
-        startDate: dateToDb(input.date),
-        endDate: dateToDb(input.date),
+        startDate: dateToDb(startDate),
+        endDate: dateToDb(endDate),
+        startMinute,
+        endMinute,
         description: input.description,
         createdById: actor.id,
       },
-      select: { id: true, startDate: true, description: true },
+      select: {
+        id: true,
+        startDate: true,
+        endDate: true,
+        startMinute: true,
+        endMinute: true,
+        description: true,
+      },
     });
-    return { ...holiday, date: dateFromDb(holiday.startDate) };
+    return {
+      ...holiday,
+      startDate: dateFromDb(holiday.startDate),
+      endDate: dateFromDb(holiday.endDate),
+      date: dateFromDb(holiday.startDate),
+    };
   }, SERIALIZABLE);
 }
 

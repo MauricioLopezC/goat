@@ -41,6 +41,8 @@ import {
 
 export type ScheduleException = {
   id: number;
+  startDate?: string;
+  endDate?: string;
   date: string;
   startMinute: number | null;
   endMinute: number | null;
@@ -48,14 +50,22 @@ export type ScheduleException = {
   createdBy: { firstName: string; lastName: string };
 };
 
+function formatExceptionPeriod(exception: ScheduleException) {
+  const start = exception.startDate ?? exception.date;
+  const end = exception.endDate ?? exception.date;
+  return start === end
+    ? formatDate(start)
+    : `${formatDate(start)} al ${formatDate(end)}`;
+}
+
 function exceptionHours(exception: ScheduleException) {
   return exception.startMinute === null || exception.endMinute === null
     ? "Día completo"
     : `${formatMinute(exception.startMinute)}–${formatMinute(exception.endMinute)}`;
 }
 
-/// Excepciones de agenda del profesional (HU-05): ausencias puntuales que se
-/// descuentan del patrón semanal. Solo `MANAGER` las carga y elimina.
+/// Excepciones de agenda del profesional (HU-05, HU-23): ausencias puntuales o
+/// períodos de vacaciones que se descuentan del patrón semanal. Solo `MANAGER` las carga y elimina.
 export function ExceptionsSection({
   professionalId,
   exceptions,
@@ -91,7 +101,7 @@ export function ExceptionsSection({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha</TableHead>
+                <TableHead>Período</TableHead>
                 <TableHead>Horario</TableHead>
                 <TableHead>Motivo</TableHead>
                 <TableHead>Cargada por</TableHead>
@@ -99,33 +109,35 @@ export function ExceptionsSection({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {exceptions.map((exception) => (
-                <TableRow key={exception.id}>
-                  <TableCell className="capitalize">
-                    {formatDate(exception.date)}
-                  </TableCell>
-                  <TableCell className="tabular-nums">
-                    {exceptionHours(exception)}
-                  </TableCell>
-                  <TableCell className="whitespace-normal">
-                    {exception.reason}
-                  </TableCell>
-                  <TableCell>
-                    {exception.createdBy.firstName}{" "}
-                    {exception.createdBy.lastName}
-                  </TableCell>
-                  {canEdit && (
-                    <TableCell className="text-right">
-                      <ConfirmDelete
-                        action={deleteAvailabilityException}
-                        fields={{ id: exception.id, professionalId }}
-                        title="Eliminar excepción"
-                        description={`El ${formatDate(exception.date)} (${exceptionHours(exception).toLowerCase()}) vuelve a ofrecer los horarios de sus franjas.`}
-                      />
+              {exceptions.map((exception) => {
+                const periodLabel = formatExceptionPeriod(exception);
+                const hoursLabel = exceptionHours(exception);
+                return (
+                  <TableRow key={exception.id}>
+                    <TableCell className="capitalize tabular-nums">
+                      {periodLabel}
                     </TableCell>
-                  )}
-                </TableRow>
-              ))}
+                    <TableCell className="tabular-nums">{hoursLabel}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      {exception.reason}
+                    </TableCell>
+                    <TableCell>
+                      {exception.createdBy.firstName}{" "}
+                      {exception.createdBy.lastName}
+                    </TableCell>
+                    {canEdit && (
+                      <TableCell className="text-right">
+                        <ConfirmDelete
+                          action={deleteAvailabilityException}
+                          fields={{ id: exception.id, professionalId }}
+                          title="Eliminar excepción"
+                          description={`Durante ${periodLabel} (${hoursLabel.toLowerCase()}) vuelve a ofrecer los horarios de sus franjas.`}
+                        />
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
@@ -153,6 +165,8 @@ function ExceptionForm({
   onDone: () => void;
 }) {
   const [allDay, setAllDay] = useState(true);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [state, formAction, pending] = useActionState<
     ScheduleMutationState,
     FormData
@@ -178,23 +192,50 @@ function ExceptionForm({
       <DialogHeader>
         <DialogTitle>Agregar excepción</DialogTitle>
         <DialogDescription>
-          Día u horario en que el profesional no atiende. No se puede cargar
+          Período u horario en que el profesional no atiende. No se puede cargar
           sobre turnos ya programados.
         </DialogDescription>
       </DialogHeader>
 
       <input type="hidden" name="professionalId" value={professionalId} />
 
-      <Field label="Fecha *" name="date" errors={fieldErrors?.date}>
-        <Input
-          id="date"
-          name="date"
-          type="date"
-          required
-          min={getTodayDateString()}
-          className="tabular-nums"
-        />
-      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          label="Fecha inicio *"
+          name="startDate"
+          errors={fieldErrors?.startDate || fieldErrors?.date}
+        >
+          <Input
+            id="startDate"
+            name="startDate"
+            type="date"
+            required
+            min={getTodayDateString()}
+            value={startDate}
+            onChange={(e) => {
+              const val = e.target.value;
+              setStartDate(val);
+              if (!endDate || endDate < val) {
+                setEndDate(val);
+              }
+            }}
+            className="tabular-nums"
+          />
+        </Field>
+
+        <Field label="Fecha fin *" name="endDate" errors={fieldErrors?.endDate}>
+          <Input
+            id="endDate"
+            name="endDate"
+            type="date"
+            required
+            min={startDate || getTodayDateString()}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="tabular-nums"
+          />
+        </Field>
+      </div>
 
       <Label className="flex items-center gap-2 font-normal">
         <Checkbox

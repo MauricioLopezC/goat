@@ -57,8 +57,11 @@ export function DayView({
   paymentStates: Record<number, PaymentState>;
 }) {
   const filtered = Boolean(query.professionalId || query.serviceId);
-  const nobodyAttends = !day.professionals.some((item) => item.attends);
-  const { firstHour, lastHour } = hourRange(day.professionals);
+  const nobodyAttends = day.professionals.length === 0;
+  const { firstHour, lastHour } = hourRange(
+    day.professionals,
+    day.partialHolidays,
+  );
   const hours = Array.from(
     { length: lastHour - firstHour },
     (_, index) => firstHour + index,
@@ -230,6 +233,22 @@ export function DayView({
                       }}
                     >
                       Ausencia: {absence.reason}
+                    </div>
+                  ))}
+                  {day.partialHolidays.map((holiday) => (
+                    <div
+                      key={holiday.id}
+                      title={`Centro cerrado: ${holiday.description}`}
+                      className="bg-holiday/15 text-holiday-foreground border-holiday/40 absolute inset-x-1 z-20 overflow-hidden rounded-sm border border-dashed p-1 text-xs"
+                      style={{
+                        top: offset(holiday.startMinute),
+                        height:
+                          offset(holiday.endMinute) -
+                          offset(holiday.startMinute),
+                      }}
+                    >
+                      <span className="font-semibold">Centro cerrado:</span>{" "}
+                      {holiday.description}
                     </div>
                   ))}
                   {item.freeBlocks.map((block) => {
