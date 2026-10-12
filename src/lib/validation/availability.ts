@@ -18,10 +18,11 @@ const date = z
   .trim()
   .refine(isCalendarDate, "Fecha inválida (formato AAAA-MM-DD)");
 
-const checkbox = z.preprocess(
-  (value) => value === true || value === "on" || value === "true",
-  z.boolean(),
-);
+const checkbox = z.preprocess((value) => {
+  if (value === true || value === "on" || value === "true") return true;
+  if (value === false || value === "false") return false;
+  return undefined;
+}, z.boolean().optional());
 
 /// Campos de una franja, tal como llegan del formulario.
 const windowFields = z.object({
@@ -94,7 +95,9 @@ export const createAvailabilityExceptionSchema = z
       });
     }
 
-    if (data.allDay) return;
+    const isAllDay = data.allDay ?? (!data.startTime && !data.endTime);
+    if (isAllDay) return;
+
     if (!data.startTime)
       ctx.addIssue({
         code: "custom",
@@ -121,12 +124,13 @@ export const createAvailabilityExceptionSchema = z
   .transform(({ allDay, startTime, endTime, ...rest }) => {
     const startDate = (rest.startDate ?? rest.date)!;
     const endDate = (rest.endDate ?? rest.date ?? rest.startDate)!;
+    const effectiveAllDay = allDay ?? (!startTime && !endTime);
     return {
       professionalId: rest.professionalId,
       startDate,
       endDate,
-      startMinute: allDay || !startTime ? null : parseTime(startTime),
-      endMinute: allDay || !endTime ? null : parseTime(endTime),
+      startMinute: effectiveAllDay || !startTime ? null : parseTime(startTime),
+      endMinute: effectiveAllDay || !endTime ? null : parseTime(endTime),
       reason: rest.reason,
       date: startDate,
     };
@@ -170,7 +174,9 @@ export const createHolidaySchema = z
       });
     }
 
-    if (data.allDay) return;
+    const isAllDay = data.allDay ?? (!data.startTime && !data.endTime);
+    if (isAllDay) return;
+
     if (!data.startTime)
       ctx.addIssue({
         code: "custom",
@@ -197,11 +203,12 @@ export const createHolidaySchema = z
   .transform(({ allDay, startTime, endTime, ...rest }) => {
     const startDate = (rest.startDate ?? rest.date)!;
     const endDate = (rest.endDate ?? rest.date ?? rest.startDate)!;
+    const effectiveAllDay = allDay ?? (!startTime && !endTime);
     return {
       startDate,
       endDate,
-      startMinute: allDay || !startTime ? null : parseTime(startTime),
-      endMinute: allDay || !endTime ? null : parseTime(endTime),
+      startMinute: effectiveAllDay || !startTime ? null : parseTime(startTime),
+      endMinute: effectiveAllDay || !endTime ? null : parseTime(endTime),
       description: rest.description,
       date: startDate,
     };

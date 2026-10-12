@@ -7,7 +7,6 @@ import {
 import { calculateFreeBlocks } from "../src/lib/calendar";
 import {
   calculateIndicators,
-  periodDays,
   type ProfessionalIndicatorsInput,
 } from "../src/lib/indicators";
 import {
@@ -89,16 +88,29 @@ test("createHolidaySchema: valida rangos de fechas de cierre", () => {
   });
   assert.equal(equalTime.success, false);
 
-  // Compatibilidad hacia atrás: soporta campo 'date'
-  const legacy = createHolidaySchema.safeParse({
-    date: "2026-10-15",
-    allDay: true,
-    description: "Compatibilidad",
+  // Compatibilidad hacia atrás: soporta campo 'date' sin allDay (formato exacto de seed y contratos anteriores)
+  const legacyWithoutAllDay = createHolidaySchema.safeParse({
+    date: "2026-10-12",
+    description: "Día del Respeto a la Diversidad Cultural",
   });
-  assert.equal(legacy.success, true);
-  if (legacy.success) {
-    assert.equal(legacy.data.startDate, "2026-10-15");
-    assert.equal(legacy.data.endDate, "2026-10-15");
+  assert.equal(legacyWithoutAllDay.success, true);
+  if (legacyWithoutAllDay.success) {
+    assert.equal(legacyWithoutAllDay.data.startDate, "2026-10-12");
+    assert.equal(legacyWithoutAllDay.data.endDate, "2026-10-12");
+    assert.equal(legacyWithoutAllDay.data.startMinute, null);
+    assert.equal(legacyWithoutAllDay.data.endMinute, null);
+  }
+
+  // Rango de fechas sin allDay ni horas se asume como día completo
+  const rangeWithoutAllDay = createHolidaySchema.safeParse({
+    startDate: "2026-10-15",
+    endDate: "2026-10-18",
+    description: "Cierre institucional",
+  });
+  assert.equal(rangeWithoutAllDay.success, true);
+  if (rangeWithoutAllDay.success) {
+    assert.equal(rangeWithoutAllDay.data.startMinute, null);
+    assert.equal(rangeWithoutAllDay.data.endMinute, null);
   }
 });
 
@@ -116,6 +128,20 @@ test("createAvailabilityExceptionSchema: valida rangos de ausencias del profesio
     assert.equal(validRange.data.endDate, "2026-10-20");
     assert.equal(validRange.data.startMinute, null);
     assert.equal(validRange.data.endMinute, null);
+  }
+
+  // Ausencia sin allDay ni horas: asume día completo
+  const exceptionWithoutAllDay = createAvailabilityExceptionSchema.safeParse({
+    professionalId: 1,
+    date: "2026-10-15",
+    reason: "Congreso",
+  });
+  assert.equal(exceptionWithoutAllDay.success, true);
+  if (exceptionWithoutAllDay.success) {
+    assert.equal(exceptionWithoutAllDay.data.startDate, "2026-10-15");
+    assert.equal(exceptionWithoutAllDay.data.endDate, "2026-10-15");
+    assert.equal(exceptionWithoutAllDay.data.startMinute, null);
+    assert.equal(exceptionWithoutAllDay.data.endMinute, null);
   }
 
   const validPartial = createAvailabilityExceptionSchema.safeParse({

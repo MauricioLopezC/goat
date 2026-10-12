@@ -15,11 +15,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDate } from "@/lib/schedule";
 import { getTodayDateString } from "@/lib/utils";
-import { createHoliday, type HolidayMutationState } from "./actions";
+import {
+  checkHolidayAffectedCount,
+  createHoliday,
+  type HolidayMutationState,
+} from "./actions";
 
 type Pending = {
   startDate: string;
@@ -29,6 +34,7 @@ type Pending = {
   endTime?: string | null;
   description: string;
   formData: FormData;
+  affectedCount?: number | null;
 };
 
 function closureMessage(count: number) {
@@ -89,7 +95,7 @@ export function CloseCenterForm({ date }: { date?: string }) {
     <>
       <form
         ref={form}
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
           const formData = new FormData(event.currentTarget);
           const sDate = String(
@@ -102,14 +108,27 @@ export function CloseCenterForm({ date }: { date?: string }) {
               date,
           );
           const isAllDay = allDay;
+          const sTime = isAllDay ? null : (formData.get("startTime") as string);
+          const eTime = isAllDay ? null : (formData.get("endTime") as string);
+
+          const countRes = await checkHolidayAffectedCount({
+            startDate: sDate,
+            endDate: eDate,
+            allDay: isAllDay,
+            startTime: sTime,
+            endTime: eTime,
+          });
+          const affectedCount = countRes.ok ? countRes.data.count : null;
+
           setConfirming({
             startDate: sDate,
             endDate: eDate,
             allDay: isAllDay,
-            startTime: isAllDay ? null : (formData.get("startTime") as string),
-            endTime: isAllDay ? null : (formData.get("endTime") as string),
+            startTime: sTime,
+            endTime: eTime,
             description: String(formData.get("description")).trim(),
             formData,
+            affectedCount,
           });
         }}
         className="flex flex-col gap-4"
@@ -164,13 +183,16 @@ export function CloseCenterForm({ date }: { date?: string }) {
           </div>
         </div>
 
-        <Label className="flex items-center gap-2 font-normal">
-          <input
-            type="checkbox"
+        <Label className="flex items-center gap-2 font-normal cursor-pointer">
+          <Checkbox
             name="allDay"
             checked={allDay}
-            onChange={(e) => setAllDay(e.target.checked)}
-            className="h-4 w-4 rounded border-input"
+            onCheckedChange={(checked) => setAllDay(checked === true)}
+          />
+          <input
+            type="hidden"
+            name="allDay"
+            value={allDay ? "true" : "false"}
           />
           Día completo
         </Label>
@@ -292,6 +314,34 @@ export function CloseCenterForm({ date }: { date?: string }) {
               </span>
               . No se ofrecen turnos para ningún profesional.
             </AlertDialogDescription>
+            {confirming?.affectedCount !== null &&
+              confirming?.affectedCount !== undefined && (
+                <div
+                  className={
+                    confirming.affectedCount > 0
+                      ? "mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-left text-xs text-amber-900 dark:text-amber-200"
+                      : "mt-3 rounded-lg border border-border bg-muted/40 p-2.5 text-left text-xs text-muted-foreground"
+                  }
+                >
+                  {confirming.affectedCount > 0 ? (
+                    <>
+                      <p className="font-semibold text-amber-800 dark:text-amber-300">
+                        ⚠️ Hay {confirming.affectedCount} turno
+                        {confirming.affectedCount > 1 ? "s" : ""} programado
+                        {confirming.affectedCount > 1 ? "s" : ""} en este
+                        período y tramo.
+                      </p>
+                      <p className="mt-1">
+                        El centro no los cancela automáticamente. Deberán
+                        cancelarse o reprogramarse antes de poder cerrar el
+                        centro.
+                      </p>
+                    </>
+                  ) : (
+                    <p>No hay turnos programados en este período y horario.</p>
+                  )}
+                </div>
+              )}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Volver</AlertDialogCancel>

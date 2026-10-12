@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "@/lib/validation/zod";
 import * as dal from "@/lib/dal/availability";
+import { parseTime } from "@/lib/schedule";
 import {
   createHolidaySchema,
   deleteHolidaySchema,
@@ -62,3 +64,31 @@ export async function deleteHoliday(
 ): Promise<HolidayMutationState> {
   return remove({ id: Number(formData.get("id")) });
 }
+
+export const checkHolidayAffectedCount = defineAction({
+  roles: ["MANAGER", "RECEPTIONIST"],
+  input: z.object({
+    startDate: z.string(),
+    endDate: z.string(),
+    allDay: z.boolean().optional(),
+    startTime: z.string().nullish(),
+    endTime: z.string().nullish(),
+  }),
+  handler: async (input, actor) => {
+    const isAllDay = input.allDay ?? (!input.startTime && !input.endTime);
+    const startMinute =
+      isAllDay || !input.startTime ? null : parseTime(input.startTime);
+    const endMinute =
+      isAllDay || !input.endTime ? null : parseTime(input.endTime);
+    const count = await dal.countAffectedAppointments(
+      {
+        startDate: input.startDate,
+        endDate: input.endDate,
+        startMinute,
+        endMinute,
+      },
+      actor,
+    );
+    return { count };
+  },
+});

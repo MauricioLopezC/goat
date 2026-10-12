@@ -736,3 +736,35 @@ export async function deleteHoliday(input: { id: number }, actor: Actor) {
   await prisma.holiday.delete({ where: { id: input.id } });
   return { id: input.id };
 }
+
+/// Cuenta cuántos turnos programados caen dentro de un período y tramo horario (HU-23).
+export async function countAffectedAppointments(
+  input: {
+    startDate: string;
+    endDate: string;
+    startMinute?: number | null;
+    endMinute?: number | null;
+    professionalId?: number;
+  },
+  actor: Actor,
+): Promise<number> {
+  assertRole(actor, ...STAFF_ROLES);
+  assertValidDateRange(input.startDate, input.endDate);
+  const where: Prisma.AppointmentWhereInput = input.professionalId
+    ? { professionalId: input.professionalId }
+    : {};
+  const appointments = await scheduledInDateRange(
+    prisma,
+    input.startDate,
+    input.endDate,
+    where,
+  );
+  const startMinute = input.startMinute ?? null;
+  const endMinute = input.endMinute ?? null;
+  const affected = appointments.filter((appointment) => {
+    if (startMinute === null || endMinute === null) return true;
+    const range = localRange(appointment);
+    return range.minute < endMinute && startMinute < range.endMinute;
+  });
+  return affected.length;
+}

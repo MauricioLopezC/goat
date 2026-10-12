@@ -10,6 +10,15 @@ import { Plus } from "lucide-react";
 
 import { ActionErrorAlert } from "@/components/action-error-alert";
 import { ConfirmDelete } from "@/components/confirm-delete";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,6 +43,7 @@ import {
 import { formatDate, formatMinute } from "@/lib/schedule";
 import { getTodayDateString } from "@/lib/utils";
 import {
+  checkExceptionAffectedCount,
   createAvailabilityException,
   deleteAvailabilityException,
   type ScheduleMutationState,
@@ -157,6 +167,17 @@ export function ExceptionsSection({
   );
 }
 
+type PendingException = {
+  startDate: string;
+  endDate: string;
+  allDay: boolean;
+  startTime?: string | null;
+  endTime?: string | null;
+  reason: string;
+  formData: FormData;
+  affectedCount?: number | null;
+};
+
 function ExceptionForm({
   professionalId,
   onDone,
@@ -167,6 +188,7 @@ function ExceptionForm({
   const [allDay, setAllDay] = useState(true);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [confirming, setConfirming] = useState<PendingException | null>(null);
   const [state, formAction, pending] = useActionState<
     ScheduleMutationState,
     FormData
@@ -180,124 +202,260 @@ function ExceptionForm({
   const fieldErrors = error?.fieldErrors;
 
   return (
-    <form
-      // Con `onSubmit` el formulario no se vacía cuando la acción falla.
-      onSubmit={(event) => {
-        event.preventDefault();
-        const formData = new FormData(event.currentTarget);
-        startTransition(() => formAction(formData));
-      }}
-      className="flex flex-col gap-4"
-    >
-      <DialogHeader>
-        <DialogTitle>Agregar excepción</DialogTitle>
-        <DialogDescription>
-          Período u horario en que el profesional no atiende. No se puede cargar
-          sobre turnos ya programados.
-        </DialogDescription>
-      </DialogHeader>
+    <>
+      <form
+        // Con `onSubmit` el formulario no se vacía cuando la acción falla.
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          const sDate = String(formData.get("startDate") || "");
+          const eDate = String(formData.get("endDate") || sDate);
+          const isAllDay = allDay;
+          const sTime = isAllDay ? null : (formData.get("startTime") as string);
+          const eTime = isAllDay ? null : (formData.get("endTime") as string);
 
-      <input type="hidden" name="professionalId" value={professionalId} />
+          const countRes = await checkExceptionAffectedCount({
+            professionalId,
+            startDate: sDate,
+            endDate: eDate,
+            allDay: isAllDay,
+            startTime: sTime,
+            endTime: eTime,
+          });
+          const affectedCount = countRes.ok ? countRes.data.count : null;
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field
-          label="Fecha inicio *"
-          name="startDate"
-          errors={fieldErrors?.startDate || fieldErrors?.date}
-        >
-          <Input
-            id="startDate"
-            name="startDate"
-            type="date"
-            required
-            min={getTodayDateString()}
-            value={startDate}
-            onChange={(e) => {
-              const val = e.target.value;
-              setStartDate(val);
-              if (!endDate || endDate < val) {
-                setEndDate(val);
-              }
-            }}
-            className="tabular-nums"
-          />
-        </Field>
+          setConfirming({
+            startDate: sDate,
+            endDate: eDate,
+            allDay: isAllDay,
+            startTime: sTime,
+            endTime: eTime,
+            reason: String(formData.get("reason")).trim(),
+            formData,
+            affectedCount,
+          });
+        }}
+        className="flex flex-col gap-4"
+      >
+        <DialogHeader>
+          <DialogTitle>Agregar excepción</DialogTitle>
+          <DialogDescription>
+            Período u horario en que el profesional no atiende. No se puede
+            cargar sobre turnos ya programados.
+          </DialogDescription>
+        </DialogHeader>
 
-        <Field label="Fecha fin *" name="endDate" errors={fieldErrors?.endDate}>
-          <Input
-            id="endDate"
-            name="endDate"
-            type="date"
-            required
-            min={startDate || getTodayDateString()}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="tabular-nums"
-          />
-        </Field>
-      </div>
+        <input type="hidden" name="professionalId" value={professionalId} />
 
-      <Label className="flex items-center gap-2 font-normal">
-        <Checkbox
-          name="allDay"
-          checked={allDay}
-          onCheckedChange={(checked) => setAllDay(checked === true)}
-        />
-        Día completo
-      </Label>
-
-      {!allDay && (
         <div className="grid gap-3 sm:grid-cols-2">
           <Field
-            label="Desde *"
-            name="startTime"
-            errors={fieldErrors?.startTime}
+            label="Fecha inicio *"
+            name="startDate"
+            errors={fieldErrors?.startDate || fieldErrors?.date}
           >
             <Input
-              id="startTime"
-              name="startTime"
-              type="time"
-              step={300}
+              id="startDate"
+              name="startDate"
+              type="date"
               required
+              min={getTodayDateString()}
+              value={startDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                setStartDate(val);
+                if (!endDate || endDate < val) {
+                  setEndDate(val);
+                }
+              }}
               className="tabular-nums"
             />
           </Field>
-          <Field label="Hasta *" name="endTime" errors={fieldErrors?.endTime}>
+
+          <Field
+            label="Fecha fin *"
+            name="endDate"
+            errors={fieldErrors?.endDate}
+          >
             <Input
-              id="endTime"
-              name="endTime"
-              type="time"
-              step={300}
+              id="endDate"
+              name="endDate"
+              type="date"
               required
+              min={startDate || getTodayDateString()}
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
               className="tabular-nums"
             />
           </Field>
         </div>
-      )}
 
-      <Field label="Motivo *" name="reason" errors={fieldErrors?.reason}>
-        <Input
-          id="reason"
-          name="reason"
-          required
-          maxLength={200}
-          placeholder="Congreso, vacaciones, trámite personal…"
+        <Label className="flex items-center gap-2 font-normal cursor-pointer">
+          <Checkbox
+            name="allDay"
+            checked={allDay}
+            onCheckedChange={(checked) => setAllDay(checked === true)}
+          />
+          <input
+            type="hidden"
+            name="allDay"
+            value={allDay ? "true" : "false"}
+          />
+          Día completo
+        </Label>
+
+        {!allDay && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field
+              label="Desde *"
+              name="startTime"
+              errors={fieldErrors?.startTime}
+            >
+              <Input
+                id="startTime"
+                name="startTime"
+                type="time"
+                step={300}
+                required
+                className="tabular-nums"
+              />
+            </Field>
+            <Field label="Hasta *" name="endTime" errors={fieldErrors?.endTime}>
+              <Input
+                id="endTime"
+                name="endTime"
+                type="time"
+                step={300}
+                required
+                className="tabular-nums"
+              />
+            </Field>
+          </div>
+        )}
+
+        <Field label="Motivo *" name="reason" errors={fieldErrors?.reason}>
+          <Input
+            id="reason"
+            name="reason"
+            required
+            maxLength={200}
+            placeholder="Congreso, vacaciones, trámite personal…"
+          />
+        </Field>
+
+        <ActionErrorAlert
+          error={
+            // Los errores de validación de un campo se muestran junto al campo.
+            error?.code === "VALIDATION" && error.fieldErrors
+              ? undefined
+              : error
+          }
         />
-      </Field>
 
-      <ActionErrorAlert
-        error={
-          // Los errores de validación de un campo se muestran junto al campo.
-          error?.code === "VALIDATION" && error.fieldErrors ? undefined : error
-        }
-      />
+        <DialogFooter>
+          <Button type="submit" disabled={pending}>
+            {pending ? "Guardando…" : "Guardar excepción"}
+          </Button>
+        </DialogFooter>
+      </form>
 
-      <DialogFooter>
-        <Button type="submit" disabled={pending}>
-          {pending ? "Guardando…" : "Guardar excepción"}
-        </Button>
-      </DialogFooter>
-    </form>
+      <AlertDialog
+        open={confirming !== null}
+        onOpenChange={(open) => !open && setConfirming(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              ¿Registrar ausencia del profesional?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirming?.startDate === confirming?.endDate ? (
+                <>
+                  El{" "}
+                  <span className="text-foreground font-medium">
+                    {confirming && formatDate(confirming.startDate)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Del{" "}
+                  <span className="text-foreground font-medium">
+                    {confirming && formatDate(confirming.startDate)}
+                  </span>{" "}
+                  al{" "}
+                  <span className="text-foreground font-medium">
+                    {confirming && formatDate(confirming.endDate)}
+                  </span>
+                </>
+              )}
+              {confirming?.allDay ? (
+                " el profesional no atenderá en todo el día "
+              ) : (
+                <>
+                  {" "}
+                  de{" "}
+                  <span className="text-foreground font-medium">
+                    {confirming?.startTime}
+                  </span>{" "}
+                  a{" "}
+                  <span className="text-foreground font-medium">
+                    {confirming?.endTime}
+                  </span>{" "}
+                  cada día{" "}
+                </>
+              )}
+              por{" "}
+              <span className="text-foreground font-medium">
+                «{confirming?.reason}»
+              </span>
+              . Durante ese período y horario no se ofrecerán turnos para este
+              profesional.
+            </AlertDialogDescription>
+            {confirming?.affectedCount !== null &&
+              confirming?.affectedCount !== undefined && (
+                <div
+                  className={
+                    confirming.affectedCount > 0
+                      ? "mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-left text-xs text-amber-900 dark:text-amber-200"
+                      : "mt-3 rounded-lg border border-border bg-muted/40 p-2.5 text-left text-xs text-muted-foreground"
+                  }
+                >
+                  {confirming.affectedCount > 0 ? (
+                    <>
+                      <p className="font-semibold text-amber-800 dark:text-amber-300">
+                        ⚠️ Hay {confirming.affectedCount} turno
+                        {confirming.affectedCount > 1 ? "s" : ""} programado
+                        {confirming.affectedCount > 1 ? "s" : ""} en este
+                        período y tramo.
+                      </p>
+                      <p className="mt-1">
+                        El sistema no los cancela automáticamente. Deberán
+                        cancelarse o reprogramarse antes de poder registrar la
+                        ausencia.
+                      </p>
+                    </>
+                  ) : (
+                    <p>No hay turnos programados en este período y horario.</p>
+                  )}
+                </div>
+              )}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Volver</AlertDialogCancel>
+            <Button
+              type="button"
+              onClick={() => {
+                if (!confirming) return;
+                const { formData } = confirming;
+                setConfirming(null);
+                startTransition(() => formAction(formData));
+              }}
+            >
+              Confirmar ausencia
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
