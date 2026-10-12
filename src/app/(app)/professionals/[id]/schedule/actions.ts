@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "@/lib/validation/zod";
 import * as dal from "@/lib/dal/availability";
+import { parseTime } from "@/lib/schedule";
 import {
   createAvailabilityExceptionSchema,
   createAvailabilityWindowSchema,
@@ -111,9 +113,13 @@ export async function createAvailabilityException(
   _previous: ScheduleMutationState,
   formData: FormData,
 ): Promise<ScheduleMutationState> {
+  const date = formData.get("date");
+  const startDate = formData.get("startDate") ?? date;
+  const endDate = formData.get("endDate") ?? date ?? startDate;
   return createException({
     professionalId: Number(formData.get("professionalId")),
-    date: formData.get("date"),
+    startDate,
+    endDate,
     allDay: formData.get("allDay"),
     startTime: formData.get("startTime") || null,
     endTime: formData.get("endTime") || null,
@@ -130,3 +136,33 @@ export async function deleteAvailabilityException(
     professionalId: Number(formData.get("professionalId")),
   });
 }
+
+export const checkExceptionAffectedCount = defineAction({
+  roles: ["MANAGER"],
+  input: z.object({
+    professionalId: z.number().int().positive(),
+    startDate: z.string(),
+    endDate: z.string(),
+    allDay: z.boolean().optional(),
+    startTime: z.string().nullish(),
+    endTime: z.string().nullish(),
+  }),
+  handler: async (input, actor) => {
+    const isAllDay = input.allDay ?? (!input.startTime && !input.endTime);
+    const startMinute =
+      isAllDay || !input.startTime ? null : parseTime(input.startTime);
+    const endMinute =
+      isAllDay || !input.endTime ? null : parseTime(input.endTime);
+    const count = await dal.countAffectedAppointments(
+      {
+        startDate: input.startDate,
+        endDate: input.endDate,
+        startMinute,
+        endMinute,
+        professionalId: input.professionalId,
+      },
+      actor,
+    );
+    return { count };
+  },
+});
