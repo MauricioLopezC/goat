@@ -45,4 +45,4 @@ Se agregan al tablero de [HU-22](HU-22-indicadores-iniciales.md). Cada indicador
 
 - Devolución del Inc. 2 (general): los indicadores tienen que permitir tomar decisiones y el equipo tiene que poder explicar la conclusión de al menos algunos. Nada de "una barra por elemento".
 - **Decisión del equipo (05/10/2026):** los indicadores son los de la tabla.
-- El ranking de pacientes muestra nombres al gerente. ¿Está bien, o alcanza con la cantidad de pacientes frecuentes?
+- **Decisión del equipo (12/10/2026):** el ranking de pacientes frecuentes muestra solo cantidades, sin nombres ni identificadores. Se puede reconocer la frecuencia sin exponer la identidad en el tablero.

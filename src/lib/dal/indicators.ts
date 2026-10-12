@@ -5,11 +5,14 @@ import { DomainError } from "@/lib/actions";
 import { assertRole, type Actor } from "@/lib/dal/auth";
 import { Role } from "@/generated/prisma/enums";
 import { appointmentInstant } from "@/lib/appointment-slots";
+import { calculateCenterMetrics } from "@/lib/center-metrics";
 import {
   calculateIndicators,
   hasActivity,
   periodBounds,
   periodDays,
+  periodMonthCount,
+  shiftMonthKey,
   sumIndicators,
 } from "@/lib/indicators";
 import { addDays, dateFromDb, dateToDb, toLocalSlot } from "@/lib/schedule";
@@ -24,6 +27,11 @@ const personSelect = {
   lastName: true,
   active: true,
 } as const;
+
+function decimalCents(amount: { toString(): string }) {
+  const [whole, fraction = ""] = amount.toString().split(".");
+  return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+}
 
 /// Ocupación, ausentismo, cancelaciones y turnos sin cerrar del período, del
 /// centro y por profesional (HU-22). Lee franjas, ausencias, feriados y
@@ -45,7 +53,7 @@ export async function getCenterIndicators(
   const days = periodDays(period);
   const onlyProfessional = professionalId ? { id: professionalId } : {};
 
-  const [professionals, holidays, appointments, professionalOptions] =
+  const [professionals, holidays, appointments, professionalOptions, payments] =
     await Promise.all([
       prisma.professional.findMany({
         where: onlyProfessional,
@@ -77,6 +85,15 @@ export async function getCenterIndicators(
         },
         select: {
           professionalId: true,
+          patientId: true,
+          serviceId: true,
+          service: {
+            select: {
+              name: true,
+              specialtyId: true,
+              specialty: { select: { name: true } },
+            },
+          },
           startsAt: true,
           endsAt: true,
           status: true,
@@ -85,6 +102,24 @@ export async function getCenterIndicators(
       prisma.professional.findMany({
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
         select: personSelect,
+      }),
+      prisma.payment.findMany({
+        where: {
+          status: "PAID",
+          createdAt: {
+            gte: appointmentInstant(
+              `${shiftMonthKey(from, -periodMonthCount(period))}-01`,
+              0,
+            ),
+            lt: appointmentInstant(`${shiftMonthKey(to, 1)}-01`, 0),
+          },
+          ...(professionalId ? { appointment: { professionalId } } : {}),
+        },
+        select: {
+          createdAt: true,
+          amount: true,
+          paymentMethod: { select: { name: true } },
+        },
       }),
     ]);
   if (professionalId && professionals.length === 0)
@@ -126,5 +161,24 @@ export async function getCenterIndicators(
     center: sumIndicators(rows),
     professionals: rows,
     professionalOptions,
+    details: calculateCenterMetrics(
+      period,
+      appointments.map((appointment) => ({
+        professionalId: appointment.professionalId,
+        patientId: appointment.patientId,
+        serviceId: appointment.serviceId,
+        serviceName: appointment.service.name,
+        specialtyId: appointment.service.specialtyId,
+        specialtyName: appointment.service.specialty?.name ?? null,
+        startsAt: appointment.startsAt,
+        endsAt: appointment.endsAt,
+        status: appointment.status,
+      })),
+      payments.map((payment) => ({
+        createdAt: payment.createdAt,
+        amountCents: decimalCents(payment.amount),
+        methodName: payment.paymentMethod.name,
+      })),
+    ),
   };
 }

@@ -45,9 +45,13 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Número de autorización | `authorizationNumber` | Orden o autorización de la obra social para un turno. Se registra al llegar el paciente, cuando el servicio requiere orden y hay obra social, con quién (`authorizedById`) y cuándo (`authorizedAt`) ([HU-21](hu/HU-21-cobrar-turno.md)). |
 | Primer horario libre | `listEarliestSlots` | Los próximos `AvailableSlot` de un servicio entre todos los profesionales que lo prestan ([HU-19](hu/HU-19-turno-prioritario.md)). |
 | Historial del paciente | `getPatientAppointmentHistory` | En el Inc. 2, la cronología de turnos del paciente con sus cambios ([HU-18](hu/HU-18-historial-de-turnos-del-paciente.md)). En el Inc. 3 suma la atención registrada y pasa a ser la bitácora del paciente ([HU-26](hu/HU-26-bitacora-del-paciente.md)). |
-| Tablero del gerente | `/dashboard` | Indicadores del centro: ocupación, ausentismo y cancelaciones ([HU-22](hu/HU-22-indicadores-iniciales.md)). |
+| Tablero del gerente | `/dashboard` | Indicadores del centro: ocupación, ausentismo, cancelaciones, demanda, carga e ingresos ([HU-22](hu/HU-22-indicadores-iniciales.md), [HU-29](hu/HU-29-indicadores-del-centro.md)). |
 | Ocupación | `occupancyRate` | Minutos ocupados por turnos Programados y Completados sobre los minutos de franja disponibles, en un período. |
 | Ausentismo | `absenteeismRate` | Turnos Vencidos sobre Completados más Vencidos, en un período. |
+| Tasa de cancelación | `cancellationRate` | Turnos Cancelados sobre todos los turnos dados en el período. |
+| Horas trabajadas | `workedMinutes` | Duración de turnos Completados de un profesional. |
+| Pacientes por hora | `patientsPerHour` | Pacientes distintos atendidos sobre horas trabajadas de un profesional. |
+| Ingreso del centro | `income` | Cobros vigentes (`Payment.status = PAID`) recibidos en el período; no incluye valores de prestaciones sin cobrar. |
 | Turno sin cerrar | `UnclosedAppointment` | Turno Programado cuya hora de fin ya pasó. Se lista en `/appointments/unclosed` para marcarlo Completado o Vencido. No es una entidad persistida. |
 | Domicilio | `address`, `city` | Del `Patient` ([HU-17](hu/HU-17-ficha-completa-del-paciente.md)). |
 | Observaciones administrativas | `Patient.notes` | Notas del mostrador sobre el paciente ([HU-17](hu/HU-17-ficha-completa-del-paciente.md)). No son datos clínicos. |

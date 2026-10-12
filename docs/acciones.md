@@ -920,7 +920,7 @@ No es una Server Action: la usa la pantalla *Turnos de hoy* (ADR 0001).
 
 ### `getCenterIndicators`
 
-**Historia de usuario:** [HU-22 — Ver la ocupación y el ausentismo del centro](hu/HU-22-indicadores-iniciales.md)
+**Historia de usuario:** [HU-22 — Ver la ocupación y el ausentismo del centro](hu/HU-22-indicadores-iniciales.md) y [HU-29 — Ver los indicadores del centro](hu/HU-29-indicadores-del-centro.md)
 **Roles:** `MANAGER`.
 **Entrada:** `from` y `to` (AAAA-MM, inclusive, hasta tres meses; por defecto, el mes en curso) y `professionalId?` (entero positivo).
 **Precondiciones:** `from` no es posterior a `to`. Si viene `professionalId`, el profesional existe.
@@ -931,10 +931,12 @@ No es una Server Action: la usa la pantalla *Turnos de hoy* (ADR 0001).
 - **Ausentismo** (`absenteeismRate`): `EXPIRED` sobre `COMPLETED` más `EXPIRED`. Sin turnos cerrados, es `null`.
 - **Cancelaciones:** cantidad de `CANCELLED`.
 - **Sin cerrar:** cantidad de `SCHEDULED` con `endsAt` anterior a ahora.
+- **Carga y demanda (HU-29):** turnos Completados para pacientes distintos por profesional, duración real de esos turnos en horas y pacientes distintos por hora; cinco frecuencias más altas de turnos Completados por paciente, sin nombres ni identificadores; tasa de cancelación (`CANCELLED` / todos los turnos dados); cinco servicios y especialidades con más turnos dados; distribución de turnos por día de la semana. Todos usan la fecha de inicio del turno en hora del centro, incluso si fue cancelado.
+- **Ingresos (HU-29):** suma de cobros `PAID` según `Payment.createdAt` en hora del centro, por mes y medio de pago. Compara con el período inmediatamente anterior de igual cantidad de meses; los cobros anulados no cuentan. Sin cobros previos, la variación porcentual es `null`.
 
 El centro suma minutos y cantidades de todos los profesionales y calcula las tasas sobre esas sumas, no como promedio de las tasas. Con `professionalId`, el centro y la tabla se limitan a ese profesional.
 **Errores:** `FORBIDDEN`, `VALIDATION` (período inválido, invertido o de más de tres meses), `NOT_FOUND` (el profesional no existe).
 **Revalida:** no aplica; lectura desde Server Component.
-**Devuelve:** `{ period: { from, to }, center: Indicators, professionals: (Indicators & { id, firstName, lastName, active })[], professionalOptions }`. `Indicators` es `{ availableMinutes, occupiedMinutes, occupancyRate, completed, expired, absenteeismRate, cancelled, unclosed }`, con las tasas entre 0 y 1, o `null`. La tabla incluye a los profesionales con franjas o turnos en el período. `professionalOptions` son las opciones del filtro.
+**Devuelve:** `{ period: { from, to }, center: Indicators, professionals: (Indicators & { id, firstName, lastName, active })[], professionalOptions, details }`. `Indicators` es `{ availableMinutes, occupiedMinutes, occupancyRate, completed, expired, absenteeismRate, cancelled, unclosed }`, con las tasas entre 0 y 1, o `null`. `details` agrega los rankings (máximo cinco), carga por profesional, tasa de cancelación, ingresos mensuales y por medio, total y variación frente al período previo, y turnos por día de semana. La tabla incluye a los profesionales con franjas o turnos en el período. `professionalOptions` son las opciones del filtro.
 
 No es una Server Action: la usa el Server Component de `/dashboard` (ADR 0001).
