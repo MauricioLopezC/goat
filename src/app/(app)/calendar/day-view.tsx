@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Ban } from "lucide-react";
+import { Ban, Stethoscope } from "lucide-react";
 import {
   Empty,
   EmptyDescription,
@@ -333,6 +333,11 @@ export function DayView({
                         </span>
                         <span className="text-muted-foreground flex items-center gap-1 truncate">
                           {APPOINTMENT_STATUS_LABEL[appointment.status]}
+                          {appointment.encounter && (
+                            <span title="Atención médica registrada">
+                              <Stethoscope className="size-3 text-primary shrink-0" />
+                            </span>
+                          )}
                           {paymentState && (
                             <>
                               {" · "}
@@ -384,6 +389,10 @@ export function Legend({ freeClickable }: { freeClickable: boolean }) {
           </li>
         ),
       )}
+      <li className="flex items-center gap-1.5">
+        <Stethoscope className="size-3.5 text-primary" />
+        Atención registrada
+      </li>
       <li className="flex items-center gap-1.5">
         <span className="bg-muted size-3 rounded-sm border" />
         Fuera de horario

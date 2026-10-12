@@ -39,6 +39,9 @@ import { StatusChangeDialog, type StatusChangeTarget } from "./status-dialog";
 import { PaymentDialog } from "./payment-dialog";
 import { VoidPaymentDialog } from "./void-payment-dialog";
 import { AuthorizationDialog } from "./authorization-dialog";
+import { EncounterDialog } from "./encounter-dialog";
+import { getEncounter } from "@/lib/dal/encounters";
+import { Stethoscope } from "lucide-react";
 
 export default async function AppointmentPage({
   params,
@@ -91,6 +94,12 @@ export default async function AppointmentPage({
   const canExpire = scheduled && !paid && appointment.endsAt <= now;
   const canCancel = scheduled && !paid;
   const canChangePriority = !own && scheduled;
+  const encounter = await getEncounter(appointment.id, actor);
+  const canRegisterEncounter =
+    own &&
+    !encounter &&
+    (appointment.status === "COMPLETED" ||
+      (scheduled && appointment.startsAt <= now));
 
   const summary = `${appointment.patient.lastName}, ${appointment.patient.firstName} · ${appointment.professional.lastName}, ${appointment.professional.firstName} · ${appointment.service.name} · ${formatDate(start.date)}, ${formatMinute(start.minute)}–${formatMinute(end.minute)}`;
   // Se vuelve al mismo calendario (vista, fecha y filtros) desde el que se
@@ -317,6 +326,146 @@ export default async function AppointmentPage({
           </dl>
         </CardContent>
       </Card>
+
+      {/* Atención médica (HU-25) */}
+      {encounter && own && (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <Stethoscope className="size-5 text-primary" />
+                Atención médica
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="border-primary/40 bg-primary-soft text-primary"
+                >
+                  Atención registrada
+                </Badge>
+                {encounter.canEdit && (
+                  <EncounterDialog
+                    appointmentId={appointment.id}
+                    encounterId={encounter.id}
+                    initialNotes={encounter.notes ?? ""}
+                    initialIndications={encounter.indications ?? ""}
+                    summary={summary}
+                    mode="update"
+                    triggerLabel="Modificar atención"
+                  />
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="text-xs text-muted-foreground">
+              <p>
+                Profesional:{" "}
+                <span className="font-semibold text-foreground">
+                  {encounter.professional.lastName},{" "}
+                  {encounter.professional.firstName}
+                </span>{" "}
+                · Registrada: {formatInstant(encounter.createdAt)}
+                {encounter.updatedAt.getTime() >
+                  encounter.createdAt.getTime() && (
+                  <> · Modificada: {formatInstant(encounter.updatedAt)}</>
+                )}
+              </p>
+              {!encounter.canEdit && (
+                <p className="mt-1 text-muted-foreground/80">
+                  El plazo de corrección venció el{" "}
+                  {formatInstant(encounter.editDeadline)}. La atención quedó
+                  fija y no puede modificarse.
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Diagnóstico y observaciones clínicas
+              </span>
+              <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+                {encounter.notes}
+              </div>
+            </div>
+
+            {encounter.indications ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Indicaciones al paciente
+                </span>
+                <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+                  {encounter.indications}
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs italic text-muted-foreground">
+                Sin indicaciones registradas.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {encounter && !own && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <Stethoscope className="size-5 text-primary" />
+                Atención médica
+              </CardTitle>
+              <Badge
+                variant="outline"
+                className="border-primary/40 bg-primary-soft text-primary"
+              >
+                Atención registrada
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm">
+            <p>
+              La atención médica fue registrada por{" "}
+              <span className="font-semibold">
+                {encounter.professional.lastName},{" "}
+                {encounter.professional.firstName}
+              </span>{" "}
+              el {formatInstant(encounter.createdAt)}.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Por secreto médico y confidencialidad, las observaciones clínicas
+              e indicaciones no son visibles para recepción ni gerencia.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {canRegisterEncounter && (
+        <Card className="border-primary/40 bg-primary-soft/30">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-primary">
+                  <Stethoscope className="size-5" />
+                  Registrar atención médica
+                </CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {scheduled
+                    ? "Al guardar la atención médica, el turno pasará automáticamente a Completado."
+                    : "Turno completado listo para registrar las observaciones e indicaciones clínicas."}
+                </p>
+              </div>
+              <EncounterDialog
+                appointmentId={appointment.id}
+                summary={summary}
+                mode="create"
+                triggerLabel="Registrar atención médica"
+              />
+            </div>
+          </CardHeader>
+        </Card>
+      )}
+
       {billing?.state && (
         <Card>
           <CardHeader>
@@ -622,6 +771,14 @@ export default async function AppointmentPage({
               Reprogramar turno
             </Link>
           </Button>
+        )}
+        {canRegisterEncounter && (
+          <EncounterDialog
+            appointmentId={appointment.id}
+            summary={summary}
+            mode="create"
+            triggerLabel="Registrar atención médica"
+          />
         )}
         {canComplete && (
           <StatusChangeDialog

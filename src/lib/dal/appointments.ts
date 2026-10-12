@@ -77,6 +77,7 @@ const summarySelect = {
   professional: { select: personSelect },
   service: { select: { id: true, name: true } },
   createdBy: { select: personSelect },
+  encounter: { select: { id: true } },
 } satisfies Prisma.AppointmentSelect;
 
 const appointmentDetailSelect = {
@@ -1198,6 +1199,11 @@ export async function getProfessionalAgenda(
           select: {
             id: true,
             name: true,
+          },
+        },
+        encounter: {
+          select: {
+            id: true,
           },
         },
       },
