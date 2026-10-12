@@ -77,13 +77,14 @@ export async function seedDemoHistory(
   prisma: PrismaClient,
   userIds: Ids,
   patientIds: Ids,
+  closedDates: ReadonlySet<string>,
 ) {
   const now = new Date();
   const today = toLocalSlot(now).date;
   const firstDate = addDays(today, -92);
   const firstInstant = appointmentInstant(firstDate, 0);
   const lastInstant = appointmentInstant(addDays(today, 1), 0);
-  const [professionals, holidays, exceptions, existing, closings, methods] =
+  const [professionals, holidays, exceptions, existing, methods] =
     await Promise.all([
       prisma.professional.findMany({
         where: { licenseNumber: { in: Object.keys(HISTORY_DEMAND) } },
@@ -144,10 +145,6 @@ export async function seedDemoHistory(
           status: true,
         },
       }),
-      prisma.cashClosing.findMany({
-        where: { date: { gte: dateToDb(firstDate), lte: dateToDb(today) } },
-        select: { date: true },
-      }),
       prisma.paymentMethod.findMany({
         where: {
           name: { in: ["Efectivo", "Tarjeta de débito", "Transferencia"] },
@@ -157,9 +154,6 @@ export async function seedDemoHistory(
     ]);
 
   const slots: Slot[] = existing;
-  const closedDates = new Set(
-    closings.map((closing) => closing.date.toISOString().slice(0, 10)),
-  );
   const patientPool = PATIENTS.map((patient) => ({
     id: patientIds.get(patient.documentNumber),
     private: patient.coverage === null,
@@ -193,6 +187,8 @@ export async function seedDemoHistory(
     key: string,
     isToday: boolean,
   ) {
+    // También protege la fase que completa los estados del día actual.
+    if (closedDates.has(date)) return false;
     const allowed = window.services.length
       ? professional.services.filter((service) =>
           window.services.some((item) => item.id === service.id),

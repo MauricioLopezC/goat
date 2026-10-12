@@ -14,6 +14,7 @@ import { appointmentInstant } from "../src/lib/appointment-slots";
 import {
   WEEKDAYS,
   addDays,
+  dateFromDb,
   dateToDb,
   getWeekDays,
   parseTime,
@@ -590,6 +591,7 @@ async function seedAppointments(
   professionalIds: Ids,
   serviceIds: Ids,
   patientIds: Ids,
+  closedDates: ReadonlySet<string>,
 ) {
   const now = new Date();
   const holidays = new Set(HOLIDAYS.map((h) => h.date));
@@ -658,6 +660,11 @@ async function seedAppointments(
     }
 
     const date = seedDate(now, a.week, a.weekday);
+    // No agregar turnos ni cobros retroactivos a una caja ya cerrada.
+    if (closedDates.has(date)) {
+      result.skipped++;
+      continue;
+    }
     const startsAt = appointmentInstant(date, startMinute);
     const endsAt = new Date(
       startsAt.getTime() + service.durationMinutes * 60_000,
@@ -883,18 +890,30 @@ async function main() {
     const patientIds = await seedPatients(prisma, userIds, plans);
     console.log(`✓ ${PATIENTS.length} pacientes`);
 
+    // Ambas fases respetan las mismas cajas existentes, incluida la de hoy.
+    const closings = await prisma.cashClosing.findMany({
+      select: { date: true },
+    });
+    const closedDates = new Set(closings.map(({ date }) => dateFromDb(date)));
+
     const appointments = await seedAppointments(
       prisma,
       userIds,
       professionalIds,
       serviceIds,
       patientIds,
+      closedDates,
     );
     console.log(
-      `✓ ${appointments.created} turnos nuevos (${appointments.existing} ya estaban, ${appointments.skipped} salteados por feriado u horario ocupado)`,
+      `✓ ${appointments.created} turnos nuevos (${appointments.existing} ya estaban, ${appointments.skipped} salteados por cierre de caja, feriado u horario ocupado)`,
     );
 
-    const demo = await seedDemoHistory(prisma, userIds, patientIds);
+    const demo = await seedDemoHistory(
+      prisma,
+      userIds,
+      patientIds,
+      closedDates,
+    );
     console.log(
       `✓ Demo: ${demo.appointments} turnos, ${demo.payments} cobros, ${demo.encounters} atenciones y ${demo.closings} cajas nuevas (${demo.today} turnos de hoy)`,
     );
