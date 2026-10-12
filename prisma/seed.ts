@@ -14,6 +14,7 @@ import { appointmentInstant } from "../src/lib/appointment-slots";
 import {
   WEEKDAYS,
   addDays,
+  dateFromDb,
   dateToDb,
   getWeekDays,
   parseTime,
@@ -35,6 +36,7 @@ import {
   HOLIDAYS,
   MANAGER_EMAIL,
   PATIENTS,
+  PATIENT_PORTAL_ACCOUNTS,
   PAYMENT_METHODS,
   PROFESSIONAL_HISTORY,
   PROFESSIONALS,
@@ -45,6 +47,7 @@ import {
   TITLES,
 } from "./seed-data";
 import { resolveSeedStatus, statusOncePast } from "./seed-status";
+import { seedDemoHistory } from "./seed-demo";
 
 // Datos de prueba para lo que ya está implementado: usuarios (HU-01),
 // profesionales y su historial (HU-02 y HU-03), agenda, excepciones y
@@ -398,6 +401,9 @@ async function seedPatients(
       throw new Error(`seed-data.ts: Plan "${key}" no existe en el seed.`);
     }
     const insurancePlanId = plan?.id;
+    const portalAccount = PATIENT_PORTAL_ACCOUNTS.find(
+      (account) => account.documentNumber === p.documentNumber,
+    );
 
     // Mismo schema que el alta desde la UI: si un dato del seed deja de ser
     // válido (ej. un menor sin tutor), el seed falla en vez de sembrarlo.
@@ -427,6 +433,9 @@ async function seedPatients(
       active: true,
       createdById: idOf(userIds, p.createdBy, "Usuario"),
       updatedById: p.updatedBy ? idOf(userIds, p.updatedBy, "Usuario") : null,
+      ...(portalAccount
+        ? { userId: idOf(userIds, portalAccount.email, "Usuario") }
+        : {}),
     };
 
     const { id: patientId } = await prisma.patient.upsert({
@@ -582,6 +591,8 @@ async function seedAppointments(
   professionalIds: Ids,
   serviceIds: Ids,
   patientIds: Ids,
+  closedDates: ReadonlySet<string>,
+  pendingCashDates: ReadonlySet<string>,
 ) {
   const now = new Date();
   const holidays = new Set(HOLIDAYS.map((h) => h.date));
@@ -650,6 +661,11 @@ async function seedAppointments(
     }
 
     const date = seedDate(now, a.week, a.weekday);
+    // No agregar turnos ni cobros retroactivos a una caja ya cerrada o con cobros pendientes.
+    if (closedDates.has(date) || pendingCashDates.has(date)) {
+      result.skipped++;
+      continue;
+    }
     const startsAt = appointmentInstant(date, startMinute);
     const endsAt = new Date(
       startsAt.getTime() + service.durationMinutes * 60_000,
@@ -875,15 +891,47 @@ async function main() {
     const patientIds = await seedPatients(prisma, userIds, plans);
     console.log(`✓ ${PATIENTS.length} pacientes`);
 
+    // Ambas fases respetan las mismas cajas existentes, incluida la de hoy,
+    // y los días pasados con cobros pendientes cargados desde la interfaz.
+    const now = new Date();
+    const today = toLocalSlot(now).date;
+    const closings = await prisma.cashClosing.findMany({
+      select: { date: true },
+    });
+    const closedDates = new Set(closings.map(({ date }) => dateFromDb(date)));
+    const pendingPayments = await prisma.payment.findMany({
+      where: {
+        cashClosingId: null,
+        createdAt: { lt: appointmentInstant(today, 0) },
+      },
+      select: { createdAt: true },
+    });
+    const pendingCashDates = new Set(
+      pendingPayments.map((p) => toLocalSlot(p.createdAt).date),
+    );
+
     const appointments = await seedAppointments(
       prisma,
       userIds,
       professionalIds,
       serviceIds,
       patientIds,
+      closedDates,
+      pendingCashDates,
     );
     console.log(
-      `✓ ${appointments.created} turnos nuevos (${appointments.existing} ya estaban, ${appointments.skipped} salteados por feriado u horario ocupado)`,
+      `✓ ${appointments.created} turnos nuevos (${appointments.existing} ya estaban, ${appointments.skipped} salteados por cierre de caja, cobro pendiente, feriado u horario ocupado)`,
+    );
+
+    const demo = await seedDemoHistory(
+      prisma,
+      userIds,
+      patientIds,
+      closedDates,
+      pendingCashDates,
+    );
+    console.log(
+      `✓ Demo: ${demo.appointments} turnos, ${demo.payments} cobros, ${demo.encounters} atenciones y ${demo.closings} cajas nuevas (${demo.today} turnos de hoy)`,
     );
 
     console.log(`\nContraseña de todos los usuarios: ${password}`);

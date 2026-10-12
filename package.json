@@ -26,6 +26,8 @@
     "db:validate": "prisma validate",
     "test:payments:db": "node --env-file=.env --import ./scripts/server-only-test-loader.mjs --import tsx scripts/verify-payments.ts",
     "test:schema:db": "tsx scripts/verify-schema-increment-3.ts",
+    "test:schema:db": "tsx scripts/verify-schema-increment-3.ts",
+    "test:seed:db": "tsx scripts/verify-seed-demo.ts",
     "test:indicators:db": "node --env-file=.env --import ./scripts/server-only-test-loader.mjs --import tsx scripts/verify-center-metrics.ts"
   },
   "dependencies": {

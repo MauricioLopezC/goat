@@ -35,9 +35,17 @@ export type ProfessionalDay = {
   appointments: CalendarAppointment[];
 };
 
+export type PartialHoliday = {
+  id: number;
+  startMinute: number;
+  endMinute: number;
+  description: string;
+};
+
 export type CalendarDay = {
   date: string;
   holiday: string | null;
+  partialHolidays: PartialHoliday[];
   /// Minuto hasta el que el día ya pasó (0 si es futuro, 1440 si es anterior).
   pastUntilMinute: number;
   professionals: ProfessionalDay[];
@@ -53,9 +61,25 @@ export function buildCalendarDay(
 ): CalendarDay {
   const bounds = appointmentDateBounds(now);
   const weekday = weekdayOf(date);
+  const dayHolidays = availability.holidays.filter(
+    (item) => item.date === date,
+  );
   const holiday =
-    availability.holidays.find((item) => item.date === date)?.description ??
-    null;
+    dayHolidays.find(
+      (item) => item.startMinute === null || item.endMinute === null,
+    )?.description ?? null;
+  const partialHolidays: PartialHoliday[] = dayHolidays.flatMap((item) =>
+    item.startMinute !== null && item.endMinute !== null
+      ? [
+          {
+            id: item.id,
+            startMinute: item.startMinute,
+            endMinute: item.endMinute,
+            description: item.description,
+          },
+        ]
+      : [],
+  );
   const dayAppointments = appointments.filter(
     (appointment) => toLocalSlot(appointment.startsAt).date === date,
   );
@@ -99,6 +123,7 @@ export function buildCalendarDay(
           exceptions,
           busy: professional.busy,
           holiday: Boolean(holiday),
+          holidays: dayHolidays,
           now,
           today: bounds.min,
           maxDate: bounds.max,
@@ -133,13 +158,17 @@ export function buildCalendarDay(
   return {
     date,
     holiday,
+    partialHolidays,
     pastUntilMinute: pastUntilMinute(date, bounds.min, now),
     professionals,
   };
 }
 
 /// Rango de horas a dibujar: el que cubre franjas y turnos, o 8 a 18.
-export function hourRange(days: ProfessionalDay[]) {
+export function hourRange(
+  days: ProfessionalDay[],
+  partialHolidays: PartialHoliday[] = [],
+) {
   const starts: number[] = [];
   const ends: number[] = [];
   for (const day of days) {
@@ -153,6 +182,10 @@ export function hourRange(days: ProfessionalDay[]) {
       starts.push(start.minute);
       ends.push(end.date === start.date ? end.minute : 1440);
     }
+  }
+  for (const holiday of partialHolidays) {
+    starts.push(holiday.startMinute);
+    ends.push(holiday.endMinute);
   }
   return {
     firstHour: starts.length ? Math.floor(Math.min(...starts) / 60) : 8,

@@ -6,6 +6,8 @@ import {
   registerPaymentSchema,
   voidPaymentSchema,
 } from "../src/lib/validation/payments";
+import { centerProfile, formatReceiptNumber } from "../src/lib/center-profile";
+import { canAccess } from "../src/lib/route-access";
 
 const base = {
   coverageType: "PRIVATE" as const,
@@ -103,4 +105,22 @@ test("Validación de cobro, anulación y autorización (HU-21)", () => {
     }).success,
     false,
   );
+});
+
+test("Comprobante de cobro: formato correlativo y datos del centro (HU-24)", () => {
+  assert.equal(formatReceiptNumber(1), "Nº 00000001");
+  assert.equal(formatReceiptNumber(42), "Nº 00000042");
+  assert.equal(formatReceiptNumber(12345678), "Nº 12345678");
+
+  assert.equal(centerProfile.legend, "Comprobante no válido como factura");
+  assert.ok(centerProfile.name.length > 0);
+  assert.ok(centerProfile.cuit.length > 0);
+  assert.ok(centerProfile.address.length > 0);
+  assert.ok(centerProfile.phone.length > 0);
+});
+
+test("Constancia de atención: acceso por rol (HU-24)", () => {
+  assert.equal(canAccess("/appointments/1/certificate", "RECEPTIONIST"), true);
+  assert.equal(canAccess("/appointments/1/certificate", "MANAGER"), true);
+  assert.equal(canAccess("/appointments/1/certificate", "PROFESSIONAL"), false);
 });

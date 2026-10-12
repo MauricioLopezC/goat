@@ -134,6 +134,16 @@ export function WeekView({
                         Cerrado: {day.holiday}
                       </span>
                     )}
+                    {!day.holiday && day.partialHolidays.length > 0 && (
+                      <span
+                        className="mt-0.5 rounded bg-holiday/15 border border-holiday/30 px-1 py-0.5 text-[10px] font-medium text-holiday-foreground truncate max-w-[140px]"
+                        title={`Cierre parcial: ${day.partialHolidays.map((h) => `${formatMinute(h.startMinute)}–${formatMinute(h.endMinute)} (${h.description})`).join(", ")}`}
+                      >
+                        Cierre parcial:{" "}
+                        {formatMinute(day.partialHolidays[0].startMinute)}–
+                        {formatMinute(day.partialHolidays[0].endMinute)}
+                      </span>
+                    )}
                   </Link>
                 </th>
               ))}
