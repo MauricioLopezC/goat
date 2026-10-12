@@ -25,10 +25,12 @@ hay que correr `npm run db:seed` a continuación.
 Los turnos se siembran desde 92 días antes de la corrida hasta tres semanas
 después. La historia de demo se genera de forma determinista: los mismos
 profesionales, horarios y fechas producen los mismos turnos, y una segunda
-corrida no duplica los existentes. Los días con caja ya cerrada se respetan en ambas fases del seed, incluida
-la caja de hoy: no se agregan turnos ni cobros en esas fechas ni se modifican
-sus cierres. `npm run test:seed:db` verifica este caso y la idempotencia en
-bases temporales, con una fecha fija de prueba.
+corrida no duplica los existentes. Los días con caja ya cerrada y los días
+pasados con cobros pendientes cargados desde la interfaz se respetan en ambas
+fases del seed, incluida la caja de hoy: no se agregan turnos ni cobros en esas
+fechas, se conservan los cobros pendientes sin cerrarles la caja y no se
+modifican los cierres existentes. `npm run test:seed:db` verifica estos casos y
+la idempotencia en bases temporales, con una fecha fija de prueba.
 Hay profesionales, servicios, días y pacientes con distinta demanda para que
 los indicadores muestren tendencias; los turnos pasados quedan cerrados y
 pueden tener cobro, caja cerrada y una nota de atención.

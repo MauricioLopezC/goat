@@ -78,6 +78,7 @@ export async function seedDemoHistory(
   userIds: Ids,
   patientIds: Ids,
   closedDates: ReadonlySet<string>,
+  pendingCashDates: ReadonlySet<string>,
 ) {
   const now = new Date();
   const today = toLocalSlot(now).date;
@@ -187,8 +188,9 @@ export async function seedDemoHistory(
     key: string,
     isToday: boolean,
   ) {
-    // También protege la fase que completa los estados del día actual.
-    if (closedDates.has(date)) return false;
+    // También protege la fase que completa los estados del día actual
+    // y los días con cobros pendientes cargados desde la interfaz.
+    if (closedDates.has(date) || pendingCashDates.has(date)) return false;
     const allowed = window.services.length
       ? professional.services.filter((service) =>
           window.services.some((item) => item.id === service.id),
@@ -348,10 +350,11 @@ export async function seedDemoHistory(
     return true;
   }
 
-  // Tres meses móviles, sin alterar un día que el usuario ya cerró en la UI.
+  // Tres meses móviles, sin alterar un día que el usuario ya cerró en la UI
+  // o que tiene cobros pendientes cargados desde la interfaz.
   for (let daysAgo = 92; daysAgo >= 1; daysAgo--) {
     const date = addDays(today, -daysAgo);
-    if (closedDates.has(date)) continue;
+    if (closedDates.has(date) || pendingCashDates.has(date)) continue;
     const weekday = toLocalSlot(appointmentInstant(date, 12 * 60)).weekday;
     for (const professional of professionals) {
       const demand = HISTORY_DEMAND[professional.licenseNumber];
@@ -439,10 +442,11 @@ export async function seedDemoHistory(
   }
 
   // La caja fotografía todos los cobros del día, incluidos los cargados desde
-  // la interfaz. Una segunda corrida no modifica cajas existentes.
+  // la interfaz. Una segunda corrida no modifica cajas existentes. Tampoco
+  // cierra cajas de días pasados que el usuario dejó pendientes con cobros manuales.
   for (let daysAgo = 92; daysAgo >= 1; daysAgo--) {
     const date = addDays(today, -daysAgo);
-    if (closedDates.has(date)) continue;
+    if (closedDates.has(date) || pendingCashDates.has(date)) continue;
     const payments = await prisma.payment.findMany({
       where: {
         createdAt: {

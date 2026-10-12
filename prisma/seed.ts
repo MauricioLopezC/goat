@@ -592,6 +592,7 @@ async function seedAppointments(
   serviceIds: Ids,
   patientIds: Ids,
   closedDates: ReadonlySet<string>,
+  pendingCashDates: ReadonlySet<string>,
 ) {
   const now = new Date();
   const holidays = new Set(HOLIDAYS.map((h) => h.date));
@@ -660,8 +661,8 @@ async function seedAppointments(
     }
 
     const date = seedDate(now, a.week, a.weekday);
-    // No agregar turnos ni cobros retroactivos a una caja ya cerrada.
-    if (closedDates.has(date)) {
+    // No agregar turnos ni cobros retroactivos a una caja ya cerrada o con cobros pendientes.
+    if (closedDates.has(date) || pendingCashDates.has(date)) {
       result.skipped++;
       continue;
     }
@@ -890,11 +891,24 @@ async function main() {
     const patientIds = await seedPatients(prisma, userIds, plans);
     console.log(`✓ ${PATIENTS.length} pacientes`);
 
-    // Ambas fases respetan las mismas cajas existentes, incluida la de hoy.
+    // Ambas fases respetan las mismas cajas existentes, incluida la de hoy,
+    // y los días pasados con cobros pendientes cargados desde la interfaz.
+    const now = new Date();
+    const today = toLocalSlot(now).date;
     const closings = await prisma.cashClosing.findMany({
       select: { date: true },
     });
     const closedDates = new Set(closings.map(({ date }) => dateFromDb(date)));
+    const pendingPayments = await prisma.payment.findMany({
+      where: {
+        cashClosingId: null,
+        createdAt: { lt: appointmentInstant(today, 0) },
+      },
+      select: { createdAt: true },
+    });
+    const pendingCashDates = new Set(
+      pendingPayments.map((p) => toLocalSlot(p.createdAt).date),
+    );
 
     const appointments = await seedAppointments(
       prisma,
@@ -903,9 +917,10 @@ async function main() {
       serviceIds,
       patientIds,
       closedDates,
+      pendingCashDates,
     );
     console.log(
-      `✓ ${appointments.created} turnos nuevos (${appointments.existing} ya estaban, ${appointments.skipped} salteados por cierre de caja, feriado u horario ocupado)`,
+      `✓ ${appointments.created} turnos nuevos (${appointments.existing} ya estaban, ${appointments.skipped} salteados por cierre de caja, cobro pendiente, feriado u horario ocupado)`,
     );
 
     const demo = await seedDemoHistory(
@@ -913,6 +928,7 @@ async function main() {
       userIds,
       patientIds,
       closedDates,
+      pendingCashDates,
     );
     console.log(
       `✓ Demo: ${demo.appointments} turnos, ${demo.payments} cobros, ${demo.encounters} atenciones y ${demo.closings} cajas nuevas (${demo.today} turnos de hoy)`,

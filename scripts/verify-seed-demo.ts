@@ -42,6 +42,7 @@ async function main(withClosedDays: boolean) {
           "import { mock } from 'node:test'; mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-14T20:00:00Z') });",
         );
       const protectedDates = ["2026-10-07", "2026-10-14"];
+      const pendingDate = "2026-10-13";
       if (withClosedDays) {
         const user = await db.query(
           `INSERT INTO "User" (email, "passwordHash", "firstName", "lastName", role, "updatedAt")
@@ -54,6 +55,45 @@ async function main(withClosedDays: boolean) {
             [date, user.rows[0].id],
           );
         }
+        const method = await db.query(
+          `INSERT INTO "PaymentMethod" (name, active, "updatedAt")
+           VALUES ('Efectivo', true, now()) RETURNING id`,
+        );
+        const professional = await db.query(
+          `INSERT INTO "Professional" ("licenseNumber", "documentType", "documentNumber", "firstName", "lastName", active, "createdById", "updatedAt")
+           VALUES ('TEST-9999', 'DNI', '99999991', 'Prueba', 'Profesional', true, $1, now()) RETURNING id`,
+          [user.rows[0].id],
+        );
+        const service = await db.query(
+          `INSERT INTO "Service" (name, "durationMinutes", price, active, "updatedAt")
+           VALUES ('Consulta previa', 30, 35000, true, now()) RETURNING id`,
+        );
+        const patient = await db.query(
+          `INSERT INTO "Patient" ("documentType", "documentNumber", "firstName", "lastName", gender, "birthDate", phone, email, "coverageType", active, "createdById", "updatedAt")
+           VALUES ('DNI', '99999992', 'Paciente', 'Prueba', 'OTHER', '1990-01-01', '3871234567', 'paciente@seed-test.invalid', 'PRIVATE', true, $1, now()) RETURNING id`,
+          [user.rows[0].id],
+        );
+        const appointment = await db.query(
+          `INSERT INTO "Appointment" ("professionalId", "serviceId", "patientId", "startsAt", "endsAt", status, "createdById", "updatedAt")
+           VALUES ($1, $2, $3, $4::date + interval '17 hours', $4::date + interval '17 hours 30 minutes', 'COMPLETED', $5, now()) RETURNING id`,
+          [
+            professional.rows[0].id,
+            service.rows[0].id,
+            patient.rows[0].id,
+            pendingDate,
+            user.rows[0].id,
+          ],
+        );
+        await db.query(
+          `INSERT INTO "Payment" ("appointmentId", "paymentMethodId", amount, status, "createdById", "createdAt")
+           VALUES ($1, $2, 35000, 'PAID', $3, $4::date + interval '17 hours')`,
+          [
+            appointment.rows[0].id,
+            method.rows[0].id,
+            user.rows[0].id,
+            pendingDate,
+          ],
+        );
       }
       const preservedClosings = await db.query(
         'SELECT * FROM "CashClosing" ORDER BY id',
@@ -93,6 +133,25 @@ async function main(withClosedDays: boolean) {
             after.rows,
             preservedClosings.rows,
             "Se modificó una caja preexistente",
+          );
+          const pendingRows = await db.query(
+            `SELECT
+              (SELECT count(*)::int FROM "Appointment" WHERE "startsAt" >= $1::date + interval '3 hours' AND "startsAt" < $1::date + interval '27 hours') AS appointments,
+              (SELECT count(*)::int FROM "Payment" WHERE "createdAt" >= $1::date + interval '3 hours' AND "createdAt" < $1::date + interval '27 hours') AS payments,
+              (SELECT count(*)::int FROM "Payment" WHERE "createdAt" >= $1::date + interval '3 hours' AND "createdAt" < $1::date + interval '27 hours' AND "cashClosingId" IS NULL) AS unclosed_payments,
+              (SELECT count(*)::int FROM "CashClosing" WHERE date = $1::date) AS closings`,
+            [pendingDate],
+          );
+          assert.deepEqual(
+            pendingRows.rows[0],
+            {
+              appointments: 1,
+              payments: 1,
+              unclosed_payments: 1,
+              closings: 0,
+            },
+            "El seed alteró o cerró indebidamente la caja pendiente del " +
+              pendingDate,
           );
         }
       }
@@ -192,7 +251,7 @@ async function main(withClosedDays: boolean) {
         WHERE "createdAt" < TIMESTAMP '2026-10-14 03:00:00'
           AND "cashClosingId" IS NULL
       `);
-      assert.equal(missingCash.rows[0].count, 0);
+      assert.equal(missingCash.rows[0].count, withClosedDays ? 1 : 0);
       runSeed();
       await verifyClosedDays();
       assert.deepEqual(
@@ -202,7 +261,7 @@ async function main(withClosedDays: boolean) {
       );
       console.log(
         withClosedDays
-          ? "OK: cajas históricas y de hoy preservadas; idempotencia."
+          ? "OK: cajas históricas, cajas pendientes y de hoy preservadas; idempotencia."
           : "OK: historia, cobros, atenciones, cajas, portal e idempotencia.",
       );
     } finally {
