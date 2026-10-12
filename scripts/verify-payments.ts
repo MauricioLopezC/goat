@@ -6,6 +6,7 @@ import { prisma } from "../src/lib/prisma";
 import { DomainError } from "../src/lib/actions";
 import {
   getAppointmentBilling,
+  getPaymentReceipt,
   getPaymentStates,
   listTodayAppointments,
   registerAuthorization,
@@ -17,6 +18,7 @@ import {
   cancelProfessionalAppointment,
   completeAppointment,
   expireAppointment,
+  getAttendanceCertificate,
 } from "../src/lib/dal/appointments";
 import { appointmentInstant } from "../src/lib/appointment-slots";
 import { addDays, dateToDb, toLocalSlot } from "../src/lib/schedule";
@@ -543,9 +545,127 @@ async function main() {
         () => listTodayAppointments(professionalActor),
         "FORBIDDEN",
       );
+      await rejects(
+        () => getPaymentReceipt(id, professionalActor),
+        "FORBIDDEN",
+      );
     });
 
-    console.log(`\n${passed} verificaciones de HU-21 pasaron.`);
+    // 13. Comprobante de cobro (HU-24)
+    await verify(
+      "comprobante: activo, anulado, correlativo y permisos (HU-24)",
+      async () => {
+        const id = await appointment({});
+        const paid = await registerPayment(
+          { appointmentId: id, paymentMethodId: cash.id },
+          receptionist,
+        );
+        assert.ok(
+          paid.receiptNumber > 0,
+          "Debe tener receiptNumber correlativo",
+        );
+        assert.equal(paid.amount, "15000.00");
+
+        // Recepcionista y Gerente pueden consultarlo
+        const receipt = await getPaymentReceipt(paid.id, receptionist);
+        assert.equal(receipt.receiptNumber, paid.receiptNumber);
+        assert.equal(receipt.paymentId, paid.id);
+        assert.equal(receipt.status, "PAID");
+        assert.equal(receipt.amount, "15000.00");
+        assert.equal(receipt.paymentMethod, `${tag}-efectivo`);
+        assert.equal(
+          receipt.center.legend,
+          "Comprobante no válido como factura",
+        );
+        assert.equal(receipt.voidedAt, null);
+        assert.ok(receipt.patient.lastName.length > 0);
+        assert.ok(receipt.appointment.service.name.length > 0);
+
+        const mgrReceipt = await getPaymentReceipt(paid.id, manager);
+        assert.equal(mgrReceipt.receiptNumber, paid.receiptNumber);
+
+        // Profesional no tiene acceso
+        await rejects(
+          () => getPaymentReceipt(paid.id, professionalActor),
+          "FORBIDDEN",
+        );
+
+        // Cobro inexistente da NOT_FOUND
+        await rejects(
+          () => getPaymentReceipt(99999999, receptionist),
+          "NOT_FOUND",
+        );
+
+        // ID no válido da VALIDATION
+        await rejects(() => getPaymentReceipt(-1, receptionist), "VALIDATION");
+
+        // Anular el cobro
+        await voidPayment(
+          { paymentId: paid.id, reason: "Error de carga para prueba" },
+          manager,
+        );
+
+        // El comprobante anulado conserva el número y trae datos de anulación
+        const voidedReceipt = await getPaymentReceipt(paid.id, receptionist);
+        assert.equal(voidedReceipt.status, "VOIDED");
+        assert.equal(voidedReceipt.receiptNumber, paid.receiptNumber);
+        assert.equal(voidedReceipt.voidReason, "Error de carga para prueba");
+        assert.ok(voidedReceipt.voidedAt !== null);
+        assert.equal(voidedReceipt.voidedBy?.id, manager.id);
+      },
+    );
+
+    await verify(
+      "constancia de atención: emite con datos del centro y paciente, rechaza cancelados y profesionales",
+      async () => {
+        const apptId = await appointment({
+          patientId: insuredPatient,
+          serviceId: referral.id,
+        });
+
+        const cert = await getAttendanceCertificate(apptId, receptionist);
+        assert.equal(cert.appointmentId, apptId);
+        assert.equal(cert.patient.id, insuredPatient);
+        assert.ok(cert.patient.lastName.length > 0);
+        assert.ok(cert.service.name.length > 0);
+        assert.ok(cert.professional.lastName.length > 0);
+        assert.equal(cert.center.name, "GOAT Policonsultorio");
+
+        // Manager también puede emitir
+        const certMgr = await getAttendanceCertificate(apptId, manager);
+        assert.equal(certMgr.appointmentId, apptId);
+
+        // Profesional no tiene permiso
+        await rejects(
+          () => getAttendanceCertificate(apptId, professionalActor),
+          "FORBIDDEN",
+        );
+
+        // Inexistente da NOT_FOUND
+        await rejects(
+          () => getAttendanceCertificate(99999999, receptionist),
+          "NOT_FOUND",
+        );
+
+        // Cancelar el turno
+        await cancelAppointment(
+          {
+            appointmentId: apptId,
+            reason: "Cancelado de prueba",
+            requestedBy: "PACIENTE",
+          },
+          receptionist,
+        );
+
+        // Turno cancelado rechaza con VALIDATION
+        await rejects(
+          () => getAttendanceCertificate(apptId, receptionist),
+          "VALIDATION",
+        );
+      },
+    );
+
+    console.log(`\n${passed} verificaciones de HU-21 y HU-24 pasaron.`);
   } finally {
     const appointments = await prisma.appointment.findMany({
       where: { createdById: { in: users } },

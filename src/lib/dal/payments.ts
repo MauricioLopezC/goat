@@ -23,6 +23,7 @@ import {
   type RegisterPaymentInput,
   type VoidPaymentInput,
 } from "@/lib/validation/payments";
+import { centerProfile } from "@/lib/center-profile";
 
 // Cobro de turnos a particulares y autorización de obra social (HU-21).
 
@@ -40,6 +41,7 @@ const billingSelect = {
   payments: {
     select: {
       id: true,
+      receiptNumber: true,
       amount: true,
       status: true,
       createdAt: true,
@@ -96,6 +98,7 @@ function toBilling(appointment: BillingRow) {
     price: appointment.service.price?.toFixed(2) ?? null,
     activePayment: activePayment && {
       id: activePayment.id,
+      receiptNumber: activePayment.receiptNumber,
       amount: activePayment.amount.toFixed(2),
       paymentMethod: activePayment.paymentMethod.name,
       createdAt: activePayment.createdAt,
@@ -105,6 +108,7 @@ function toBilling(appointment: BillingRow) {
       .filter((payment) => payment.status === PaymentStatus.VOIDED)
       .map((payment) => ({
         id: payment.id,
+        receiptNumber: payment.receiptNumber,
         amount: payment.amount.toFixed(2),
         paymentMethod: payment.paymentMethod.name,
         createdAt: payment.createdAt,
@@ -197,7 +201,12 @@ export async function listTodayAppointments(actor: Actor, now = new Date()) {
       service: { select: { name: true, price: true, requiresReferral: true } },
       payments: {
         where: { status: PaymentStatus.PAID },
-        select: { amount: true, paymentMethod: { select: { name: true } } },
+        select: {
+          id: true,
+          receiptNumber: true,
+          amount: true,
+          paymentMethod: { select: { name: true } },
+        },
       },
     },
     orderBy: [{ startsAt: "asc" }, { id: "asc" }],
@@ -216,6 +225,8 @@ export async function listTodayAppointments(actor: Actor, now = new Date()) {
       // Decimal no cruza a componentes cliente: va como texto ("15000.00").
       price: service.price?.toFixed(2) ?? null,
       activePayment: activePayment && {
+        id: activePayment.id,
+        receiptNumber: activePayment.receiptNumber,
         amount: activePayment.amount.toFixed(2),
         paymentMethod: activePayment.paymentMethod.name,
       },
@@ -279,9 +290,13 @@ export async function registerPayment(
           amount: appointment.service.price,
           createdById: actor.id,
         },
-        select: { id: true, amount: true },
+        select: { id: true, receiptNumber: true, amount: true },
       });
-      return { id: payment.id, amount: payment.amount.toFixed(2) };
+      return {
+        id: payment.id,
+        receiptNumber: payment.receiptNumber,
+        amount: payment.amount.toFixed(2),
+      };
     });
   } catch (error) {
     // Dos cobros a la vez: el índice parcial deja pasar uno solo.
@@ -408,3 +423,125 @@ export async function assertNoActivePayment(
       `El turno tiene un cobro registrado. Anulá el cobro antes de ${action}.`,
     );
 }
+
+/// Comprobante de un cobro con los datos del centro, el paciente, el turno
+/// y el cobro (HU-24). Roles: mesa de entradas y gerencia. Paciente solo sus
+/// propios turnos (HU-31). Profesional sin acceso.
+export async function getPaymentReceipt(paymentId: number, actor: Actor) {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PATIENT);
+  if (!Number.isInteger(paymentId) || paymentId <= 0) {
+    throw new DomainError("VALIDATION", "ID de cobro no válido.");
+  }
+
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    select: {
+      id: true,
+      receiptNumber: true,
+      status: true,
+      amount: true,
+      createdAt: true,
+      createdBy: { select: personSelect },
+      paymentMethod: { select: { name: true } },
+      voidedAt: true,
+      voidedBy: { select: personSelect },
+      voidReason: true,
+      appointment: {
+        select: {
+          id: true,
+          startsAt: true,
+          endsAt: true,
+          service: { select: { id: true, name: true } },
+          professional: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              licenseNumber: true,
+            },
+          },
+          patient: {
+            select: {
+              id: true,
+              userId: true,
+              firstName: true,
+              lastName: true,
+              documentType: true,
+              documentNumber: true,
+              email: true,
+              coverageType: true,
+              coverage: {
+                select: {
+                  memberNumber: true,
+                  insurancePlan: {
+                    select: {
+                      name: true,
+                      healthInsurer: {
+                        select: {
+                          name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!payment) {
+    throw new DomainError("NOT_FOUND", "El cobro no existe.");
+  }
+
+  if (
+    actor.role === Role.PATIENT &&
+    payment.appointment.patient.userId !== actor.id
+  ) {
+    throw new DomainError(
+      "FORBIDDEN",
+      "No podés consultar comprobantes de otros pacientes.",
+    );
+  }
+
+  return {
+    paymentId: payment.id,
+    receiptNumber: payment.receiptNumber,
+    status: payment.status,
+    amount: payment.amount.toFixed(2),
+    paymentMethod: payment.paymentMethod.name,
+    createdAt: payment.createdAt,
+    createdBy: payment.createdBy,
+    voidedAt: payment.voidedAt,
+    voidedBy: payment.voidedBy,
+    voidReason: payment.voidReason,
+    appointment: {
+      id: payment.appointment.id,
+      startsAt: payment.appointment.startsAt,
+      endsAt: payment.appointment.endsAt,
+      service: payment.appointment.service,
+      professional: payment.appointment.professional,
+    },
+    patient: {
+      id: payment.appointment.patient.id,
+      firstName: payment.appointment.patient.firstName,
+      lastName: payment.appointment.patient.lastName,
+      documentType: payment.appointment.patient.documentType,
+      documentNumber: payment.appointment.patient.documentNumber,
+      email: payment.appointment.patient.email,
+      coverageType: payment.appointment.patient.coverageType,
+      healthInsurer:
+        payment.appointment.patient.coverage?.insurancePlan.healthInsurer
+          .name ?? null,
+      healthPlan:
+        payment.appointment.patient.coverage?.insurancePlan.name ?? null,
+      affiliateNumber:
+        payment.appointment.patient.coverage?.memberNumber ?? null,
+    },
+    center: centerProfile,
+  };
+}
+
+export type PaymentReceipt = Awaited<ReturnType<typeof getPaymentReceipt>>;

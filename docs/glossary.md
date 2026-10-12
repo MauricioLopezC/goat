@@ -53,6 +53,7 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Observaciones administrativas | `Patient.notes` | Notas del mostrador sobre el paciente ([HU-17](hu/HU-17-ficha-completa-del-paciente.md)). No son datos clínicos. |
 | Contacto de emergencia | `emergencyContactName`, `emergencyContactPhone`, `emergencyContactRelationship` | Del `Patient`. Distinto del responsable o tutor (`guardianName`). |
 | Comprobante | `receiptNumber` | Constancia no fiscal de un cobro, con la marca del centro y número correlativo (`Payment.receiptNumber`). No es una factura ([HU-24](hu/HU-24-comprobante-de-cobro.md)). Inc. 3. |
+| Constancia de atención | `getAttendanceCertificate` | Constancia institucional de atención médica de un turno sin cobro (obra social o constancia laboral), reutilizando el diseño del comprobante ([HU-24](hu/HU-24-comprobante-de-cobro.md)). Inc. 3. |
 | Datos del centro | `centerProfile` | Nombre, razón social, CUIT, dirección y teléfono del centro, configurados en un solo lugar. Los usa el comprobante ([HU-24](hu/HU-24-comprobante-de-cobro.md)). Inc. 3. |
 | Cierre de caja | `CashClosing` | Cierre de los cobros de un día del centro, con el detalle por medio y por profesional, el efectivo contado y la diferencia ([HU-27](hu/HU-27-cierre-de-caja.md)). Inc. 3. |
 | Rendición por profesional | `getProfessionalStatement` | Producido (pacientes atendidos), cobrado (lo pagado por particulares), comisión del centro y neto de un profesional en un período ([HU-28](hu/HU-28-rendicion-por-profesional.md)). Inc. 3. |

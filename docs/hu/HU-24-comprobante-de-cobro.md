@@ -23,16 +23,18 @@
 - Los datos del centro se configuran en un solo lugar del sistema, no en cada pantalla.
 - Al terminar un cobro, el mensaje de éxito ofrece **Ver comprobante**. También se abre desde el detalle del turno, desde la fila de *Turnos de hoy* ([HU-21](HU-21-cobrar-turno.md)) cuando el turno está cobrado y desde la caja ([HU-27](HU-27-cierre-de-caja.md)).
 - Un cobro anulado muestra su comprobante con la marca **ANULADO**, el motivo y la fecha de anulación.
+- **Constancia de atención:** para turnos de pacientes con obra social (que no tienen cobro directo) o turnos que requieran acreditación de asistencia médica, se emite una constancia reutilizando este diseño institucional sin importes ni medios de pago. No se emite para turnos cancelados. Se accede desde el detalle del turno y desde la vista de *Turnos de hoy*.
 
 ## Permisos
 
-- `RECEPTIONIST` y `MANAGER`: ven e imprimen cualquier comprobante.
-- `PATIENT`: ve los comprobantes de sus propios turnos desde el portal ([HU-31](HU-31-portal-del-paciente.md)).
+- `RECEPTIONIST` y `MANAGER`: ven e imprimen cualquier comprobante o constancia de atención.
+- `PATIENT`: ve los comprobantes y constancias de sus propios turnos desde el portal ([HU-31](HU-31-portal-del-paciente.md)).
 - `PROFESSIONAL`: sin acceso.
 
 ## Operaciones
 
 - `getPaymentReceipt` — nueva, de lectura.
+- `getAttendanceCertificate` — nueva, de lectura (constancia de atención sin cobro).
 - `registerPayment` — asigna el número de comprobante.
 - `listTodayAppointments` — suma el cobro vigente, para el acceso al comprobante.
 
@@ -40,4 +42,5 @@
 
 - Devolución del Inc. 2 (particular): el cliente pidió el comprobante para esta entrega.
 - La factura electrónica y AFIP siguen fuera de alcance ([`contexto-goat.md`](../contexto-goat.md)).
-- Al paciente con obra social no se le cobra ([HU-21](HU-21-cobrar-turno.md)), así que no tiene cobro ni comprobante. ¿Necesita una constancia de atención? Si el cliente la pide, se reutiliza este diseño sin importe.
+- Constancia de atención acordada con el cliente: se reutiliza el diseño institucional del comprobante omitiendo los campos de cobro.
+

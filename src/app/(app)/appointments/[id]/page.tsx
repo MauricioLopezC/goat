@@ -10,6 +10,7 @@ import {
   PAYMENT_STATE_LABEL,
   formatAmount,
 } from "@/lib/payments";
+import { formatReceiptNumber } from "@/lib/center-profile";
 import { DomainError } from "@/lib/actions";
 import {
   formatDate,
@@ -159,11 +160,24 @@ export default async function AppointmentPage({
       )}
       {billingNotice === "paid" && billing?.activePayment && (
         <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
-          <AlertTitle>
-            Cobro registrado: {formatAmount(billing.activePayment.amount)}
+          <AlertTitle className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              Cobro registrado: {formatAmount(billing.activePayment.amount)}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              asChild
+              className="bg-card text-foreground"
+            >
+              <Link href={`/payments/${billing.activePayment.id}/receipt`}>
+                Ver comprobante
+              </Link>
+            </Button>
           </AlertTitle>
           <AlertDescription className="text-success-soft-foreground">
-            Se cobró con {billing.activePayment.paymentMethod}.
+            Se cobró con {billing.activePayment.paymentMethod} (
+            {formatReceiptNumber(billing.activePayment.receiptNumber)}).
           </AlertDescription>
         </Alert>
       )}
@@ -179,8 +193,13 @@ export default async function AppointmentPage({
       {billingNotice === "authorized" && billing?.authorization && (
         <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
           <AlertTitle>Autorización registrada</AlertTitle>
-          <AlertDescription className="text-success-soft-foreground">
-            Número de autorización: {billing.authorization.number}.
+          <AlertDescription className="text-success-soft-foreground flex flex-wrap items-center justify-between gap-2">
+            <span>Número de autorización: {billing.authorization.number}.</span>
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/appointments/${id}/certificate`}>
+                Ver constancia
+              </Link>
+            </Button>
           </AlertDescription>
         </Alert>
       )}
@@ -327,6 +346,12 @@ export default async function AppointmentPage({
                   <dd>{billing.activePayment.paymentMethod}</dd>
                 </div>
                 <div>
+                  <dt className="text-muted-foreground">Comprobante</dt>
+                  <dd className="font-semibold text-primary">
+                    {formatReceiptNumber(billing.activePayment.receiptNumber)}
+                  </dd>
+                </div>
+                <div>
                   <dt className="text-muted-foreground">Cobrado por</dt>
                   <dd>
                     {billing.activePayment.createdBy.lastName},{" "}
@@ -384,7 +409,10 @@ export default async function AppointmentPage({
                   el día del turno, cuando llega el paciente.
                 </p>
               )}
-            {(canCharge || paid || canAuthorize) && (
+            {(canCharge ||
+              paid ||
+              canAuthorize ||
+              Boolean(billing.authorization)) && (
               <div className="flex flex-wrap gap-3">
                 {canCharge && billing.price !== null && (
                   <PaymentDialog
@@ -396,12 +424,28 @@ export default async function AppointmentPage({
                   />
                 )}
                 {billing.activePayment && (
-                  <VoidPaymentDialog
-                    paymentId={billing.activePayment.id}
-                    appointmentId={appointment.id}
-                    returnSearch={returnSearch}
-                    description={`${formatAmount(billing.activePayment.amount)} con ${billing.activePayment.paymentMethod}`}
-                  />
+                  <>
+                    <Button variant="outline" asChild>
+                      <Link
+                        href={`/payments/${billing.activePayment.id}/receipt`}
+                      >
+                        Ver comprobante
+                      </Link>
+                    </Button>
+                    <VoidPaymentDialog
+                      paymentId={billing.activePayment.id}
+                      appointmentId={appointment.id}
+                      returnSearch={returnSearch}
+                      description={`${formatAmount(billing.activePayment.amount)} con ${billing.activePayment.paymentMethod}`}
+                    />
+                  </>
+                )}
+                {billing.authorization && (
+                  <Button variant="outline" asChild>
+                    <Link href={`/appointments/${appointment.id}/certificate`}>
+                      Ver constancia
+                    </Link>
+                  </Button>
                 )}
                 {canAuthorize && (
                   <AuthorizationDialog
@@ -422,12 +466,23 @@ export default async function AppointmentPage({
                       key={payment.id}
                       className="flex flex-col gap-0.5 text-sm"
                     >
-                      <p className="tabular-nums">
-                        {formatAmount(payment.amount)} · {payment.paymentMethod}{" "}
-                        · cobrado por {payment.createdBy.lastName},{" "}
-                        {payment.createdBy.firstName} ·{" "}
-                        {formatInstant(payment.createdAt)}
-                      </p>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="tabular-nums">
+                          <span className="font-semibold text-primary">
+                            {formatReceiptNumber(payment.receiptNumber)}
+                          </span>{" "}
+                          · {formatAmount(payment.amount)} ·{" "}
+                          {payment.paymentMethod} · cobrado por{" "}
+                          {payment.createdBy.lastName},{" "}
+                          {payment.createdBy.firstName} ·{" "}
+                          {formatInstant(payment.createdAt)}
+                        </p>
+                        <Button size="xs" variant="outline" asChild>
+                          <Link href={`/payments/${payment.id}/receipt`}>
+                            Ver comprobante
+                          </Link>
+                        </Button>
+                      </div>
                       {payment.voidedBy && payment.voidedAt && (
                         <p className="text-muted-foreground">
                           Anulado por {payment.voidedBy.lastName},{" "}
@@ -539,6 +594,13 @@ export default async function AppointmentPage({
             Historial del paciente
           </Link>
         </Button>
+        {!own && appointment.status !== "CANCELLED" && (
+          <Button asChild variant="outline">
+            <Link href={`/appointments/${appointment.id}/certificate`}>
+              Constancia de atención
+            </Link>
+          </Button>
+        )}
         {!own && (
           <Button asChild>
             <Link href="/appointments/new">Dar otro turno</Link>
