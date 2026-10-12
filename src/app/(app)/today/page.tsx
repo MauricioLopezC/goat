@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requirePageRole } from "@/lib/dal/auth";
 import { listTodayAppointments } from "@/lib/dal/payments";
 import { listActivePaymentMethods } from "@/lib/dal/payment-methods";
+import { getUnclosedCashDays } from "@/lib/dal/cash";
 import {
   PAYMENT_STATE_BADGE_CLASS,
   PAYMENT_STATE_LABEL,
@@ -25,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AlertCircle } from "lucide-react";
 import { PaymentDialog } from "../appointments/[id]/payment-dialog";
 import { AuthorizationDialog } from "../appointments/[id]/authorization-dialog";
 
@@ -45,6 +47,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
   const actor = await requirePageRole("RECEPTIONIST", "MANAGER");
   const { paid, authorized } = await searchParams;
   const rows = await listTodayAppointments(actor);
+  const unclosedDays = await getUnclosedCashDays(actor);
   const pendingPayment = rows.filter(
     (row) => row.state === "PENDING_PAYMENT",
   ).length;
@@ -62,6 +65,30 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
 
   return (
     <div className="flex flex-col gap-6">
+      {unclosedDays.length > 0 && (
+        <Alert className="bg-warning-soft text-warning-soft-foreground border-warning-soft-border">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Cajas anteriores sin cerrar</AlertTitle>
+          <AlertDescription className="text-warning-soft-foreground flex flex-col gap-1.5 mt-1">
+            <p>
+              Hay días anteriores con cobros registrados que todavía no fueron
+              cerrados:
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {unclosedDays.map((d) => (
+                <Link
+                  key={d}
+                  href={`/cash?date=${d}`}
+                  className="inline-flex items-center gap-1 rounded bg-background/80 px-2.5 py-1 text-xs font-semibold text-warning-soft-foreground hover:bg-background border border-warning-soft-border hover:underline"
+                >
+                  Cerrar caja del {formatDate(d)} →
+                </Link>
+              ))}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div>
         <h1 className="text-display-lg font-semibold tracking-tight text-foreground">
           Turnos de hoy

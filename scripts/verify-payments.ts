@@ -13,6 +13,12 @@ import {
   voidPayment,
 } from "../src/lib/dal/payments";
 import {
+  closeCash,
+  getCashSummary,
+  listCashClosings,
+  getUnclosedCashDays,
+} from "../src/lib/dal/cash";
+import {
   cancelAppointment,
   cancelProfessionalAppointment,
   completeAppointment,
@@ -545,7 +551,159 @@ async function main() {
       );
     });
 
-    console.log(`\n${passed} verificaciones de HU-21 pasaron.`);
+    await verify(
+      "HU-27: Arqueo, cierre de caja, restricciones y ajustes posteriores de gerencia",
+      async () => {
+        const testDate = "2026-01-20";
+        await prisma.payment.deleteMany({
+          where: {
+            createdAt: {
+              gte: appointmentInstant(testDate, 0),
+              lt: appointmentInstant(testDate, 1440),
+            },
+          },
+        });
+        await prisma.cashClosing.deleteMany({
+          where: { date: dateToDb(testDate) },
+        });
+
+        // Crear turnos completados en esa fecha
+        const appt1 = await appointment({
+          status: "COMPLETED",
+          date: testDate,
+        });
+        const appt2 = await appointment({
+          status: "COMPLETED",
+          date: testDate,
+        });
+
+        // Cobrar ambos turnos
+        const pay1 = await registerPayment(
+          { appointmentId: appt1, paymentMethodId: cash.id },
+          receptionist,
+        );
+        const pay2 = await registerPayment(
+          { appointmentId: appt2, paymentMethodId: cash.id },
+          receptionist,
+        );
+
+        // Mover createdAt al rango de testDate
+        const payDate = appointmentInstant(testDate, 660);
+        await prisma.payment.updateMany({
+          where: { id: { in: [pay1.id, pay2.id] } },
+          data: { createdAt: payDate },
+        });
+
+        // getCashSummary muestra ambos cobros en vivo
+        const summaryOpen = await getCashSummary(testDate, receptionist);
+        assert.equal(summaryOpen.isClosed, false);
+        assert.equal(summaryOpen.summary.paymentCount, 2);
+        assert.equal(summaryOpen.summary.totalAmount, "30000.00");
+        assert.equal(summaryOpen.summary.expectedCashAmount, "30000.00");
+
+        // getUnclosedCashDays detecta que testDate tiene cobros sin cerrar
+        const unclosed = await getUnclosedCashDays(receptionist);
+        assert.ok(unclosed.includes(testDate));
+
+        // Intento de cerrar con fecha futura falla
+        await rejects(
+          () =>
+            closeCash(
+              { date: "2099-01-01", countedCashAmount: 30000 },
+              receptionist,
+            ),
+          "VALIDATION",
+        );
+
+        // Intento de cerrar con diferencia sin notas falla
+        await rejects(
+          () =>
+            closeCash(
+              { date: testDate, countedCashAmount: 25000, notes: "" },
+              receptionist,
+            ),
+          "VALIDATION",
+        );
+
+        // Cierre con diferencia y observaciones obligatorias pasa
+        const closingResult = await closeCash(
+          {
+            date: testDate,
+            countedCashAmount: 28000,
+            notes: "Faltante de $2000 por cambio",
+          },
+          receptionist,
+        );
+        assert.equal(closingResult.date, testDate);
+
+        // Reintentar cerrar el mismo día falla con DUPLICATE
+        await rejects(
+          () =>
+            closeCash(
+              { date: testDate, countedCashAmount: 28000, notes: "reintento" },
+              receptionist,
+            ),
+          "DUPLICATE",
+        );
+
+        // Verificar que los pagos quedaron vinculados a la caja
+        const linkedPayments = await prisma.payment.findMany({
+          where: { id: { in: [pay1.id, pay2.id] } },
+          select: { cashClosingId: true },
+        });
+        assert.equal(linkedPayments[0].cashClosingId, closingResult.id);
+        assert.equal(linkedPayments[1].cashClosingId, closingResult.id);
+
+        // Una vez cerrada, testDate ya no aparece en getUnclosedCashDays
+        const unclosedAfter = await getUnclosedCashDays(receptionist);
+        assert.ok(!unclosedAfter.includes(testDate));
+
+        // La recepcionista no puede anular cobros de una caja cerrada
+        await rejects(
+          () =>
+            voidPayment(
+              { paymentId: pay1.id, reason: "Error de cobro" },
+              receptionist,
+            ),
+          "FORBIDDEN",
+        );
+
+        // El gerente SÍ puede anular un cobro de una caja cerrada (corrección)
+        await voidPayment(
+          { paymentId: pay1.id, reason: "Corrección autorizada por gerencia" },
+          manager,
+        );
+
+        // Consultar el resumen como gerente: la caja sigue cerrada, muestra el ajuste posterior
+        // y el total corregido junto al original
+        const summaryClosed = await getCashSummary(testDate, manager);
+        assert.equal(summaryClosed.isClosed, true);
+        assert.equal(summaryClosed.closing?.totalAmount, "30000.00");
+        assert.equal(summaryClosed.closing?.countedCashAmount, "28000.00");
+        assert.equal(summaryClosed.closing?.difference, "-2000.00");
+        assert.equal(summaryClosed.subsequentAdjustments.length, 1);
+        assert.equal(summaryClosed.subsequentAdjustments[0].id, pay1.id);
+        assert.equal(
+          summaryClosed.correctedTotals?.correctedTotalAmount,
+          "15000.00",
+        );
+        assert.equal(summaryClosed.correctedTotals?.correctedPaymentCount, 1);
+
+        // listCashClosings funciona para gerente y falla para recepcionista
+        const closingsList = await listCashClosings(1, manager);
+        assert.ok(closingsList.items.some((c) => c.date === testDate));
+        await rejects(() => listCashClosings(1, receptionist), "FORBIDDEN");
+
+        // El turno del cobro anulado puede volver a cobrarse (HU-27)
+        const newPay = await registerPayment(
+          { appointmentId: appt1, paymentMethodId: cash.id },
+          receptionist,
+        );
+        assert.ok(newPay.id);
+      },
+    );
+
+    console.log(`\n${passed} verificaciones de HU-21 y HU-27 pasaron.`);
   } finally {
     const appointments = await prisma.appointment.findMany({
       where: { createdById: { in: users } },
@@ -553,7 +711,22 @@ async function main() {
     });
     const appointmentIds = appointments.map((a) => a.id);
     await prisma.payment.deleteMany({
-      where: { appointmentId: { in: appointmentIds } },
+      where: {
+        OR: [
+          { appointmentId: { in: appointmentIds } },
+          {
+            createdAt: {
+              gte: appointmentInstant("2026-01-20", 0),
+              lt: appointmentInstant("2026-01-20", 1440),
+            },
+          },
+        ],
+      },
+    });
+    await prisma.cashClosing.deleteMany({
+      where: {
+        OR: [{ closedById: { in: users } }, { date: dateToDb("2026-01-20") }],
+      },
     });
     await prisma.appointment.deleteMany({
       where: { id: { in: appointmentIds } },

@@ -313,6 +313,23 @@ export async function voidPayment(input: VoidPaymentInput, actor: Actor) {
       "El motivo de la anulación es obligatorio.",
     );
   return prisma.$transaction(async (tx) => {
+    const existing = await tx.payment.findUnique({
+      where: { id: paymentId },
+      select: { id: true, status: true, cashClosingId: true },
+    });
+    if (!existing) throw new DomainError("NOT_FOUND", "El cobro no existe.");
+    if (existing.status !== PaymentStatus.PAID)
+      throw new DomainError(
+        "INVALID_STATUS_TRANSITION",
+        "El cobro ya estaba anulado.",
+      );
+    if (existing.cashClosingId !== null && actor.role !== Role.MANAGER) {
+      throw new DomainError(
+        "FORBIDDEN",
+        "Un cobro de una caja cerrada solo puede ser anulado por el gerente.",
+      );
+    }
+
     // La condición de estado va en el mismo UPDATE: dos anulaciones a la vez
     // no se pisan.
     const { count } = await tx.payment.updateMany({
