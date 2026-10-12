@@ -772,14 +772,6 @@ export default async function AppointmentPage({
             </Link>
           </Button>
         )}
-        {canRegisterEncounter && (
-          <EncounterDialog
-            appointmentId={appointment.id}
-            summary={summary}
-            mode="create"
-            triggerLabel="Registrar atención médica"
-          />
-        )}
         {canComplete && (
           <StatusChangeDialog
             appointmentId={appointment.id}

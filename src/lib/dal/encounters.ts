@@ -202,35 +202,76 @@ export async function getEncounter(appointmentId: number, actor: Actor) {
     throw new DomainError("NOT_FOUND", "El turno no existe.");
   }
 
-  const encounter = await prisma.encounter.findUnique({
-    where: { appointmentId },
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
     select: {
       id: true,
-      appointmentId: true,
-      notes: true,
-      indications: true,
-      createdAt: true,
-      updatedAt: true,
-      professional: {
+      startsAt: true,
+      professionalId: true,
+      patientId: true,
+      encounter: {
         select: {
           id: true,
-          firstName: true,
-          lastName: true,
-          userId: true,
-        },
-      },
-      appointment: {
-        select: {
-          id: true,
-          startsAt: true,
+          appointmentId: true,
+          notes: true,
+          indications: true,
+          createdAt: true,
+          updatedAt: true,
+          professional: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              userId: true,
+            },
+          },
         },
       },
     },
   });
 
-  if (!encounter) {
+  if (!appointment) {
+    throw new DomainError("NOT_FOUND", "El turno no existe.");
+  }
+
+  let ownProfessional: { id: number } | null = null;
+  if (actor.role === Role.PROFESSIONAL) {
+    ownProfessional = await prisma.professional.findUnique({
+      where: { userId: actor.id },
+      select: { id: true },
+    });
+
+    if (!ownProfessional) {
+      throw new DomainError(
+        "NOT_FOUND",
+        "No se encontró el perfil profesional vinculado a tu usuario.",
+      );
+    }
+
+    // Pertenencia: el profesional debe ser el titular del turno, o atender a este paciente (HU-25 / AGENTS.md)
+    const isOwner = appointment.professionalId === ownProfessional.id;
+    if (!isOwner) {
+      const hasAttendedPatient = await prisma.appointment.count({
+        where: {
+          patientId: appointment.patientId,
+          professionalId: ownProfessional.id,
+        },
+      });
+
+      if (!hasAttendedPatient) {
+        throw new DomainError(
+          "FORBIDDEN",
+          "No podés acceder a la atención médica de un paciente que no atendés.",
+        );
+      }
+    }
+  }
+
+  if (!appointment.encounter) {
     return null;
   }
+
+  const encounter = appointment.encounter;
 
   // Recepción y Gerencia no ven el contenido clínico (secreto médico, HU-25)
   if (actor.role !== Role.PROFESSIONAL) {
@@ -248,20 +289,13 @@ export async function getEncounter(appointmentId: number, actor: Actor) {
       createdAt: encounter.createdAt,
       updatedAt: encounter.updatedAt,
       canEdit: false,
-      editDeadline: encounterEditDeadline(encounter.appointment.startsAt),
+      editDeadline: encounterEditDeadline(appointment.startsAt),
     };
   }
 
-  // Profesional: puede ver el contenido clínico para continuidad asistencial
-  const ownProfessional = await prisma.professional.findUnique({
-    where: { userId: actor.id },
-    select: { id: true },
-  });
-
   const isAuthor = ownProfessional?.id === encounter.professional.id;
-  const deadline = encounterEditDeadline(encounter.appointment.startsAt);
-  const canEdit =
-    isAuthor && isEncounterEditable(encounter.appointment.startsAt);
+  const deadline = encounterEditDeadline(appointment.startsAt);
+  const canEdit = isAuthor && isEncounterEditable(appointment.startsAt);
 
   return {
     id: encounter.id,

@@ -371,6 +371,12 @@ async function main() {
           "Radiografía de tórax y jarabe mucolítico.",
         );
         assert.equal(asDoc.canEdit, true);
+
+        // Profesional ajeno que no atiende al paciente es rechazado con FORBIDDEN
+        await rejects(
+          () => getEncounter(encounter!.appointmentId, doc2Actor),
+          "FORBIDDEN",
+        );
       },
     );
 
