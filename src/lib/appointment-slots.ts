@@ -39,9 +39,16 @@ export function calculateAvailableSlots(input: {
   exceptions: { startMinute: number | null; endMinute: number | null }[];
   appointments: { startsAt: Date; endsAt: Date }[];
   holiday: boolean;
+  holidays?: { startMinute: number | null; endMinute: number | null }[];
   now: Date;
 }): AvailableSlot[] {
-  if (input.holiday || input.durationMinutes <= 0) return [];
+  const isFullHoliday =
+    input.holiday ||
+    (input.holidays?.some(
+      (h) => h.startMinute === null || h.endMinute === null,
+    ) ??
+      false);
+  if (isFullHoliday || input.durationMinutes <= 0) return [];
   const slots: AvailableSlot[] = [];
   for (const window of input.windows) {
     for (
@@ -63,6 +70,20 @@ export function calculateAvailableSlots(input: {
               endMinute,
               exception.startMinute,
               exception.endMinute,
+            ),
+        )
+      )
+        continue;
+      if (
+        input.holidays?.some(
+          (holiday) =>
+            holiday.startMinute !== null &&
+            holiday.endMinute !== null &&
+            rangesOverlap(
+              minute,
+              endMinute,
+              holiday.startMinute,
+              holiday.endMinute,
             ),
         )
       )

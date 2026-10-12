@@ -85,7 +85,17 @@ export function WeeklyAgendaGrid({
                 timeZone: "UTC",
                 month: "short",
               }).format(dateObj);
-              const holiday = data.holidays.find((h) => h.date === day.date);
+              const fullDayHoliday = data.holidays.find(
+                (h) =>
+                  h.date === day.date &&
+                  (h.startMinute === null || h.endMinute === null),
+              );
+              const partialHolidays = data.holidays.filter(
+                (h) =>
+                  h.date === day.date &&
+                  h.startMinute !== null &&
+                  h.endMinute !== null,
+              );
               const dayExceptions = data.exceptions.filter(
                 (e) => e.date === day.date,
               );
@@ -99,9 +109,9 @@ export function WeeklyAgendaGrid({
                   className={cn(
                     "pb-2 text-center transition-colors flex flex-col items-center justify-start rounded-t-lg",
                     isToday &&
-                      !holiday &&
+                      !fullDayHoliday &&
                       "bg-primary-soft/40 border-b-2 border-primary pt-1",
-                    holiday &&
+                    fullDayHoliday &&
                       "bg-holiday/15 border-b-2 border-holiday/60 pt-1",
                   )}
                 >
@@ -126,18 +136,29 @@ export function WeeklyAgendaGrid({
                     )}
                   </div>
 
-                  {/* Cierre del centro en la cabecera (sin pisar las franjas) */}
-                  {holiday && (
+                  {/* Cierre del centro de día completo en la cabecera */}
+                  {fullDayHoliday && (
                     <span
                       className="mt-1 w-full max-w-[130px] truncate rounded bg-holiday/15 border border-holiday/30 px-1 py-0.5 text-[10px] font-semibold text-holiday-muted-foreground"
-                      title={`Centro cerrado: ${holiday.description}`}
+                      title={`Centro cerrado: ${fullDayHoliday.description}`}
                     >
-                      Cerrado: {holiday.description}
+                      Cerrado: {fullDayHoliday.description}
+                    </span>
+                  )}
+
+                  {/* Cierre parcial del centro en la cabecera */}
+                  {!fullDayHoliday && partialHolidays.length > 0 && (
+                    <span
+                      className="mt-1 w-full max-w-[130px] truncate rounded bg-holiday/15 border border-holiday/30 px-1 py-0.5 text-[10px] font-semibold text-holiday-foreground"
+                      title={`Centro cerrado: ${formatMinute(partialHolidays[0].startMinute!)}–${formatMinute(partialHolidays[0].endMinute!)} (${partialHolidays[0].description})`}
+                    >
+                      Cerrado: {formatMinute(partialHolidays[0].startMinute!)}–
+                      {formatMinute(partialHolidays[0].endMinute!)}
                     </span>
                   )}
 
                   {/* Ausencia de día completo en la cabecera */}
-                  {!holiday && fullDayException && (
+                  {!fullDayHoliday && fullDayException && (
                     <span
                       className="mt-1 w-full max-w-[130px] truncate rounded bg-destructive/10 border border-destructive/25 px-1 py-0.5 text-[10px] font-semibold text-destructive"
                       title={`Ausencia: ${fullDayException.reason}`}
@@ -170,7 +191,17 @@ export function WeeklyAgendaGrid({
               const dayAppointments = data.appointments.filter(
                 (a) => toLocalSlot(a.startsAt).date === day.date,
               );
-              const holiday = data.holidays.find((h) => h.date === day.date);
+              const fullDayHoliday = data.holidays.find(
+                (h) =>
+                  h.date === day.date &&
+                  (h.startMinute === null || h.endMinute === null),
+              );
+              const partialHolidays = data.holidays.filter(
+                (h) =>
+                  h.date === day.date &&
+                  h.startMinute !== null &&
+                  h.endMinute !== null,
+              );
               const dayExceptions = data.exceptions.filter(
                 (e) => e.date === day.date,
               );
@@ -181,7 +212,7 @@ export function WeeklyAgendaGrid({
                 (e) => e.startMinute !== null && e.endMinute !== null,
               );
 
-              if (holiday) {
+              if (fullDayHoliday) {
                 return (
                   <div
                     key={day.date}
@@ -193,7 +224,7 @@ export function WeeklyAgendaGrid({
                         Centro cerrado
                       </span>
                       <span className="text-xs font-bold text-holiday-foreground mt-1.5 max-w-[120px] line-clamp-2">
-                        {holiday.description}
+                        {fullDayHoliday.description}
                       </span>
                       <span className="text-[10px] text-holiday-muted-foreground/80 mt-1 max-w-[120px] leading-tight font-medium">
                         Sin turnos para ningún profesional
@@ -216,6 +247,25 @@ export function WeeklyAgendaGrid({
                       className="border-border/40 pointer-events-none absolute inset-x-0 border-t"
                       style={{ top: offset(hour * 60) }}
                     />
+                  ))}
+
+                  {/* Cierres parciales del centro */}
+                  {partialHolidays.map((h) => (
+                    <div
+                      key={h.id}
+                      className="bg-holiday/20 border-holiday/50 text-holiday-foreground absolute inset-x-1 z-15 overflow-hidden rounded border border-dashed p-1 text-[11px] font-semibold"
+                      style={{
+                        top: offset(h.startMinute!),
+                        height: Math.max(
+                          offset(h.endMinute!) - offset(h.startMinute!),
+                          24,
+                        ),
+                      }}
+                      title={`Centro cerrado: ${h.description}`}
+                    >
+                      Centro cerrado ({formatMinute(h.startMinute!)}–
+                      {formatMinute(h.endMinute!)}): {h.description}
+                    </div>
                   ))}
 
                   {/* Ausencias / Excepciones parciales por hora */}

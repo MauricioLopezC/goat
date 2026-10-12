@@ -212,12 +212,19 @@ export function calculateFreeBlocks(input: {
   /// Turnos que ocupan (Programados o Completados), de cualquier servicio.
   busy: { startsAt: Date; endsAt: Date }[];
   holiday: boolean;
+  holidays?: { startMinute: number | null; endMinute: number | null }[];
   now: Date;
   today: string;
   maxDate: string;
   durationMinutes?: number;
 }): FreeBlock[] {
-  if (input.holiday || input.date < input.today || input.date > input.maxDate)
+  const isFullHoliday =
+    input.holiday ||
+    (input.holidays?.some(
+      (h) => h.startMinute === null || h.endMinute === null,
+    ) ??
+      false);
+  if (isFullHoliday || input.date < input.today || input.date > input.maxDate)
     return [];
   if (input.durationMinutes)
     return calculateAvailableSlots({
@@ -227,6 +234,7 @@ export function calculateFreeBlocks(input: {
       exceptions: input.exceptions,
       appointments: input.busy,
       holiday: false,
+      holidays: input.holidays,
       now: input.now,
     }).map((slot) => ({
       startMinute: parseTime(slot.startTime),
@@ -245,6 +253,12 @@ export function calculateFreeBlocks(input: {
             endMinute: exception.endMinute,
           },
     ),
+    ...(input.holidays ?? [])
+      .filter((h) => h.startMinute !== null && h.endMinute !== null)
+      .map((h) => ({
+        startMinute: h.startMinute!,
+        endMinute: h.endMinute!,
+      })),
     ...input.busy.map((appointment) => ({
       startMinute: toMinute(appointment.startsAt),
       endMinute: toMinute(appointment.endsAt),
