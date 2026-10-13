@@ -60,6 +60,17 @@ test("los filtros de la URL ignoran valores inválidos", () => {
     parseHistoryQuery({ status: ["COMPLETED"], professionalId: "-3" }),
     { status: undefined, professionalId: undefined, page: 1 },
   );
+  assert.deepEqual(parseHistoryQuery({ withEncounter: "true" }), {
+    status: undefined,
+    professionalId: undefined,
+    withEncounter: true,
+    page: 1,
+  });
+  assert.deepEqual(parseHistoryQuery({ withEncounter: "false" }), {
+    status: undefined,
+    professionalId: undefined,
+    page: 1,
+  });
 });
 
 test("los filtros vigentes viajan en los links y el ancla lleva a la sección", () => {
@@ -70,6 +81,11 @@ test("los filtros vigentes viajan en los links y el ancla lleva a la sección", 
   assert.deepEqual(historyParams({ professionalId: 5, page: 1 }), {
     status: undefined,
     professionalId: "5",
+  });
+  assert.deepEqual(historyParams({ withEncounter: true, page: 1 }), {
+    status: undefined,
+    professionalId: undefined,
+    withEncounter: "true",
   });
   assert.equal(patientHistoryHref(12), "/patients/12#historial");
 });

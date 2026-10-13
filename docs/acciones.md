@@ -753,16 +753,16 @@ No es una Server Action: es una lectura que el Server Component de `/patients/[i
 
 ### `getPatientAppointmentHistory`
 
-**Historia de usuario:** [HU-18 — Ver el historial de turnos del paciente](hu/HU-18-historial-de-turnos-del-paciente.md)
+**Historia de usuario:** [HU-18 — Ver el historial de turnos del paciente](hu/HU-18-historial-de-turnos-del-paciente.md), [HU-26 — Ver la bitácora del paciente](hu/HU-26-bitacora-del-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`
-**Entrada:** `input: { patientId: number, status?: AppointmentStatus, professionalId?: number, page?: number }` y el `actor`.
+**Entrada:** `input: { patientId: number, status?: AppointmentStatus, professionalId?: number, withEncounter?: boolean, page?: number }` y el `actor`.
 **Precondiciones:**
 - El paciente existe.
-- Si `actor.role === Role.PROFESSIONAL`, la DAL limita la consulta a los turnos cuyo `professional.userId` es el del actor. Si pide el `professionalId` de otro profesional, se rechaza con `FORBIDDEN`.
-**Efectos:** ninguno. Es una lectura de los turnos del paciente, del más reciente al más antiguo (`startsAt` e `id` descendentes), filtrados por `status` y `professionalId` si vienen y paginados de a 10 ([listados paginados](#listados-paginados)). Cada turno trae servicio, profesional, estado, prioridad, observaciones, quién lo creó y sus eventos en orden cronológico (tipo, motivo, quién lo solicitó, autor, fecha y, en una reprogramación, horario y profesional de antes y después). Para `RECEPTIONIST` y `MANAGER` incluye el cobro vigente (`PAID`); al `PROFESSIONAL` el cobro no se le consulta.
-**Errores:** `FORBIDDEN` (rol no habilitado, o un `PROFESSIONAL` que filtra por otro profesional o no tiene perfil profesional), `NOT_FOUND` (el paciente no existe), `VALIDATION` (parámetros inválidos).
+- Si `actor.role === Role.PROFESSIONAL`, la DAL verifica que el profesional atienda o haya atendido al paciente (al menos un turno registrado con él). De no ser así, rechaza con `FORBIDDEN`. Si atiende al paciente, puede ver todos los turnos del centro y filtrar por cualquier colega que haya atendido al paciente.
+**Efectos:** ninguno. Es una lectura de los turnos y la bitácora del paciente, del más reciente al más antiguo (`startsAt` e `id` descendentes), filtrados por `status`, `professionalId` y `withEncounter` (solo turnos con atención registrada) si vienen y paginados de a 10 ([listados paginados](#listados-paginados)). Cada turno trae servicio, profesional, estado, prioridad, observaciones, quién lo creó, sus eventos en orden cronológico (tipo, motivo, quién lo solicitó, autor, fecha y detalles de cambios) y la atención médica registrada (`encounter`). Para `PROFESSIONAL` se incluyen el autor, fecha, notas e indicaciones de la atención; para `RECEPTIONIST` y `MANAGER`, por secreto médico, `notes` e `indications` son `null`. Para `RECEPTIONIST` y `MANAGER` incluye el cobro vigente (`PAID`); al `PROFESSIONAL` el cobro no se le consulta.
+**Errores:** `FORBIDDEN` (rol no habilitado, o un `PROFESSIONAL` que no atiende ni atendió al paciente o no tiene perfil profesional), `NOT_FOUND` (el paciente no existe), `VALIDATION` (parámetros inválidos).
 **Revalida:** no aplica.
-**Devuelve:** `{ page: Page<HistoryItem>, attendance: { completed, expired }, professionals }`. `attendance` cuenta los turnos Completados y Vencidos con el mismo alcance de rol y el mismo filtro de profesional, sin aplicar el filtro de estado ni la página. `professionals` son las opciones del filtro: los profesionales con algún turno del paciente, vacío para el `PROFESSIONAL`.
+**Devuelve:** `{ page: Page<HistoryItem>, attendance: { completed, expired }, professionals }`. `attendance` cuenta los turnos Completados y Vencidos con el mismo alcance de rol y el mismo filtro de profesional, sin aplicar el filtro de estado, `withEncounter` ni la página. `professionals` son las opciones del filtro: los profesionales con algún turno del paciente.
 
 No es una Server Action: el Server Component de `/patients/[id]` la llama directo a la DAL (ADR 0001).
 

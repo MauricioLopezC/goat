@@ -96,9 +96,21 @@ async function main() {
       professionals.push(professional.id);
       return professional;
     };
-    // El profesional A es el del usuario profesional; B es otro.
+    // El profesional A es el del usuario profesional; B es otro; C no tiene turnos.
     const professionalA = await createProfessional("A", professionalActor.id);
     const professionalB = await createProfessional("B");
+    const userC = await prisma.user.create({
+      data: {
+        email: `${tag}-c@example.invalid`,
+        passwordHash: "verification-disabled-login",
+        firstName: "ProC",
+        lastName: `${tag}-C`,
+        role: Role.PROFESSIONAL,
+      },
+    });
+    users.push(userC.id);
+    const professionalActorC = userC;
+    await createProfessional("C", userC.id);
 
     // Turnos en días distintos, lejos de los datos del seed: pasados a más de
     // 500 días y futuros a más de 500 días.
@@ -152,6 +164,14 @@ async function main() {
         reason: `Motivo ${tag}`,
         requestedBy: "el paciente",
         userId: receptionist.id,
+      },
+    });
+    const encounter = await prisma.encounter.create({
+      data: {
+        appointmentId: paid.id,
+        professionalId: professionalA.id,
+        notes: `Notas clínicas ${tag}`,
+        indications: `Indicaciones ${tag}`,
       },
     });
     const paymentMethod = await prisma.paymentMethod.create({
@@ -243,20 +263,32 @@ async function main() {
     );
 
     await verify(
-      "el profesional ve solo sus turnos con el paciente y no ve el cobro",
+      "el profesional que no atiende al paciente es rechazado con FORBIDDEN",
+      async () => {
+        await rejects(
+          () =>
+            getPatientAppointmentHistory(
+              { patientId: patient.id },
+              professionalActorC,
+            ),
+          "FORBIDDEN",
+        );
+      },
+    );
+
+    await verify(
+      "el profesional que atiende ve la bitácora completa de todos los profesionales y no ve el cobro",
       async () => {
         const history = await getPatientAppointmentHistory(
           { patientId: patient.id },
           professionalActor,
         );
-        assert.equal(history.page.total, 12);
-        assert.ok(
-          history.page.items.every(
-            (item) => item.professional.id === professionalA.id,
-          ),
+        assert.equal(history.page.total, 15);
+        assert.deepEqual(history.attendance, { completed: 6, expired: 4 });
+        assert.deepEqual(
+          history.professionals.map((p) => p.id).sort(),
+          [professionalA.id, professionalB.id].sort(),
         );
-        assert.deepEqual(history.attendance, { completed: 5, expired: 2 });
-        assert.deepEqual(history.professionals, []);
         const all = [
           ...history.page.items,
           ...(
@@ -267,25 +299,68 @@ async function main() {
           ).page.items,
         ];
         assert.ok(all.every((item) => item.payment === null));
-        const ownFilter = await getPatientAppointmentHistory(
-          { patientId: patient.id, professionalId: professionalA.id },
+        // Puede filtrar por colega
+        const colleagueFilter = await getPatientAppointmentHistory(
+          { patientId: patient.id, professionalId: professionalB.id },
           professionalActor,
         );
-        assert.equal(ownFilter.page.total, 12);
+        assert.equal(colleagueFilter.page.total, 3);
+        assert.deepEqual(colleagueFilter.attendance, {
+          completed: 1,
+          expired: 2,
+        });
       },
     );
 
     await verify(
-      "el profesional no puede pedir los turnos de otro profesional",
+      "la atención médica expone notas al profesional y las oculta a recepción y gerencia (secreto médico)",
       async () => {
-        await rejects(
-          () =>
-            getPatientAppointmentHistory(
-              { patientId: patient.id, professionalId: professionalB.id },
-              professionalActor,
-            ),
-          "FORBIDDEN",
+        const historyPro = await getPatientAppointmentHistory(
+          { patientId: patient.id },
+          professionalActor,
         );
+        const proItem = historyPro.page.items.find((i) => i.id === paid.id);
+        assert.ok(proItem?.encounter);
+        assert.equal(proItem.encounter.id, encounter.id);
+        assert.equal(proItem.encounter.notes, `Notas clínicas ${tag}`);
+        assert.equal(proItem.encounter.indications, `Indicaciones ${tag}`);
+        assert.equal(proItem.encounter.professional.id, professionalA.id);
+
+        const historyRecep = await getPatientAppointmentHistory(
+          { patientId: patient.id },
+          receptionist,
+        );
+        const recepItem = historyRecep.page.items.find((i) => i.id === paid.id);
+        assert.ok(recepItem?.encounter);
+        assert.equal(recepItem.encounter.id, encounter.id);
+        assert.equal(recepItem.encounter.notes, null);
+        assert.equal(recepItem.encounter.indications, null);
+        assert.equal(recepItem.encounter.professional.id, professionalA.id);
+
+        const historyManager = await getPatientAppointmentHistory(
+          { patientId: patient.id },
+          manager,
+        );
+        const managerItem = historyManager.page.items.find(
+          (i) => i.id === paid.id,
+        );
+        assert.ok(managerItem?.encounter);
+        assert.equal(managerItem.encounter.notes, null);
+        assert.equal(managerItem.encounter.indications, null);
+      },
+    );
+
+    await verify(
+      "el filtro withEncounter devuelve únicamente turnos con atención médica registrada",
+      async () => {
+        const history = await getPatientAppointmentHistory(
+          { patientId: patient.id, withEncounter: true },
+          professionalActor,
+        );
+        assert.equal(history.page.total, 1);
+        assert.equal(history.page.items.length, 1);
+        assert.equal(history.page.items[0].id, paid.id);
+        assert.deepEqual(history.attendance, { completed: 6, expired: 4 });
       },
     );
 
@@ -365,9 +440,12 @@ async function main() {
     );
 
     console.log(
-      `${passed} grupos de verificaciones HU-18 PostgreSQL correctos.`,
+      `${passed} grupos de verificaciones HU-26 PostgreSQL correctos.`,
     );
   } finally {
+    await prisma.encounter.deleteMany({
+      where: { appointment: { createdById: { in: users } } },
+    });
     await prisma.payment.deleteMany({
       where: { paymentMethodId: { in: paymentMethods } },
     });
