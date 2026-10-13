@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { patientHistoryHref } from "@/lib/patient-history";
-import { Calendar, Clock, FileText, User } from "lucide-react";
+import { Calendar, Clock, FileText, Stethoscope, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -401,6 +401,11 @@ export function WeeklyAgendaGrid({
                             {appointment.patient.lastName},{" "}
                             {appointment.patient.firstName}
                           </span>
+                          {appointment.encounter && (
+                            <span title="Atención médica registrada">
+                              <Stethoscope className="size-3 text-primary shrink-0" />
+                            </span>
+                          )}
                           {paymentStates[appointment.id] && (
                             <PaymentStateIcon
                               state={paymentStates[appointment.id]}
@@ -466,6 +471,15 @@ export function WeeklyAgendaGrid({
                         ? "Completado"
                         : "Programado"}
                   </Badge>
+                  {selectedAppointment.encounter && (
+                    <Badge
+                      variant="outline"
+                      className="border-primary/40 bg-primary-soft text-primary flex items-center gap-1"
+                    >
+                      <Stethoscope className="size-3" />
+                      Atención registrada
+                    </Badge>
+                  )}
                 </div>
               </div>
               <DialogDescription>
@@ -575,7 +589,10 @@ export function WeeklyAgendaGrid({
               </DialogClose>
               <Button asChild size="sm">
                 <Link href={`/appointments/${selectedAppointment.id}`}>
-                  Ver turno completo #{selectedAppointment.id}
+                  {selectedAppointment.encounter
+                    ? "Ver turno y atención"
+                    : "Ver turno completo"}{" "}
+                  #{selectedAppointment.id}
                 </Link>
               </Button>
             </DialogFooter>
