@@ -1,0 +1,135 @@
+import {
+  AlertCircle,
+  CircleDollarSign,
+  FileCheck,
+  Stethoscope,
+} from "lucide-react";
+import {
+  APPOINTMENT_STATUS_BORDER_CLASS,
+  APPOINTMENT_STATUS_LABEL,
+} from "@/lib/appointment-status";
+import { AppointmentStatus } from "@/generated/prisma/enums";
+import { cn } from "@/lib/utils";
+
+// Rayado diagonal del horario de atención que ya pasó (sincronizado con day-view.tsx).
+const PAST_PATTERN_CLASS =
+  "bg-muted bg-[repeating-linear-gradient(135deg,var(--color-placeholder)_0_1.5px,transparent_1.5px_7px)]";
+
+const STATUS_ORDER: AppointmentStatus[] = [
+  AppointmentStatus.SCHEDULED,
+  AppointmentStatus.COMPLETED,
+  AppointmentStatus.EXPIRED,
+  AppointmentStatus.CANCELLED,
+];
+
+export interface AppointmentLegendProps {
+  /**
+   * Si incluye bloques libres y horario fuera de franja (true en calendario, false en agenda del profesional).
+   * @default true
+   */
+  showFreeBlocks?: boolean;
+  /**
+   * Si los bloques libres aceptan clic para dar turno (vista día del calendario).
+   * @default false
+   */
+  freeClickable?: boolean;
+  /**
+   * Si muestra la referencia de horario pasado (por defecto true si freeClickable es true).
+   */
+  showPastHours?: boolean;
+  /**
+   * Si muestra la referencia de cobro y autorización (vistas de mesa de entradas y gerencia).
+   * @default false
+   */
+  showPayments?: boolean;
+  className?: string;
+}
+
+/**
+ * Leyenda unificada para vistas de Calendario y Agenda (docs/DESIGN.md).
+ * Regla canónica: El color es el estado del turno; todo lo demás es ícono.
+ */
+export function AppointmentLegend({
+  showFreeBlocks = true,
+  freeClickable = false,
+  showPastHours,
+  showPayments = false,
+  className,
+}: AppointmentLegendProps) {
+  const includePast = showPastHours ?? freeClickable;
+
+  return (
+    <ul
+      aria-label="Referencias"
+      className={cn(
+        "text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs sm:text-sm",
+        className,
+      )}
+    >
+      {showFreeBlocks && (
+        <li className="flex items-center gap-1.5">
+          <span className="border-primary/60 bg-primary-soft size-3.5 shrink-0 rounded-sm border-2 border-dashed" />
+          {freeClickable
+            ? "Bloque libre (clic para dar turno)"
+            : "Bloque libre"}
+        </li>
+      )}
+
+      <li className="flex items-center gap-1.5">
+        <span className="border-holiday/40 bg-holiday/25 size-3.5 shrink-0 rounded-sm border-2 border-dashed" />
+        Centro cerrado (feriado o día excepcional)
+      </li>
+
+      {STATUS_ORDER.map((status) => (
+        <li key={status} className="flex items-center gap-1.5">
+          <span
+            className={cn(
+              "bg-card size-3 shrink-0 rounded-sm border border-l-4",
+              APPOINTMENT_STATUS_BORDER_CLASS[status],
+            )}
+          />
+          {APPOINTMENT_STATUS_LABEL[status]}
+        </li>
+      ))}
+
+      <li className="flex items-center gap-1.5">
+        <AlertCircle className="text-destructive size-3.5 shrink-0" />
+        Urgente
+      </li>
+
+      <li className="flex items-center gap-1.5">
+        <Stethoscope className="text-primary size-3.5 shrink-0" />
+        Atención registrada
+      </li>
+
+      {showPayments && (
+        <li className="flex items-center gap-1.5">
+          <span className="inline-flex shrink-0 items-center gap-1">
+            <CircleDollarSign className="text-primary size-3.5" />
+            <FileCheck className="text-primary size-3.5" />
+          </span>
+          Cobrado / Autorizado
+        </li>
+      )}
+
+      {showFreeBlocks && (
+        <li className="flex items-center gap-1.5">
+          <span className="bg-muted border-border size-3 shrink-0 rounded-sm border" />
+          Fuera de horario
+        </li>
+      )}
+
+      {includePast && (
+        <li className="flex items-center gap-1.5">
+          <span
+            className={cn(
+              "border-border size-3 shrink-0 rounded-sm border",
+              PAST_PATTERN_CLASS,
+            )}
+          />
+          Horario pasado
+        </li>
+      )}
+    </ul>
+  );
+}

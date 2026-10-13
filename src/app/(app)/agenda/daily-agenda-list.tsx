@@ -4,7 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EncounterDialog } from "@/app/(app)/appointments/[id]/encounter-dialog";
-import { Stethoscope } from "lucide-react";
+import { AlertCircle, Stethoscope } from "lucide-react";
+import {
+  APPOINTMENT_STATUS_BADGE_CLASS,
+  APPOINTMENT_STATUS_BORDER_CLASS,
+  APPOINTMENT_STATUS_LABEL,
+} from "@/lib/appointment-status";
+import { AppointmentLegend } from "@/components/appointment-legend";
 import {
   Empty,
   EmptyDescription,
@@ -206,18 +212,17 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                     48,
                   );
                   const isCancelled = appointment.status === "CANCELLED";
-                  const isCompleted = appointment.status === "COMPLETED";
 
                   return (
                     <div
                       key={appointment.id}
-                      className={`absolute inset-x-1 z-25 flex flex-col justify-between rounded-md border p-1.5 text-xs shadow-xs ${
+                      className={cn(
+                        "absolute inset-x-1 z-25 flex flex-col justify-between rounded-md border border-l-4 p-1.5 text-xs shadow-xs",
+                        APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
                         isCancelled
-                          ? "bg-card/90 text-muted-foreground border-border border-l-destructive line-through opacity-75 border-l-4"
-                          : isCompleted
-                            ? "bg-card text-foreground border-border border-l-emerald-600 border-l-4"
-                            : "bg-card text-foreground border-border border-l-primary border-l-4"
-                      }`}
+                          ? "bg-muted text-muted-foreground border-input line-through opacity-75"
+                          : "bg-card text-foreground",
+                      )}
                       style={{ top, height: cardHeight }}
                     >
                       <div className="flex items-center justify-between gap-1">
@@ -226,8 +231,15 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                         </span>
                         <div className="flex items-center gap-1 truncate">
                           {appointment.priority === "URGENT" && (
-                            <span className="shrink-0 rounded bg-destructive-soft px-1 text-[9px] font-bold text-destructive-soft-foreground border border-destructive-soft-border">
-                              Urgente
+                            <span
+                              title={
+                                appointment.priorityReason
+                                  ? `Urgente: ${appointment.priorityReason}`
+                                  : "Prioridad urgente"
+                              }
+                              className="inline-flex items-center text-destructive shrink-0"
+                            >
+                              <AlertCircle className="size-3 text-destructive" />
                             </span>
                           )}
                           {appointment.encounter && (
@@ -297,13 +309,11 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
               return (
                 <Card
                   key={appointment.id}
-                  className={`overflow-hidden border transition-shadow hover:shadow-md ${
-                    isCancelled
-                      ? "border-destructive/30 bg-muted/20 opacity-80"
-                      : isCompleted
-                        ? "border-emerald-200 dark:border-emerald-800"
-                        : "border-border"
-                  }`}
+                  className={cn(
+                    "overflow-hidden border border-l-4 transition-shadow hover:shadow-md",
+                    APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
+                    isCancelled && "bg-muted/30 opacity-80",
+                  )}
                 >
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center justify-between gap-2">
@@ -314,26 +324,19 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                         {appointment.priority === "URGENT" && (
                           <Badge
                             variant="outline"
-                            className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
+                            className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border flex items-center gap-1"
                           >
+                            <AlertCircle className="size-3" />
                             Urgente
                           </Badge>
                         )}
                         <Badge
                           variant="outline"
                           className={
-                            isCancelled
-                              ? "bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
-                              : isCompleted
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                                : "bg-primary-soft text-primary-soft-foreground border-primary-soft-border"
+                            APPOINTMENT_STATUS_BADGE_CLASS[appointment.status]
                           }
                         >
-                          {isCancelled
-                            ? "Cancelado"
-                            : isCompleted
-                              ? "Completado"
-                              : "Programado"}
+                          {APPOINTMENT_STATUS_LABEL[appointment.status]}
                         </Badge>
                         {appointment.encounter && (
                           <Badge
@@ -415,6 +418,10 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
             })}
           </div>
         )}
+      </div>
+
+      <div className="lg:col-span-12">
+        <AppointmentLegend showFreeBlocks={false} showPayments={false} />
       </div>
     </div>
   );

@@ -22,7 +22,7 @@ import {
 import { appointmentDateBounds } from "@/lib/appointment-slots";
 import { calculateFreeBlocks } from "@/lib/calendar";
 import { MonthGrid, type MonthGridDay } from "../calendar/month-view";
-import { Legend } from "../calendar/day-view";
+import { AppointmentLegend } from "@/components/appointment-legend";
 import type { AgendaData } from "./agenda-types";
 import {
   AgendaProfessionalSwitcher,
@@ -159,7 +159,7 @@ export function AgendaView({
               {data.summary.completed > 0 && (
                 <>
                   <span>·</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                  <span className="text-success font-medium">
                     {data.summary.completed}{" "}
                     {data.summary.completed === 1
                       ? "completado"
@@ -170,7 +170,7 @@ export function AgendaView({
               {data.summary.cancelled > 0 && (
                 <>
                   <span>·</span>
-                  <span className="text-destructive font-medium">
+                  <span className="text-muted-foreground font-medium">
                     {data.summary.cancelled}{" "}
                     {data.summary.cancelled === 1 ? "cancelado" : "cancelados"}
                   </span>
@@ -322,7 +322,7 @@ export function AgendaView({
             leadingBlankDays={monthInfo.leadingBlankDays}
             trailingBlankDays={monthInfo.trailingBlankDays}
           />
-          <Legend freeClickable={false} />
+          <AppointmentLegend showFreeBlocks={false} showPayments={false} />
         </div>
       ) : isWeek ? (
         <WeeklyAgendaGrid data={data} />

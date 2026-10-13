@@ -10,6 +10,7 @@ import {
   APPOINTMENT_STATUS_BADGE_CLASS,
   APPOINTMENT_STATUS_BORDER_CLASS,
   APPOINTMENT_STATUS_LABEL,
+  APPOINTMENT_STATUS_ROW_CLASS,
 } from "@/lib/appointment-status";
 import {
   HISTORY_ANCHOR,
@@ -184,8 +185,9 @@ function HistoryEntry({ item, own }: { item: HistoryItem; own: boolean }) {
   return (
     <li
       className={cn(
-        "flex flex-col gap-2 rounded-xl border border-l-4 border-border bg-card p-3",
+        "flex flex-col gap-2 rounded-xl border border-l-4 border-border p-3 transition-colors",
         APPOINTMENT_STATUS_BORDER_CLASS[item.status],
+        APPOINTMENT_STATUS_ROW_CLASS[item.status],
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">

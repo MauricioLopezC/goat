@@ -1802,6 +1802,7 @@ export async function listUnclosedAppointments(page: number, actor: Actor) {
         ...range,
         select: {
           id: true,
+          status: true,
           startsAt: true,
           endsAt: true,
           patient: { select: patientSelect },

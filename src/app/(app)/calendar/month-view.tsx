@@ -5,7 +5,7 @@ import { Weekday } from "@/generated/prisma/enums";
 import { WEEKDAYS, WEEKDAY_LABEL } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { summarizeCalendarDay, type CalendarDay } from "./calendar-model";
-import { Legend } from "./day-view";
+import { AppointmentLegend } from "@/components/appointment-legend";
 
 export type MonthGridDay = {
   date: string;
@@ -251,7 +251,7 @@ export function MonthView({
         leadingBlankDays={leadingBlankDays}
         trailingBlankDays={trailingBlankDays}
       />
-      <Legend freeClickable={false} />
+      <AppointmentLegend freeClickable={false} showPayments={false} />
     </div>
   );
 }

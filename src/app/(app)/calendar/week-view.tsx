@@ -5,10 +5,11 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Stethoscope } from "lucide-react";
+import { AlertCircle, Stethoscope } from "lucide-react";
 import { APPOINTMENT_STATUS_BORDER_CLASS } from "@/lib/appointment-status";
 import type { PaymentState } from "@/lib/payments";
 import { PaymentStateIcon } from "@/components/payment-state-icon";
+import { AppointmentLegend } from "@/components/appointment-legend";
 import { calendarHref, type CalendarQuery } from "@/lib/calendar";
 import {
   dateToDb,
@@ -19,7 +20,6 @@ import {
 } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import type { CalendarDay, ProfessionalDay } from "./calendar-model";
-import { Legend } from "./day-view";
 
 // Vista semana del calendario del centro (HU-11): una fila por profesional y
 // una columna por día. Cada celda abre ese día.
@@ -231,8 +231,15 @@ export function WeekView({
                               )}
                             </span>{" "}
                             {appointment.priority === "URGENT" && (
-                              <span className="mr-1 inline-block rounded-xs border border-destructive-soft-border bg-destructive-soft px-1 py-0.2 text-[10px] font-semibold uppercase tracking-wider text-destructive-soft-foreground">
-                                Urgente
+                              <span
+                                title={
+                                  appointment.priorityReason
+                                    ? `Urgente: ${appointment.priorityReason}`
+                                    : "Prioridad urgente"
+                                }
+                                className="mr-1 inline-flex items-center text-destructive align-[-1px]"
+                              >
+                                <AlertCircle className="size-3 text-destructive" />
                               </span>
                             )}
                             {appointment.patient.lastName}
@@ -283,7 +290,7 @@ export function WeekView({
           </tbody>
         </table>
       </div>
-      <Legend freeClickable={false} />
+      <AppointmentLegend freeClickable={false} showPayments />
     </div>
   );
 }

@@ -3,8 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { patientHistoryHref } from "@/lib/patient-history";
-import { Calendar, Clock, FileText, Stethoscope, User } from "lucide-react";
+import {
+  AlertCircle,
+  Calendar,
+  Clock,
+  FileText,
+  Stethoscope,
+  User,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  APPOINTMENT_STATUS_BADGE_CLASS,
+  APPOINTMENT_STATUS_BORDER_CLASS,
+  APPOINTMENT_STATUS_LABEL,
+} from "@/lib/appointment-status";
+import { AppointmentLegend } from "@/components/appointment-legend";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -361,7 +374,6 @@ export function WeeklyAgendaGrid({
                     const cardHeight = Math.max(rawHeight - 1, 24);
 
                     const isCancelled = appointment.status === "CANCELLED";
-                    const isCompleted = appointment.status === "COMPLETED";
 
                     return (
                       <button
@@ -369,15 +381,13 @@ export function WeeklyAgendaGrid({
                         type="button"
                         onClick={() => setSelectedAppointment(appointment)}
                         title={`Clic para ver turno: ${appointment.patient.lastName}, ${appointment.patient.firstName}`}
-                        className={`group absolute inset-x-0.5 flex items-center justify-between overflow-hidden rounded border border-l-4 px-1.5 py-0.5 text-left text-xs transition-all hover:scale-[1.01] hover:shadow-xs cursor-pointer ${
-                          // Opaco para tapar el rótulo de la franja; debajo de
-                          // los turnos activos si el horario se volvió a dar
+                        className={cn(
+                          "group absolute inset-x-0.5 flex items-center justify-between overflow-hidden rounded border border-l-4 px-1.5 py-0.5 text-left text-xs transition-all hover:scale-[1.01] hover:shadow-xs cursor-pointer",
+                          APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
                           isCancelled
-                            ? "z-19 border-border border-l-destructive bg-muted text-muted-foreground line-through"
-                            : isCompleted
-                              ? "z-20 border-border border-l-emerald-600 bg-card text-foreground shadow-2xs hover:border-emerald-600"
-                              : "z-20 border-border border-l-primary bg-card text-foreground shadow-2xs hover:border-primary"
-                        }`}
+                            ? "z-19 border-input bg-muted text-muted-foreground line-through"
+                            : "z-20 bg-card text-foreground shadow-2xs",
+                        )}
                         style={{
                           top,
                           height: cardHeight,
@@ -385,18 +395,31 @@ export function WeeklyAgendaGrid({
                       >
                         <div className="flex items-center gap-1.5 overflow-hidden w-full">
                           <span
-                            className={`font-bold tabular-nums text-[11px] shrink-0 ${isCancelled ? "" : "text-foreground"}`}
+                            className={cn(
+                              "font-bold tabular-nums text-[11px] shrink-0",
+                              !isCancelled && "text-foreground",
+                            )}
                           >
                             {formatMinute(startMinute)}–
                             {formatMinute(endMinute)}
                           </span>
                           {appointment.priority === "URGENT" && (
-                            <span className="shrink-0 rounded bg-destructive-soft px-1 text-[9px] font-bold text-destructive-soft-foreground border border-destructive-soft-border">
-                              Urgente
+                            <span
+                              title={
+                                appointment.priorityReason
+                                  ? `Urgente: ${appointment.priorityReason}`
+                                  : "Prioridad urgente"
+                              }
+                              className="inline-flex items-center text-destructive shrink-0"
+                            >
+                              <AlertCircle className="size-3 text-destructive" />
                             </span>
                           )}
                           <span
-                            className={`font-medium text-[11px] truncate ${isCancelled ? "" : "text-foreground/90"}`}
+                            className={cn(
+                              "font-medium text-[11px] truncate",
+                              !isCancelled && "text-foreground/90",
+                            )}
                           >
                             {appointment.patient.lastName},{" "}
                             {appointment.patient.firstName}
@@ -412,15 +435,6 @@ export function WeeklyAgendaGrid({
                             />
                           )}
                         </div>
-                        <span
-                          className={`size-1.5 rounded-full shrink-0 ml-1 ${
-                            isCancelled
-                              ? "bg-destructive"
-                              : isCompleted
-                                ? "bg-emerald-600"
-                                : "bg-primary"
-                          }`}
-                        />
                       </button>
                     );
                   })}
@@ -430,6 +444,13 @@ export function WeeklyAgendaGrid({
           </div>
         </div>
       </div>
+
+      <AppointmentLegend
+        showFreeBlocks={false}
+        showPayments={Boolean(
+          paymentStates && Object.keys(paymentStates).length > 0,
+        )}
+      />
 
       {/* Modal interactivo con los datos del turno en concreto */}
       {selectedAppointment && (
@@ -450,26 +471,19 @@ export function WeeklyAgendaGrid({
                   {selectedAppointment.priority === "URGENT" && (
                     <Badge
                       variant="outline"
-                      className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
+                      className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border flex items-center gap-1"
                     >
+                      <AlertCircle className="size-3" />
                       Urgente
                     </Badge>
                   )}
                   <Badge
                     variant="outline"
                     className={
-                      selectedAppointment.status === "CANCELLED"
-                        ? "bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
-                        : selectedAppointment.status === "COMPLETED"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                          : "bg-primary-soft text-primary-soft-foreground border-primary-soft-border"
+                      APPOINTMENT_STATUS_BADGE_CLASS[selectedAppointment.status]
                     }
                   >
-                    {selectedAppointment.status === "CANCELLED"
-                      ? "Cancelado"
-                      : selectedAppointment.status === "COMPLETED"
-                        ? "Completado"
-                        : "Programado"}
+                    {APPOINTMENT_STATUS_LABEL[selectedAppointment.status]}
                   </Badge>
                   {selectedAppointment.encounter && (
                     <Badge

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Ban, Stethoscope } from "lucide-react";
+import { AlertCircle, Ban, Stethoscope } from "lucide-react";
+import { AppointmentLegend } from "@/components/appointment-legend";
 import {
   Empty,
   EmptyDescription,
@@ -89,7 +90,7 @@ export function DayView({
             ningún profesional.
           </p>
         </div>
-        <Legend freeClickable />
+        <AppointmentLegend freeClickable showPayments />
       </div>
     );
   }
@@ -333,8 +334,15 @@ export function DayView({
                             {formatMinute(start.minute)}
                           </span>{" "}
                           {appointment.priority === "URGENT" && (
-                            <span className="mr-1 inline-block rounded-xs border border-destructive-soft-border bg-destructive-soft px-1 py-0.2 text-[10px] font-semibold uppercase tracking-wider text-destructive-soft-foreground">
-                              Urgente
+                            <span
+                              title={
+                                appointment.priorityReason
+                                  ? `Urgente: ${appointment.priorityReason}`
+                                  : "Prioridad urgente"
+                              }
+                              className="mr-1 inline-flex items-center text-destructive align-[-1px]"
+                            >
+                              <AlertCircle className="size-3 text-destructive" />
                             </span>
                           )}
                           <span
@@ -376,52 +384,9 @@ export function DayView({
           </div>
         </div>
       )}
-      <Legend freeClickable />
+      <AppointmentLegend freeClickable showPayments />
     </div>
   );
 }
 
-export function Legend({ freeClickable }: { freeClickable: boolean }) {
-  return (
-    <ul
-      aria-label="Referencias"
-      className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm"
-    >
-      <li className="flex items-center gap-1.5">
-        <span className="border-primary/60 bg-primary-soft size-3.5 rounded-sm border-2 border-dashed" />
-        {freeClickable ? "Bloque libre (clic para dar turno)" : "Bloque libre"}
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="border-holiday/40 bg-holiday/25 size-3.5 rounded-sm border-2 border-dashed" />
-        Centro cerrado (feriado o día excepcional)
-      </li>
-      {(["SCHEDULED", "COMPLETED", "EXPIRED", "CANCELLED"] as const).map(
-        (status) => (
-          <li key={status} className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                "bg-card size-3 rounded-sm border border-l-4",
-                APPOINTMENT_STATUS_BORDER_CLASS[status],
-              )}
-            />
-            {APPOINTMENT_STATUS_LABEL[status]}
-          </li>
-        ),
-      )}
-      <li className="flex items-center gap-1.5">
-        <Stethoscope className="size-3.5 text-primary" />
-        Atención registrada
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="bg-muted size-3 rounded-sm border" />
-        Fuera de horario
-      </li>
-      {freeClickable && (
-        <li className="flex items-center gap-1.5">
-          <span className={cn("size-3 rounded-sm border", PAST)} />
-          Horario pasado
-        </li>
-      )}
-    </ul>
-  );
-}
+export { AppointmentLegend as Legend } from "@/components/appointment-legend";
