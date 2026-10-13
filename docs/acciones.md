@@ -6,7 +6,7 @@ Los nombres de código (modelos, roles, estados, funciones) siguen [`glossary.md
 
 ## Compatibilidad con el schema del incremento 3
 
-El `chore/schema-incremento-3` conserva los contratos actuales de las operaciones: `createHoliday` y `createAvailabilityException` reciben `date` y guardan `startDate = endDate`; los listados devuelven la fecha con el nombre anterior. Las lecturas de turnos, agenda e indicadores se adaptan al nombre de la columna. La carga e interpretación de rangos y cierres parciales, con sus fichas actualizadas, pertenece a HU-23.
+El incremento 3 incorpora la carga e interpretación de rangos de fechas y cierres parciales por horas en `createHoliday` y `createAvailabilityException` ([HU-23](hu/HU-23-cerrar-el-centro-por-horas-o-dias.md)), manteniendo compatibilidad con entradas `date` simples. Las lecturas de turnos, agenda e indicadores operan sobre el período completo y descuentan tramos parciales.
 
 `registerPayment` obtiene `receiptNumber` por defecto desde una secuencia de PostgreSQL. Las operaciones y reglas nuevas de atención, caja y portal se especifican e implementan en las historias respectivas; el [contrato del schema](modelo-de-datos.md#contrato-del-schema-del-incremento-3) deja sus campos preparados.
 
@@ -670,57 +670,57 @@ No es una Server Action: la página `/my-schedule` la llama directo a la DAL y r
 
 ### `createAvailabilityException`
 
-**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md), [HU-23](hu/HU-23-cerrar-el-centro-por-horas-o-dias.md)
 **Roles:** `MANAGER`
-**Entrada:** `professionalId`, `date` (`AAAA-MM-DD`), `allDay` (booleano), `startTime` y `endTime` (`HH:MM`, obligatorios si no es el día entero) y `reason`.
-**Precondiciones:** el profesional existe. La fecha es hoy o futura, en hora de Argentina. Si no es el día entero, `endTime` es posterior a `startTime`. No hay turnos `SCHEDULED` que todavía no comenzaron del profesional que se superpongan con la excepción.
-**Efectos:** crea la `AvailabilityException` con su autor (`createdById`). Ese día u horario deja de ofrecer disponibilidad.
-**Errores:** `VALIDATION` (fecha inválida o pasada, horario incompleto o invertido, motivo vacío), `FORBIDDEN`, `NOT_FOUND`, `FUTURE_APPOINTMENTS` (con `meta.appointments`).
+**Entrada:** `professionalId`, `startDate` (`AAAA-MM-DD`), `endDate` (`AAAA-MM-DD`, opcional; por defecto igual a `startDate`), `allDay` (booleano), `startTime` y `endTime` (`HH:MM`, obligatorios si no es el día entero) y `reason`. Acepta `date` como alias retrocompatible.
+**Precondiciones:** el profesional existe. Las fechas son hoy o futuras, en hora de Argentina (`endDate >= startDate`). Si no es el día entero, `endTime` es posterior a `startTime`. No se superpone con otra ausencia del mismo profesional en ese período y horario. No hay turnos `SCHEDULED` que todavía no comenzaron del profesional que caigan dentro del período y tramo horario.
+**Efectos:** crea la `AvailabilityException` con su autor (`createdById`) y rango. El tramo horario se aplica a cada día del rango `[startDate, endDate]`. Durante ese período y horario no se ofrece disponibilidad en la agenda del profesional.
+**Errores:** `VALIDATION` (fechas inválidas, pasadas o invertidas, horario incompleto o invertido, motivo vacío), `FORBIDDEN`, `NOT_FOUND`, `DUPLICATE` (superposición con otra ausencia), `FUTURE_APPOINTMENTS` (con `meta.appointments`).
 **Revalida:** `/professionals/[id]/schedule` y `/calendar`.
 **Devuelve:** `{ id }`.
 
 ### `deleteAvailabilityException`
 
-**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md)
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md), [HU-23](hu/HU-23-cerrar-el-centro-por-horas-o-dias.md)
 **Roles:** `MANAGER`
 **Entrada:** `id`, `professionalId`.
 **Precondiciones:** la excepción existe y pertenece a ese profesional.
-**Efectos:** borra la excepción: el día u horario vuelve a ofrecer la disponibilidad de las franjas.
+**Efectos:** borra la excepción: todo el período y horario vuelve a ofrecer la disponibilidad de las franjas.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`.
 **Revalida:** `/professionals/[id]/schedule` y `/calendar`.
 **Devuelve:** `{ id }`.
 
 ### `listHolidays`
 
-**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md), [HU-14](hu/HU-14-cerrar-el-centro.md)
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md), [HU-14](hu/HU-14-cerrar-el-centro.md), [HU-23](hu/HU-23-cerrar-el-centro-por-horas-o-dias.md)
 **Roles:** `MANAGER`, `RECEPTIONIST`, `PROFESSIONAL`
 **Entrada:** `page` (de `?page=`) y el `actor`.
 **Precondiciones:** el actor pertenece a `STAFF_ROLES`.
 **Efectos:** ninguno. Es una lectura.
 **Errores:** `FORBIDDEN`.
 **Revalida:** no aplica.
-**Devuelve:** `Page<{ id, date, description }>` de hoy en adelante, ordenado por fecha ([listados paginados](#listados-paginados)).
+**Devuelve:** `Page<{ id, startDate, endDate, startMinute, endMinute, description, date }>` de cierres no finalizados (`endDate >= hoy`), ordenado por fecha de inicio ([listados paginados](#listados-paginados)).
 
 No es una Server Action: la página `/holidays` la llama directo a la DAL (ADR 0001).
 
 ### `createHoliday`
 
-**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md), [HU-14](hu/HU-14-cerrar-el-centro.md)
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md), [HU-14](hu/HU-14-cerrar-el-centro.md), [HU-23](hu/HU-23-cerrar-el-centro-por-horas-o-dias.md)
 **Roles:** `MANAGER`, `RECEPTIONIST`
-**Entrada:** `date` (`AAAA-MM-DD`), `description` (feriado o día excepcional, hasta 120 caracteres). La UI la llama desde `/holidays` y desde la vista día de `/calendar`, con la fecha del día que se está viendo.
-**Precondiciones:** la fecha es hoy o futura, en hora de Argentina, y no hay otro `Holiday` ese día. Ningún profesional tiene turnos `SCHEDULED` que todavía no comenzaron ese día; los que ya comenzaron no bloquean el cierre.
-**Efectos:** crea el `Holiday` con su autor (`createdById`) y fecha de carga (`createdAt`). El cierre es siempre del día completo: ese día el centro no ofrece disponibilidad para nadie y se pinta en el calendario y en la agenda de cada profesional.
-**Errores:** `VALIDATION` (fecha inválida o pasada, descripción vacía), `FORBIDDEN`, `DUPLICATE` (ya hay un cierre ese día; incluye `fieldErrors`), `FUTURE_APPOINTMENTS` (con `meta.appointments`, incluido el teléfono del paciente para avisarle; hay que cancelar o reprogramar esos turnos antes de volver a intentar).
+**Entrada:** `startDate` (`AAAA-MM-DD`), `endDate` (`AAAA-MM-DD`, opcional; por defecto igual a `startDate`), `allDay` (booleano), `startTime` y `endTime` (`HH:MM`, opcionales), `description` (hasta 120 caracteres). Acepta `date` como alias retrocompatible. Se invoca desde `/holidays` y desde `/calendar`.
+**Precondiciones:** la fecha de inicio es hoy o futura en hora de Argentina; `endDate >= startDate`. Si no es día completo (`!allDay`), `startTime` y `endTime` son obligatorios y `endTime` es posterior a `startTime`. No se superpone con otro `Holiday` en fechas y horario. Ningún profesional tiene turnos `SCHEDULED` futuros (`startsAt > now`) que caigan dentro del período y tramo horario especificados.
+**Efectos:** crea el `Holiday` con su autor (`createdById`), período `[startDate, endDate]` y tramo diario opcional. Si es día completo, bloquea todo el día para todos los profesionales; si es por horas, bloquea esa franja horaria en cada día del rango, dejando el resto de horarios disponibles.
+**Errores:** `VALIDATION` (fechas inválidas, pasadas o invertidas, horas incompletas o invertidas, descripción vacía), `FORBIDDEN`, `DUPLICATE` (superposición con otro cierre; incluye `fieldErrors`), `FUTURE_APPOINTMENTS` (con `meta.appointments`, incluyendo teléfono del paciente para contactarlo y reprogramar/cancelar).
 **Revalida:** `/holidays`, `/calendar` y `/agenda`.
-**Devuelve:** `{ id, date, description }`.
+**Devuelve:** `{ id, startDate, endDate, startMinute, endMinute, description, date }`.
 
 ### `deleteHoliday`
 
-**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md), [HU-14](hu/HU-14-cerrar-el-centro.md)
+**Historia de usuario:** [HU-05](hu/HU-05-franjas-de-atencion.md), [HU-14](hu/HU-14-cerrar-el-centro.md), [HU-23](hu/HU-23-cerrar-el-centro-por-horas-o-dias.md)
 **Roles:** `MANAGER`, `RECEPTIONIST`
-**Entrada:** `id`. La UI la llama desde `/holidays` y desde la vista día de `/calendar`, con confirmación.
+**Entrada:** `id`. La UI la llama desde `/holidays` y desde la vista de `/calendar`, con confirmación.
 **Precondiciones:** el cierre existe.
-**Efectos:** lo borra: el día vuelve a ofrecer disponibilidad según las franjas.
+**Efectos:** lo borra: todo el período y tramo horario del centro vuelve a ofrecer disponibilidad según las franjas de cada profesional.
 **Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`.
 **Revalida:** `/holidays`, `/calendar` y `/agenda`.
 **Devuelve:** `{ id }`.
@@ -947,7 +947,7 @@ No es una Server Action: la usa la página de constancia de atención (ADR 0001)
 
 ### `getCenterIndicators`
 
-**Historia de usuario:** [HU-22 — Ver la ocupación y el ausentismo del centro](hu/HU-22-indicadores-iniciales.md)
+**Historia de usuario:** [HU-22 — Ver la ocupación y el ausentismo del centro](hu/HU-22-indicadores-iniciales.md) y [HU-29 — Ver los indicadores del centro](hu/HU-29-indicadores-del-centro.md)
 **Roles:** `MANAGER`.
 **Entrada:** `from` y `to` (AAAA-MM, inclusive, hasta tres meses; por defecto, el mes en curso) y `professionalId?` (entero positivo).
 **Precondiciones:** `from` no es posterior a `to`. Si viene `professionalId`, el profesional existe.
@@ -958,11 +958,13 @@ No es una Server Action: la usa la página de constancia de atención (ADR 0001)
 - **Ausentismo** (`absenteeismRate`): `EXPIRED` sobre `COMPLETED` más `EXPIRED`. Sin turnos cerrados, es `null`.
 - **Cancelaciones:** cantidad de `CANCELLED`.
 - **Sin cerrar:** cantidad de `SCHEDULED` con `endsAt` anterior a ahora.
+- **Carga y demanda (HU-29):** turnos Completados para pacientes distintos por profesional, duración real de esos turnos en horas y pacientes distintos por hora; cinco frecuencias más altas de turnos Completados por paciente, sin nombres ni identificadores; tasa de cancelación (`CANCELLED` / todos los turnos dados); cinco servicios y especialidades con más turnos dados; distribución de turnos por día de la semana. Todos usan la fecha de inicio del turno en hora del centro, incluso si fue cancelado.
+- **Ingresos (HU-29):** suma de cobros `PAID` según `Payment.createdAt` en hora del centro, por mes y medio de pago. Compara con el período inmediatamente anterior de igual cantidad de meses; los cobros anulados no cuentan. Sin cobros previos, la variación porcentual es `null`.
 
 El centro suma minutos y cantidades de todos los profesionales y calcula las tasas sobre esas sumas, no como promedio de las tasas. Con `professionalId`, el centro y la tabla se limitan a ese profesional.
 **Errores:** `FORBIDDEN`, `VALIDATION` (período inválido, invertido o de más de tres meses), `NOT_FOUND` (el profesional no existe).
 **Revalida:** no aplica; lectura desde Server Component.
-**Devuelve:** `{ period: { from, to }, center: Indicators, professionals: (Indicators & { id, firstName, lastName, active })[], professionalOptions }`. `Indicators` es `{ availableMinutes, occupiedMinutes, occupancyRate, completed, expired, absenteeismRate, cancelled, unclosed }`, con las tasas entre 0 y 1, o `null`. La tabla incluye a los profesionales con franjas o turnos en el período. `professionalOptions` son las opciones del filtro.
+**Devuelve:** `{ period: { from, to }, center: Indicators, professionals: (Indicators & { id, firstName, lastName, active })[], professionalOptions, details }`. `Indicators` es `{ availableMinutes, occupiedMinutes, occupancyRate, completed, expired, absenteeismRate, cancelled, unclosed }`, con las tasas entre 0 y 1, o `null`. `details` agrega los rankings (máximo cinco), carga por profesional, tasa de cancelación, ingresos mensuales y por medio, total y variación frente al período previo, y turnos por día de semana. La tabla incluye a los profesionales con franjas o turnos en el período. `professionalOptions` son las opciones del filtro.
 
 No es una Server Action: la usa el Server Component de `/dashboard` (ADR 0001).
 

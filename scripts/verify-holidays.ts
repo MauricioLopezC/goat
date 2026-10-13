@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../src/lib/prisma";
 import {
+  countAffectedAppointments,
   createHoliday,
   deleteHoliday,
   listHolidays,
@@ -57,7 +58,10 @@ async function main() {
     while (dates.length < count) {
       const busy =
         (await prisma.holiday.findFirst({
-          where: { startDate: dateToDb(date) },
+          where: {
+            startDate: { lte: dateToDb(date) },
+            endDate: { gte: dateToDb(date) },
+          },
         })) ||
         (await prisma.appointment.findFirst({
           where: {
@@ -72,6 +76,40 @@ async function main() {
       date = addDays(date, 1);
     }
     return dates;
+  }
+
+  async function freeConsecutiveDates(count: number): Promise<string[]> {
+    let startCandidate = addDays(toLocalSlot(new Date()).date, 450);
+    while (true) {
+      const candidateList: string[] = [];
+      let allFree = true;
+      for (let i = 0; i < count; i++) {
+        const d = addDays(startCandidate, i);
+        candidateList.push(d);
+        const busy =
+          (await prisma.holiday.findFirst({
+            where: {
+              startDate: { lte: dateToDb(d) },
+              endDate: { gte: dateToDb(d) },
+            },
+          })) ||
+          (await prisma.appointment.findFirst({
+            where: {
+              status: "SCHEDULED",
+              startsAt: {
+                gte: appointmentInstant(d, 0),
+                lt: appointmentInstant(d, 1440),
+              },
+            },
+          }));
+        if (busy) {
+          allFree = false;
+          break;
+        }
+      }
+      if (allFree) return candidateList;
+      startCandidate = addDays(startCandidate, 1);
+    }
   }
 
   try {
@@ -251,14 +289,275 @@ async function main() {
       await deleteHoliday({ id: holiday.id }, manager);
     });
 
+    // ─────────────────────── HU-23: Rangos y tramos horarios ───────────────────────
+
+    const [rangeStart, rangeMid, rangeEnd] = await freeConsecutiveDates(3);
+
+    await verify(
+      "cierre por rango de varios días y eliminación desde un día intermedio (HU-23)",
+      async () => {
+        // Crear cierre multi-día
+        const rangeHoliday = await createHoliday(
+          {
+            startDate: rangeStart,
+            endDate: rangeEnd,
+            description: `${tag}-range`,
+          },
+          receptionist,
+        );
+        assert.equal(rangeHoliday.startDate, rangeStart);
+        assert.equal(rangeHoliday.endDate, rangeEnd);
+
+        // Se lista en los cierres futuros
+        const firstPage = await listHolidays(1, receptionist);
+        const lastPage = await listHolidays(firstPage.pageCount, receptionist);
+        const inList = [...firstPage.items, ...lastPage.items].find(
+          (h) => h.id === rangeHoliday.id,
+        );
+        assert.ok(inList, "El cierre por rango debe figurar en listHolidays");
+        assert.equal(inList.startDate, rangeStart);
+        assert.equal(inList.endDate, rangeEnd);
+
+        // Intento de superposición parcial o total es rechazado con DUPLICATE
+        await rejects(
+          () =>
+            createHoliday(
+              {
+                date: rangeMid,
+                description: `${tag}-mid-overlap`,
+              },
+              manager,
+            ),
+          "DUPLICATE",
+        );
+
+        await rejects(
+          () =>
+            createHoliday(
+              {
+                startDate: rangeMid,
+                endDate: addDays(rangeEnd, 1),
+                description: `${tag}-span-overlap`,
+              },
+              manager,
+            ),
+          "DUPLICATE",
+        );
+
+        // [P2] Quitar el cierre consultando desde un día intermedio elimina el rango completo
+        const foundIntermediate = await prisma.holiday.findFirst({
+          where: {
+            startDate: { lte: dateToDb(rangeMid) },
+            endDate: { gte: dateToDb(rangeMid) },
+          },
+        });
+        assert.ok(foundIntermediate);
+        assert.equal(foundIntermediate.id, rangeHoliday.id);
+
+        await deleteHoliday({ id: foundIntermediate.id }, receptionist);
+
+        // Verifica que los 3 días quedan libres
+        const countRemaining = await prisma.holiday.count({
+          where: {
+            OR: [
+              {
+                startDate: { lte: dateToDb(rangeStart) },
+                endDate: { gte: dateToDb(rangeStart) },
+              },
+              {
+                startDate: { lte: dateToDb(rangeMid) },
+                endDate: { gte: dateToDb(rangeMid) },
+              },
+              {
+                startDate: { lte: dateToDb(rangeEnd) },
+                endDate: { gte: dateToDb(rangeEnd) },
+              },
+            ],
+          },
+        });
+        assert.equal(
+          countRemaining,
+          0,
+          "Todo el período debe quedar libre tras borrar el cierre",
+        );
+      },
+    );
+
+    const [partialDate] = await freeDates(1);
+
+    await verify(
+      "cierre por tramo horario y detección de turnos en franja (HU-23)",
+      async () => {
+        // Crear turno en la tarde: 14:00 - 14:30 (minutos 840 - 870)
+        const startsAtAfternoon = appointmentInstant(partialDate, 840);
+        const afternoonAppt = await prisma.appointment.create({
+          data: {
+            patientId: patient.id,
+            professionalId: professional.id,
+            serviceId: service.id,
+            startsAt: startsAtAfternoon,
+            endsAt: new Date(startsAtAfternoon.getTime() + 30 * 60_000),
+            createdById: receptionist.id,
+          },
+        });
+
+        // Intentar cerrar el tramo de la mañana: 08:00 - 12:00 (minutos 480 - 720).
+        // No colisiona con el turno de la tarde, por lo que DEBE permitir crearlo.
+        const morningClosure = await createHoliday(
+          {
+            date: partialDate,
+            startMinute: 480,
+            endMinute: 720,
+            description: `${tag}-morning`,
+          },
+          receptionist,
+        );
+        assert.equal(morningClosure.startMinute, 480);
+        assert.equal(morningClosure.endMinute, 720);
+
+        // Superposición de tramo en el mismo día debe ser rechazada
+        await rejects(
+          () =>
+            createHoliday(
+              {
+                date: partialDate,
+                startMinute: 600,
+                endMinute: 800,
+                description: `${tag}-overlap-slot`,
+              },
+              manager,
+            ),
+          "DUPLICATE",
+        );
+
+        // Otro tramo independiente en el mismo día (ej. 16:00 - 18:00 / 960 - 1080) se permite
+        const eveningClosure = await createHoliday(
+          {
+            date: partialDate,
+            startMinute: 960,
+            endMinute: 1080,
+            description: `${tag}-evening`,
+          },
+          receptionist,
+        );
+        assert.equal(eveningClosure.startMinute, 960);
+        await deleteHoliday({ id: eveningClosure.id }, receptionist);
+
+        // Intentar cerrar un tramo que incluye las 14:00 (13:00 - 16:00 / 780 - 960):
+        // Debe ser rechazado con FUTURE_APPOINTMENTS por el turno de la tarde.
+        await rejects(
+          () =>
+            createHoliday(
+              {
+                date: partialDate,
+                startMinute: 780,
+                endMinute: 960,
+                description: `${tag}-afternoon-closure`,
+              },
+              receptionist,
+            ),
+          "FUTURE_APPOINTMENTS",
+          (error) => {
+            const affected = error.meta?.appointments as AffectedAppointment[];
+            assert.equal(affected.length, 1);
+            assert.equal(affected[0].id, afternoonAppt.id);
+          },
+        );
+
+        // Limpiar el cierre de la mañana y el turno de la tarde
+        await deleteHoliday({ id: morningClosure.id }, receptionist);
+        await prisma.appointment.delete({ where: { id: afternoonAppt.id } });
+      },
+    );
+
+    const [compatDate] = await freeDates(1);
+
+    await verify(
+      "compatibilidad: creación de cierre con contrato legacy { date, description } sin allDay (HU-23)",
+      async () => {
+        // Objeto como en HOLIDAYS del seed: { date, description }
+        const legacyHoliday = await createHoliday(
+          {
+            date: compatDate,
+            description: `${tag}-legacy`,
+          },
+          receptionist,
+        );
+        assert.equal(legacyHoliday.startDate, compatDate);
+        assert.equal(legacyHoliday.endDate, compatDate);
+        assert.equal(legacyHoliday.startMinute, null);
+        assert.equal(legacyHoliday.endMinute, null);
+
+        await deleteHoliday({ id: legacyHoliday.id }, receptionist);
+      },
+    );
+
+    const [affectedCheckDate] = await freeDates(1);
+
+    await verify(
+      "cálculo previo de turnos afectados con countAffectedAppointments (HU-23)",
+      async () => {
+        // Sin turnos, conteo es 0
+        const zeroCount = await countAffectedAppointments(
+          {
+            startDate: affectedCheckDate,
+            endDate: affectedCheckDate,
+            startMinute: 480,
+            endMinute: 720,
+          },
+          receptionist,
+        );
+        assert.equal(zeroCount, 0);
+
+        // Con turno a las 10:00 (600)
+        const startsAt = appointmentInstant(affectedCheckDate, 600);
+        const appt = await prisma.appointment.create({
+          data: {
+            patientId: patient.id,
+            professionalId: professional.id,
+            serviceId: service.id,
+            startsAt,
+            endsAt: new Date(startsAt.getTime() + 30 * 60_000),
+            createdById: receptionist.id,
+          },
+        });
+
+        const counted = await countAffectedAppointments(
+          {
+            startDate: affectedCheckDate,
+            endDate: affectedCheckDate,
+            startMinute: 480,
+            endMinute: 720,
+          },
+          receptionist,
+        );
+        assert.equal(counted, 1);
+
+        const outsideCount = await countAffectedAppointments(
+          {
+            startDate: affectedCheckDate,
+            endDate: affectedCheckDate,
+            startMinute: 720,
+            endMinute: 900,
+          },
+          receptionist,
+        );
+        assert.equal(outsideCount, 0);
+
+        await prisma.appointment.delete({ where: { id: appt.id } });
+      },
+    );
+
     console.log(
-      `${passed} grupos de verificaciones HU-14 PostgreSQL correctos.`,
+      `${passed} grupos de verificaciones HU-14 / HU-23 PostgreSQL correctos.`,
     );
   } finally {
     await prisma.appointment.deleteMany({
       where: { createdById: { in: users } },
     });
-    await prisma.holiday.deleteMany({ where: { description: tag } });
+    await prisma.holiday.deleteMany({
+      where: { description: { startsWith: tag } },
+    });
     await prisma.professional.deleteMany({
       where: { id: { in: professionals } },
     });

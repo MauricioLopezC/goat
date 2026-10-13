@@ -32,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { IndicatorCard } from "./indicator-card";
+import { CenterMetrics } from "./center-metrics";
 
 export const metadata: Metadata = { title: "Tablero · GOAT" };
 
@@ -83,7 +84,7 @@ export default async function DashboardPage({
     input = { ...input, professionalId: undefined };
     data = await getCenterIndicators(input, actor);
   }
-  const { period, center, professionals, professionalOptions } = data;
+  const { period, center, professionals, professionalOptions, details } = data;
   const selected = professionalOptions.find(
     (professional) => professional.id === input.professionalId,
   );
@@ -202,7 +203,7 @@ export default async function DashboardPage({
           title="Ocupación"
           value={formatRate(center.occupancyRate)}
           meter={center.occupancyRate}
-          detail={`${formatHours(center.occupiedMinutes)} ocupadas de ${formatHours(center.availableMinutes)} disponibles`}
+          detail={`${formatHours(center.occupiedMinutes)} ocupadas de ${formatHours(center.availableMinutes)} disponibles. ${center.occupancyRate === null ? "No hay franjas abiertas para evaluar." : center.occupancyRate >= 0.8 ? "La agenda está muy ocupada; conviene revisar la capacidad." : "Hay espacio disponible en la agenda."}`}
           formula="Minutos de turnos Programados y Completados dentro de la franja, sobre los minutos de franja disponibles, sin feriados ni ausencias."
         />
         <IndicatorCard
@@ -212,29 +213,48 @@ export default async function DashboardPage({
           detail={
             center.absenteeismRate === null
               ? "No hay turnos cerrados en el período"
-              : `${center.expired} vencidos de ${center.completed + center.expired} turnos cerrados`
+              : `${center.expired} vencidos de ${center.completed + center.expired} turnos cerrados. ${center.expired > 0 ? "Conviene revisar las ausencias." : "No hubo ausencias registradas."}`
           }
           formula="Turnos Vencidos sobre turnos Completados más Vencidos."
         />
         <IndicatorCard
           title="Cancelaciones"
           value={String(center.cancelled)}
-          detail={
-            center.cancelled === 1 ? "turno cancelado" : "turnos cancelados"
-          }
+          detail={`${center.cancelled === 1 ? "turno cancelado" : "turnos cancelados"}. ${center.cancelled > 0 ? "Revisá la tasa y los días más concurridos." : "No hubo cancelaciones registradas."}`}
           formula="Turnos Cancelados que estaban dados para el período."
         />
         <IndicatorCard
           title="Turnos sin cerrar"
           value={String(center.unclosed)}
-          detail="Programados que ya terminaron"
+          detail={
+            center.unclosed > 0
+              ? "Programados que ya terminaron; cerrarlos mejora la lectura del ausentismo."
+              : "No quedan turnos pasados sin cerrar en el período."
+          }
           formula="Turnos Programados cuya hora de fin ya pasó. No cuentan para el ausentismo."
         />
       </div>
 
+      <CenterMetrics
+        metrics={details}
+        professionalNames={
+          new Map(
+            professionalOptions.map((professional) => [
+              professional.id,
+              `${professional.lastName}, ${professional.firstName}`,
+            ]),
+          )
+        }
+      />
+
       <Card>
         <CardHeader>
           <CardTitle>Por profesional</CardTitle>
+          <p className="text-muted-foreground text-sm">
+            Pacientes por hora = personas distintas atendidas ÷ horas de turnos
+            Completados. La tasa de cancelación divide turnos Cancelados por
+            todos los turnos dados.
+          </p>
         </CardHeader>
         <CardContent>
           {professionals.length === 0 ? (
@@ -249,55 +269,87 @@ export default async function DashboardPage({
                   <TableHead className="text-right">Ocupación</TableHead>
                   <TableHead className="text-right">Horas ocupadas</TableHead>
                   <TableHead className="text-right">Completados</TableHead>
+                  <TableHead className="text-right">Horas trabajadas</TableHead>
+                  <TableHead className="text-right">
+                    Pacientes distintos
+                  </TableHead>
+                  <TableHead className="text-right">Pacientes/hora</TableHead>
                   <TableHead className="text-right">Vencidos</TableHead>
                   <TableHead className="text-right">Ausentismo</TableHead>
                   <TableHead className="text-right">Cancelados</TableHead>
+                  <TableHead className="text-right">
+                    Tasa de cancelación
+                  </TableHead>
                   <TableHead className="text-right">Sin cerrar</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {professionals.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      <Link
-                        href={dashboardHref(period, row.id)}
-                        className="font-medium hover:underline"
-                      >
-                        {row.lastName}, {row.firstName}
-                      </Link>
-                      {!row.active && (
-                        <Badge
-                          variant="outline"
-                          className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border ml-2"
+                {professionals.map((row) => {
+                  const load = details.professionals.find(
+                    (item) => item.id === row.id,
+                  );
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <Link
+                          href={dashboardHref(period, row.id)}
+                          className="font-medium hover:underline"
                         >
-                          De baja
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">
-                      {formatRate(row.occupancyRate)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-right tabular-nums">
-                      {formatHours(row.occupiedMinutes)} de{" "}
-                      {formatHours(row.availableMinutes)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {row.completed}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {row.expired}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">
-                      {formatRate(row.absenteeismRate)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {row.cancelled}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {row.unclosed}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {row.lastName}, {row.firstName}
+                        </Link>
+                        {!row.active && (
+                          <Badge
+                            variant="outline"
+                            className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border ml-2"
+                          >
+                            De baja
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {formatRate(row.occupancyRate)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-right tabular-nums">
+                        {formatHours(row.occupiedMinutes)} de{" "}
+                        {formatHours(row.availableMinutes)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.completed}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {load?.workedMinutes
+                          ? formatHours(load.workedMinutes)
+                          : "Sin datos"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {load?.distinctPatients ?? "Sin datos"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {load?.patientsPerHour === null ||
+                        load?.patientsPerHour === undefined
+                          ? "Sin datos"
+                          : load.patientsPerHour.toLocaleString("es-AR", {
+                              maximumFractionDigits: 2,
+                            })}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.expired}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {formatRate(row.absenteeismRate)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.cancelled}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatRate(load?.cancellationRate ?? null)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.unclosed}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

@@ -14,14 +14,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDate } from "@/lib/schedule";
+import { formatDate, formatMinute } from "@/lib/schedule";
 import { deleteHoliday } from "./actions";
 import { CloseCenterForm } from "./close-center-form";
 
-type Holiday = { id: number; date: string; description: string };
+type Holiday = {
+  id: number;
+  startDate?: string;
+  endDate?: string;
+  startMinute?: number | null;
+  endMinute?: number | null;
+  date: string;
+  description: string;
+};
+
+function formatHolidayPeriod(holiday: Holiday) {
+  const start = holiday.startDate ?? holiday.date;
+  const end = holiday.endDate ?? holiday.date;
+  return start === end
+    ? formatDate(start)
+    : `${formatDate(start)} al ${formatDate(end)}`;
+}
+
+function formatHolidayHours(holiday: Holiday) {
+  return holiday.startMinute === null ||
+    holiday.endMinute === null ||
+    holiday.startMinute === undefined ||
+    holiday.endMinute === undefined
+    ? "Día completo"
+    : `${formatMinute(holiday.startMinute)}–${formatMinute(holiday.endMinute)}`;
+}
 
 /// Cierres del centro de hoy en adelante, por feriado o día excepcional
-/// (HU-05, HU-14). `MANAGER` y `RECEPTIONIST` los cargan y quitan.
+/// (HU-05, HU-14, HU-23). `MANAGER` y `RECEPTIONIST` los cargan y quitan.
 /// `holidays` es la página visible; `pagination`, su pie ya armado.
 export function HolidaysManager({
   holidays,
@@ -37,7 +62,7 @@ export function HolidaysManager({
       {canEdit && (
         <Card>
           <CardHeader>
-            <CardTitle>Cerrar el centro un día</CardTitle>
+            <CardTitle>Cerrar el centro</CardTitle>
           </CardHeader>
           <CardContent>
             <CloseCenterForm />
@@ -58,39 +83,47 @@ export function HolidaysManager({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Fecha</TableHead>
+                  <TableHead>Período</TableHead>
+                  <TableHead>Horario</TableHead>
                   <TableHead>Descripción</TableHead>
                   {canEdit && <TableHead />}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {holidays.map((holiday) => (
-                  <TableRow key={holiday.id}>
-                    <TableCell className="capitalize tabular-nums">
-                      {formatDate(holiday.date)}
-                    </TableCell>
-                    <TableCell className="whitespace-normal">
-                      {holiday.description}
-                    </TableCell>
-                    {canEdit && (
-                      <TableCell className="text-right">
-                        <ConfirmDelete
-                          action={deleteHoliday}
-                          fields={{ id: holiday.id }}
-                          title="Quitar cierre"
-                          confirmLabel="Quitar cierre"
-                          trigger={
-                            <Button type="button" variant="outline" size="sm">
-                              <CalendarCheck data-icon="inline-start" />
-                              Quitar cierre
-                            </Button>
-                          }
-                          description={`El ${formatDate(holiday.date)} el centro vuelve a ofrecer turnos según las franjas de cada profesional.`}
-                        />
+                {holidays.map((holiday) => {
+                  const periodLabel = formatHolidayPeriod(holiday);
+                  const hoursLabel = formatHolidayHours(holiday);
+                  return (
+                    <TableRow key={holiday.id}>
+                      <TableCell className="capitalize tabular-nums">
+                        {periodLabel}
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
+                      <TableCell className="tabular-nums">
+                        {hoursLabel}
+                      </TableCell>
+                      <TableCell className="whitespace-normal">
+                        {holiday.description}
+                      </TableCell>
+                      {canEdit && (
+                        <TableCell className="text-right">
+                          <ConfirmDelete
+                            action={deleteHoliday}
+                            fields={{ id: holiday.id }}
+                            title="Quitar cierre"
+                            confirmLabel="Quitar cierre"
+                            trigger={
+                              <Button type="button" variant="outline" size="sm">
+                                <CalendarCheck data-icon="inline-start" />
+                                Quitar cierre
+                              </Button>
+                            }
+                            description={`Durante ${periodLabel} (${hoursLabel.toLowerCase()}) el centro vuelve a ofrecer turnos según las franjas de cada profesional.`}
+                          />
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

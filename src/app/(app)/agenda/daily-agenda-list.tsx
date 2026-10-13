@@ -31,7 +31,15 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
   const dayAppointments = data.appointments.filter(
     (a) => toLocalSlot(a.startsAt).date === selectedDate,
   );
-  const holiday = data.holidays.find((h) => h.date === selectedDate);
+  const fullDayHoliday = data.holidays.find(
+    (h) =>
+      h.date === selectedDate &&
+      (h.startMinute === null || h.endMinute === null),
+  );
+  const partialHolidays = data.holidays.filter(
+    (h) =>
+      h.date === selectedDate && h.startMinute !== null && h.endMinute !== null,
+  );
   const exceptions = data.exceptions.filter((e) => e.date === selectedDate);
 
   const windowStartHours = dayWindows.map((w) =>
@@ -67,11 +75,21 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
           {WEEKDAY_LABEL[weekday]} {formatDate(selectedDate)}
         </p>
 
-        {holiday && (
+        {fullDayHoliday && (
           <div className="bg-holiday/15 border-holiday/30 text-holiday-muted-foreground mb-3 rounded-lg border p-2 text-xs font-medium">
-            Centro cerrado: {holiday.description}
+            Centro cerrado: {fullDayHoliday.description}
           </div>
         )}
+
+        {partialHolidays.map((h) => (
+          <div
+            key={h.id}
+            className="bg-holiday/15 border-holiday/30 text-holiday-foreground mb-3 rounded-lg border p-2 text-xs font-medium"
+          >
+            Centro cerrado: {h.description} ({formatMinute(h.startMinute!)}–
+            {formatMinute(h.endMinute!)})
+          </div>
+        ))}
 
         {exceptions.map((exc) => (
           <div
@@ -103,19 +121,19 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
           <div
             className={cn(
               "relative rounded-lg border transition-colors",
-              holiday
+              fullDayHoliday
                 ? "bg-holiday/10 border-holiday/30"
                 : "bg-muted/30 border-border",
             )}
             style={{ height }}
           >
-            {holiday ? (
+            {fullDayHoliday ? (
               <div className="absolute inset-1 flex flex-col items-center justify-center rounded-md border-2 border-dashed border-holiday/40 bg-holiday/15 p-4 text-center">
                 <span className="rounded-full bg-holiday/25 border border-holiday/40 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-holiday-foreground">
                   Centro cerrado
                 </span>
                 <span className="text-sm font-bold text-holiday-foreground mt-2">
-                  {holiday.description}
+                  {fullDayHoliday.description}
                 </span>
                 <p className="text-xs text-holiday-muted-foreground/80 mt-1 max-w-[200px] leading-tight font-medium">
                   Cerrado todo el día, sin turnos para ningún profesional.
@@ -129,6 +147,29 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                     className="border-border/40 pointer-events-none absolute inset-x-0 border-t"
                     style={{ top: offset(hour * 60) }}
                   />
+                ))}
+
+                {/* Cierres parciales del centro */}
+                {partialHolidays.map((h) => (
+                  <div
+                    key={h.id}
+                    className="bg-holiday/20 border-holiday/50 text-holiday-foreground absolute inset-x-1 z-15 flex flex-col justify-between overflow-hidden rounded-lg border-2 border-dashed p-1.5 shadow-xs"
+                    style={{
+                      top: offset(h.startMinute!),
+                      height: Math.max(
+                        offset(h.endMinute!) - offset(h.startMinute!),
+                        28,
+                      ),
+                    }}
+                  >
+                    <p className="font-semibold tabular-nums text-xs">
+                      Centro cerrado: {h.description}
+                    </p>
+                    <p className="text-[10px] font-medium">
+                      {formatMinute(h.startMinute!)}–
+                      {formatMinute(h.endMinute!)}
+                    </p>
+                  </div>
                 ))}
 
                 {/* Franjas del profesional */}
@@ -216,13 +257,13 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
           </h3>
         </div>
 
-        {holiday ? (
+        {fullDayHoliday ? (
           <div className="bg-holiday/10 border-holiday/30 text-holiday-foreground flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center shadow-xs">
             <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-holiday/40 bg-holiday/25 px-3 py-1 text-xs font-bold uppercase tracking-wider text-holiday-muted-foreground">
               Centro cerrado
             </span>
             <h4 className="text-xl font-bold text-holiday-foreground sm:text-2xl">
-              {holiday.description}
+              {fullDayHoliday.description}
             </h4>
             <p className="mt-2 max-w-md text-sm font-medium text-holiday-muted-foreground/80">
               El centro permanece cerrado todo el día: no se ofrecen turnos para
