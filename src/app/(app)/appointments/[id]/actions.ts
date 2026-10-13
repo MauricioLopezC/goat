@@ -14,11 +14,19 @@ import {
   voidPayment as voidPaymentInDal,
 } from "@/lib/dal/payments";
 import {
+  createEncounter as createEncounterInDal,
+  updateEncounter as updateEncounterInDal,
+} from "@/lib/dal/encounters";
+import {
   appointmentStatusChangeSchema,
   cancelAppointmentSchema,
   rescheduleAppointmentSchema,
   updateAppointmentPrioritySchema,
 } from "@/lib/validation/appointments";
+import {
+  createEncounterSchema,
+  updateEncounterSchema,
+} from "@/lib/validation/encounters";
 import {
   registerAuthorizationSchema,
   registerPaymentSchema,
@@ -116,6 +124,26 @@ export const updateAppointmentPriority = defineAction({
   handler: async (input, actor) => {
     const result = await updatePriorityInDal(input, actor);
     revalidateAppointment(input.appointmentId);
+    return result;
+  },
+});
+
+export const createEncounter = defineAction({
+  roles: ["PROFESSIONAL"],
+  input: createEncounterSchema,
+  handler: async (input, actor) => {
+    const result = await createEncounterInDal(input, actor);
+    revalidateClosedAppointment(result.appointmentId);
+    return result;
+  },
+});
+
+export const updateEncounter = defineAction({
+  roles: ["PROFESSIONAL"],
+  input: updateEncounterSchema,
+  handler: async (input, actor) => {
+    const result = await updateEncounterInDal(input, actor);
+    revalidateAppointment(result.appointmentId);
     return result;
   },
 });

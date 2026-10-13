@@ -3,6 +3,8 @@ import { patientHistoryHref } from "@/lib/patient-history";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EncounterDialog } from "@/app/(app)/appointments/[id]/encounter-dialog";
+import { Stethoscope } from "lucide-react";
 import {
   Empty,
   EmptyDescription,
@@ -228,6 +230,11 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                               Urgente
                             </span>
                           )}
+                          {appointment.encounter && (
+                            <span title="Atención médica registrada">
+                              <Stethoscope className="size-3 text-primary shrink-0" />
+                            </span>
+                          )}
                           <span className="text-[10px] text-muted-foreground truncate">
                             {appointment.patient.lastName}
                           </span>
@@ -280,6 +287,12 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
               const endMinute = toLocalSlot(appointment.endsAt).minute;
               const isCancelled = appointment.status === "CANCELLED";
               const isCompleted = appointment.status === "COMPLETED";
+              const now = new Date();
+              const canRegisterEncounter =
+                (isCompleted ||
+                  (appointment.status === "SCHEDULED" &&
+                    new Date(appointment.startsAt) <= now)) &&
+                !appointment.encounter;
 
               return (
                 <Card
@@ -322,6 +335,15 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                               ? "Completado"
                               : "Programado"}
                         </Badge>
+                        {appointment.encounter && (
+                          <Badge
+                            variant="outline"
+                            className="border-primary/40 bg-primary-soft text-primary flex items-center gap-1"
+                          >
+                            <Stethoscope className="size-3" />
+                            Atención registrada
+                          </Badge>
+                        )}
                       </div>
                     </CardTitle>
                   </CardHeader>
@@ -363,12 +385,24 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                       </div>
                     )}
 
-                    <div className="pt-2 border-t border-border flex items-center justify-between">
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={`/appointments/${appointment.id}`}>
-                          Ver turno #{appointment.id}
-                        </Link>
-                      </Button>
+                    <div className="pt-2 border-t border-border flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canRegisterEncounter && (
+                          <EncounterDialog
+                            appointmentId={appointment.id}
+                            summary={`${appointment.service.name} · ${appointment.patient.lastName}, ${appointment.patient.firstName}`}
+                            triggerLabel="Registrar atención"
+                          />
+                        )}
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/appointments/${appointment.id}`}>
+                            {appointment.encounter
+                              ? "Ver turno y atención"
+                              : "Ver turno"}{" "}
+                            #{appointment.id}
+                          </Link>
+                        </Button>
+                      </div>
                       <Button asChild variant="ghost" size="sm">
                         <Link href={patientHistoryHref(appointment.patient.id)}>
                           Historial del paciente

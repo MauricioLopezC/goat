@@ -5,6 +5,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Stethoscope } from "lucide-react";
 import { APPOINTMENT_STATUS_BORDER_CLASS } from "@/lib/appointment-status";
 import type { PaymentState } from "@/lib/payments";
 import { PaymentStateIcon } from "@/components/payment-state-icon";
@@ -235,6 +236,11 @@ export function WeekView({
                               </span>
                             )}
                             {appointment.patient.lastName}
+                            {appointment.encounter && (
+                              <span title="Atención médica registrada">
+                                <Stethoscope className="ml-1 inline size-3 text-primary align-[-2px]" />
+                              </span>
+                            )}
                             {paymentStates[appointment.id] && (
                               <PaymentStateIcon
                                 state={paymentStates[appointment.id]}

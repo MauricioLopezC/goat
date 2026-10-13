@@ -947,7 +947,7 @@ No es una Server Action: la usa la página de constancia de atención (ADR 0001)
 
 ### `getCenterIndicators`
 
-**Historia de usuario:** [HU-22 — Ver la ocupación y el ausentismo del centro](hu/HU-22-indicadores-iniciales.md)
+**Historia de usuario:** [HU-22 — Ver la ocupación y el ausentismo del centro](hu/HU-22-indicadores-iniciales.md) y [HU-29 — Ver los indicadores del centro](hu/HU-29-indicadores-del-centro.md)
 **Roles:** `MANAGER`.
 **Entrada:** `from` y `to` (AAAA-MM, inclusive, hasta tres meses; por defecto, el mes en curso) y `professionalId?` (entero positivo).
 **Precondiciones:** `from` no es posterior a `to`. Si viene `professionalId`, el profesional existe.
@@ -958,13 +958,60 @@ No es una Server Action: la usa la página de constancia de atención (ADR 0001)
 - **Ausentismo** (`absenteeismRate`): `EXPIRED` sobre `COMPLETED` más `EXPIRED`. Sin turnos cerrados, es `null`.
 - **Cancelaciones:** cantidad de `CANCELLED`.
 - **Sin cerrar:** cantidad de `SCHEDULED` con `endsAt` anterior a ahora.
+- **Carga y demanda (HU-29):** turnos Completados para pacientes distintos por profesional, duración real de esos turnos en horas y pacientes distintos por hora; cinco frecuencias más altas de turnos Completados por paciente, sin nombres ni identificadores; tasa de cancelación (`CANCELLED` / todos los turnos dados); cinco servicios y especialidades con más turnos dados; distribución de turnos por día de la semana. Todos usan la fecha de inicio del turno en hora del centro, incluso si fue cancelado.
+- **Ingresos (HU-29):** suma de cobros `PAID` según `Payment.createdAt` en hora del centro, por mes y medio de pago. Compara con el período inmediatamente anterior de igual cantidad de meses; los cobros anulados no cuentan. Sin cobros previos, la variación porcentual es `null`.
 
 El centro suma minutos y cantidades de todos los profesionales y calcula las tasas sobre esas sumas, no como promedio de las tasas. Con `professionalId`, el centro y la tabla se limitan a ese profesional.
 **Errores:** `FORBIDDEN`, `VALIDATION` (período inválido, invertido o de más de tres meses), `NOT_FOUND` (el profesional no existe).
 **Revalida:** no aplica; lectura desde Server Component.
-**Devuelve:** `{ period: { from, to }, center: Indicators, professionals: (Indicators & { id, firstName, lastName, active })[], professionalOptions }`. `Indicators` es `{ availableMinutes, occupiedMinutes, occupancyRate, completed, expired, absenteeismRate, cancelled, unclosed }`, con las tasas entre 0 y 1, o `null`. La tabla incluye a los profesionales con franjas o turnos en el período. `professionalOptions` son las opciones del filtro.
+**Devuelve:** `{ period: { from, to }, center: Indicators, professionals: (Indicators & { id, firstName, lastName, active })[], professionalOptions, details }`. `Indicators` es `{ availableMinutes, occupiedMinutes, occupancyRate, completed, expired, absenteeismRate, cancelled, unclosed }`, con las tasas entre 0 y 1, o `null`. `details` agrega los rankings (máximo cinco), carga por profesional, tasa de cancelación, ingresos mensuales y por medio, total y variación frente al período previo, y turnos por día de semana. La tabla incluye a los profesionales con franjas o turnos en el período. `professionalOptions` son las opciones del filtro.
 
 No es una Server Action: la usa el Server Component de `/dashboard` (ADR 0001).
+
+### `createEncounter`
+
+**Historia de usuario:** [HU-25 — Registrar la atención](hu/HU-25-registrar-la-atencion.md)
+**Roles:** `PROFESSIONAL`.
+**Entrada:** `appointmentId` (entero positivo), `notes` (texto libre obligatorio, 1-5000 caracteres con trim), `indications?` (texto libre opcional, hasta 5000 caracteres con trim).
+**Precondiciones:**
+- El turno existe y pertenece al profesional autenticado.
+- El turno no tiene una atención previa registrada.
+- El turno no está `CANCELLED` ni `EXPIRED`.
+- Si el turno está `SCHEDULED`, ya comenzó (`startsAt <= now`).
+**Efectos:**
+- Crea el registro `Encounter` con `appointmentId`, `professionalId`, `notes` e `indications`.
+- Si el turno estaba `SCHEDULED`, se actualiza automáticamente a `COMPLETED` y se registra un `AppointmentEvent` de tipo `COMPLETED` con motivo `"Atención médica registrada"`.
+**Errores:** `FORBIDDEN` (rol incorrecto o turno de otro profesional), `NOT_FOUND` (turno inexistente o sin perfil profesional), `DUPLICATE` (turno con atención ya registrada), `INVALID_STATUS_TRANSITION` (turno cancelado, vencido o programado aún no iniciado), `VALIDATION` (notas vacías o caracteres excesivos).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`, `/appointments/unclosed`, `/dashboard`.
+**Devuelve:** `{ id, appointmentId }`.
+
+### `updateEncounter`
+
+**Historia de usuario:** [HU-25 — Registrar la atención](hu/HU-25-registrar-la-atencion.md)
+**Roles:** `PROFESSIONAL`.
+**Entrada:** `encounterId` (entero positivo), `notes` (texto libre obligatorio, 1-5000 caracteres con trim), `indications?` (texto libre opcional, hasta 5000 caracteres con trim).
+**Precondiciones:**
+- La atención existe.
+- El profesional autenticado es el autor original de la atención (`professionalId`).
+- El plazo de edición está vigente (hasta el fin del día siguiente al turno en hora local de Argentina).
+**Efectos:** actualiza las `notes` e `indications` del `Encounter` y actualiza `updatedAt`.
+**Errores:** `FORBIDDEN` (rol incorrecto o intento de edición por un profesional distinto al autor), `NOT_FOUND` (atención inexistente), `DEADLINE_EXCEEDED` (plazo de edición vencido), `VALIDATION` (notas vacías o caracteres excesivos).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`.
+**Devuelve:** `{ id, appointmentId }`.
+
+### `getEncounter`
+
+**Historia de usuario:** [HU-25 — Registrar la atención](hu/HU-25-registrar-la-atencion.md)
+**Roles:** `PROFESSIONAL`, `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `appointmentId` (entero positivo).
+**Precondiciones:** el turno existe. Si el actor es `PROFESSIONAL`, debe ser el titular del turno o haber atendido al paciente (tener al menos un turno con él).
+**Efectos:** ninguno.
+**Secreto médico:** para `RECEPTIONIST` y `MANAGER`, devuelve solo `hasEncounter: true` con autor y fechas, omitiendo `notes` e `indications` (`null`). Para `PROFESSIONAL`, devuelve el contenido clínico completo para continuidad asistencial, e informa si `canEdit` está habilitado (solo si es el autor y el plazo no venció).
+**Errores:** `FORBIDDEN` (rol no autorizado o profesional ajeno al paciente), `NOT_FOUND` (turno inválido o sin perfil profesional).
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** datos de la atención o `null` si el turno aún no tiene atención.
+
+No es una Server Action: la usa el Server Component del detalle del turno `/appointments/[id]` (ADR 0001).
 
 ### `getCashSummary`
 
@@ -1009,4 +1056,5 @@ No es una Server Action: la usa el Server Component de `/dashboard` (ADR 0001).
 **Errores:** `FORBIDDEN`.
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** `string[]` con las fechas pendientes de cierre en formato AAAA-MM-DD.
+
 
