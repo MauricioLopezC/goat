@@ -28,7 +28,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertCircle, History, Receipt, ShieldAlert } from "lucide-react";
+import { DomainError } from "@/lib/actions";
+import {
+  AlertCircle,
+  CheckCircle2,
+  History,
+  Receipt,
+  ShieldAlert,
+} from "lucide-react";
 import { CloseCashDialog } from "./close-cash-dialog";
 import { VoidClosedPaymentDialog } from "./void-closed-payment-dialog";
 import { PrintSummaryButton } from "./print-summary-button";
@@ -41,20 +48,64 @@ export const metadata: Metadata = { title: "Caja · Goat" };
 export default async function CashPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; closed?: string }>;
 }) {
   const actor = await requirePageRole("RECEPTIONIST", "MANAGER");
-  const { date } = await searchParams;
+  const { date, closed } = await searchParams;
   const today = toLocalSlot(new Date()).date;
   const targetDate = date && isCalendarDate(date) ? date : today;
 
-  const cashSummary = await getCashSummary(targetDate, actor);
-  const unclosedDays = await getUnclosedCashDays(actor);
+  let cashSummary;
+  try {
+    cashSummary = await getCashSummary(targetDate, actor);
+  } catch (error) {
+    if (
+      error instanceof DomainError &&
+      error.code === "FORBIDDEN" &&
+      targetDate !== today &&
+      actor.role !== "MANAGER"
+    ) {
+      return (
+        <div className="flex flex-col gap-6">
+          <Alert className="bg-info-soft text-info-soft-foreground border-info-soft-border">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>Caja cerrada histórica</AlertTitle>
+            <AlertDescription className="mt-1 flex flex-col gap-3">
+              <p>
+                La caja del día {formatDate(targetDate)} ya se encuentra
+                cerrada. Solo la gerencia puede consultar el detalle de cajas
+                cerradas de fechas anteriores.
+              </p>
+              <div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/cash">Volver a la caja de hoy</Link>
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
+      );
+    }
+    throw error;
+  }
 
+  const unclosedDays = await getUnclosedCashDays(actor);
   const isToday = targetDate === today;
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Mensaje de caja cerrada con éxito */}
+      {closed && isCalendarDate(closed) && (
+        <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border print:hidden">
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertTitle>Caja cerrada exitosamente</AlertTitle>
+          <AlertDescription>
+            La caja del día {formatDate(closed)} fue cerrada correctamente y
+            guardada en el historial contable.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Alerta de días anteriores sin cerrar */}
       {unclosedDays.length > 0 && (
         <Alert className="bg-warning-soft text-warning-soft-foreground border-warning-soft-border print:hidden">
@@ -139,6 +190,8 @@ export default async function CashPage({
               expectedCashAmount={cashSummary.summary.expectedCashAmount}
               totalAmount={cashSummary.summary.totalAmount}
               paymentCount={cashSummary.summary.paymentCount}
+              actorRole={actor.role}
+              isToday={isToday}
             />
           )}
         </div>

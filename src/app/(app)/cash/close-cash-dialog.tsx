@@ -34,11 +34,15 @@ export function CloseCashDialog({
   expectedCashAmount,
   totalAmount,
   paymentCount,
+  actorRole,
+  isToday,
 }: {
   date: string;
   expectedCashAmount: string;
   totalAmount: string;
   paymentCount: number;
+  actorRole?: string;
+  isToday?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -65,7 +69,11 @@ export function CloseCashDialog({
 
     if (result.ok) {
       setOpen(false);
-      router.refresh();
+      if (!isToday && actorRole !== "MANAGER") {
+        router.push(`/cash?closed=${date}`);
+      } else {
+        router.refresh();
+      }
     }
     return result;
   }, null);
