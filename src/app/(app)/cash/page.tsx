@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
-import logo from "@/assets/logo-goat.png";
-import { centerProfile } from "@/lib/center-profile";
 import { requirePageRole } from "@/lib/dal/auth";
 import { getCashSummary, getUnclosedCashDays } from "@/lib/dal/cash";
 import { formatAmount } from "@/lib/payments";
@@ -42,7 +39,6 @@ import {
 } from "lucide-react";
 import { CloseCashDialog } from "./close-cash-dialog";
 import { VoidClosedPaymentDialog } from "./void-closed-payment-dialog";
-import { PrintSummaryButton } from "./print-summary-button";
 
 export const metadata: Metadata = { title: "Caja · Goat" };
 
@@ -152,70 +148,8 @@ export default async function CashPage({
         </div>
       )}
 
-      {/* Encabezado institucional exclusivo para impresión */}
-      <div className="hidden print:flex flex-col border-b pb-6 mb-2">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <Image
-              src={logo}
-              width={48}
-              height={48}
-              alt={centerProfile.name}
-              className="size-12 shrink-0 rounded-xl"
-              priority
-            />
-            <div>
-              <h1 className="text-xl font-bold text-foreground">
-                {centerProfile.name}
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                {centerProfile.legalName}
-              </p>
-            </div>
-          </div>
-          <div className="text-right text-xs text-muted-foreground">
-            <p className="font-semibold text-foreground">
-              CUIT {centerProfile.cuit}
-            </p>
-            <p>{centerProfile.address}</p>
-            <p>Tel: {centerProfile.phone}</p>
-          </div>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between border-t pt-3">
-          <div>
-            <h2 className="text-base font-bold uppercase tracking-wider text-foreground">
-              Planilla de Cierre de Caja
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Fecha de la caja:{" "}
-              <strong className="text-foreground">
-                {formatDate(targetDate)}
-              </strong>
-            </p>
-          </div>
-          <div className="text-right text-xs text-muted-foreground">
-            <p>
-              Estado:{" "}
-              <strong className="text-foreground uppercase">
-                {cashSummary.isClosed ? "Cerrada" : "Abierta (en vivo)"}
-              </strong>
-            </p>
-            {cashSummary.isClosed && cashSummary.closing ? (
-              <p>
-                Cerrada por: {cashSummary.closing.closedBy.firstName}{" "}
-                {cashSummary.closing.closedBy.lastName} ·{" "}
-                {formatInstant(cashSummary.closing.closedAt)}
-              </p>
-            ) : (
-              <p>Impreso el {formatInstant(new Date())}</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Cabecera de pantalla */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
+      {/* Cabecera */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-display-lg font-semibold tracking-tight text-foreground">
@@ -260,7 +194,7 @@ export default async function CashPage({
         </div>
 
         {/* Acciones principales */}
-        <div className="flex items-center gap-2 print:hidden">
+        <div className="flex items-center gap-2">
           {actor.role === "MANAGER" && (
             <Button variant="outline" asChild>
               <Link href="/cash/history">
@@ -270,9 +204,7 @@ export default async function CashPage({
             </Button>
           )}
 
-          {cashSummary.isClosed ? (
-            <PrintSummaryButton />
-          ) : (
+          {!cashSummary.isClosed && (
             <CloseCashDialog
               date={targetDate}
               expectedCashAmount={cashSummary.summary.expectedCashAmount}
@@ -800,28 +732,6 @@ export default async function CashPage({
           </CardContent>
         </Card>
       )}
-
-      {/* Sección de firmas formal para la rendición impresa */}
-      <div className="hidden print:grid grid-cols-2 gap-12 pt-16 mt-8 border-t border-border">
-        <div className="flex flex-col items-center text-center">
-          <div className="w-48 border-b border-foreground mb-2" />
-          <span className="text-xs font-semibold text-foreground">
-            Firma Responsable de Caja
-          </span>
-          <span className="text-xs text-muted-foreground">
-            Mesa de Entradas
-          </span>
-        </div>
-        <div className="flex flex-col items-center text-center">
-          <div className="w-48 border-b border-foreground mb-2" />
-          <span className="text-xs font-semibold text-foreground">
-            Firma de Conformidad / Control
-          </span>
-          <span className="text-xs text-muted-foreground">
-            Gerencia / Administración
-          </span>
-        </div>
-      </div>
     </div>
   );
 }

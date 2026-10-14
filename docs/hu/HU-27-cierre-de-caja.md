@@ -24,7 +24,7 @@
 - **Cerrar caja** pide el efectivo contado, muestra la diferencia y confirma.
 - Un cobro de un turno de un día anterior cae en la caja del día en que se cobra, no en la del turno.
 - **Corrección del gerente:** si anula un cobro de una caja cerrada, la caja no se reabre: muestra la anulación como ajuste posterior, con quién, cuándo y por qué, y el total corregido junto al original. El turno se puede volver a cobrar, y ese cobro cae en la caja del día.
-- Las cajas cerradas quedan en una lista por fecha, con su resumen e impresión.
+- Las cajas cerradas quedan en una lista por fecha con su resumen.
 - Arriba de *Turnos de hoy* se avisa si hay días anteriores con la caja sin cerrar.
 
 ## Confirmación
