@@ -217,12 +217,12 @@ export function WeekView({
                             key={appointment.id}
                             className={cn(
                               "truncate rounded-sm border border-l-4 px-1.5 py-0.5 text-xs font-medium shadow-2xs",
-                              APPOINTMENT_STATUS_BORDER_CLASS[
-                                appointment.status
-                              ],
                               appointment.status === "CANCELLED"
                                 ? "bg-muted text-muted-foreground line-through"
                                 : "bg-card",
+                              APPOINTMENT_STATUS_BORDER_CLASS[
+                                appointment.status
+                              ],
                             )}
                           >
                             <span className="tabular-nums font-semibold">

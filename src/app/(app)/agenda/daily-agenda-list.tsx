@@ -218,10 +218,10 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                       key={appointment.id}
                       className={cn(
                         "absolute inset-x-1 z-25 flex flex-col justify-between rounded-md border border-l-4 p-1.5 text-xs shadow-xs",
-                        APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
                         isCancelled
                           ? "bg-muted text-muted-foreground border-input line-through opacity-75"
                           : "bg-card text-foreground",
+                        APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
                       )}
                       style={{ top, height: cardHeight }}
                     >

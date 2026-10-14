@@ -251,7 +251,11 @@ export function MonthView({
         leadingBlankDays={leadingBlankDays}
         trailingBlankDays={trailingBlankDays}
       />
-      <AppointmentLegend freeClickable={false} showPayments={false} />
+      <AppointmentLegend
+        freeClickable={false}
+        showOffHours={false}
+        showPayments={false}
+      />
     </div>
   );
 }

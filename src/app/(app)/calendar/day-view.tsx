@@ -313,10 +313,10 @@ export function DayView({
                         title={`${formatMinute(start.minute)} · ${patient} · ${appointment.service.name} · ${APPOINTMENT_STATUS_LABEL[appointment.status]}${appointment.priority === "URGENT" ? " · Urgente" : ""}${paymentState ? ` · ${PAYMENT_STATE_LABEL[paymentState]}` : ""}`}
                         className={cn(
                           "focus-visible:ring-ring absolute z-10 flex flex-col overflow-hidden rounded-sm border border-l-4 px-1.5 py-0.5 text-xs shadow-sm outline-none hover:shadow-md focus-visible:ring-2",
-                          APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
                           appointment.status === "CANCELLED"
                             ? "bg-muted text-muted-foreground border-input"
                             : "bg-card",
+                          APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
                         )}
                         style={{
                           ...(occupies

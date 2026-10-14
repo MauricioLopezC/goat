@@ -45,7 +45,7 @@ const HOUR_HEIGHT = 48;
 
 export function WeeklyAgendaGrid({
   data,
-  paymentStates = {},
+  paymentStates,
 }: {
   data: AgendaData;
   /// Marca de cobro (HU-21). Solo la pasa el calendario del centro: el
@@ -383,10 +383,10 @@ export function WeeklyAgendaGrid({
                         title={`Clic para ver turno: ${appointment.patient.lastName}, ${appointment.patient.firstName}`}
                         className={cn(
                           "group absolute inset-x-0.5 flex items-center justify-between overflow-hidden rounded border border-l-4 px-1.5 py-0.5 text-left text-xs transition-all hover:scale-[1.01] hover:shadow-xs cursor-pointer",
-                          APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
                           isCancelled
                             ? "z-19 border-input bg-muted text-muted-foreground line-through"
                             : "z-20 bg-card text-foreground shadow-2xs",
+                          APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
                         )}
                         style={{
                           top,
@@ -429,7 +429,7 @@ export function WeeklyAgendaGrid({
                               <Stethoscope className="size-3 text-primary shrink-0" />
                             </span>
                           )}
-                          {paymentStates[appointment.id] && (
+                          {paymentStates?.[appointment.id] && (
                             <PaymentStateIcon
                               state={paymentStates[appointment.id]}
                             />
@@ -447,9 +447,7 @@ export function WeeklyAgendaGrid({
 
       <AppointmentLegend
         showFreeBlocks={false}
-        showPayments={Boolean(
-          paymentStates && Object.keys(paymentStates).length > 0,
-        )}
+        showPayments={Boolean(paymentStates)}
       />
 
       {/* Modal interactivo con los datos del turno en concreto */}

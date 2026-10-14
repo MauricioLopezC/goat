@@ -322,7 +322,11 @@ export function AgendaView({
             leadingBlankDays={monthInfo.leadingBlankDays}
             trailingBlankDays={monthInfo.trailingBlankDays}
           />
-          <AppointmentLegend showFreeBlocks={false} showPayments={false} />
+          <AppointmentLegend
+            showFreeBlocks
+            showOffHours={false}
+            showPayments={false}
+          />
         </div>
       ) : isWeek ? (
         <WeeklyAgendaGrid data={data} />

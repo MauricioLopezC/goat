@@ -1,15 +1,12 @@
-import {
-  AlertCircle,
-  CircleDollarSign,
-  FileCheck,
-  Stethoscope,
-} from "lucide-react";
+import { AlertCircle, Stethoscope } from "lucide-react";
 import {
   APPOINTMENT_STATUS_BORDER_CLASS,
   APPOINTMENT_STATUS_LABEL,
 } from "@/lib/appointment-status";
 import { AppointmentStatus } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
+import { PaymentStateIcon } from "@/components/payment-state-icon";
+import { PAYMENT_STATE_LABEL, PAYMENT_STATES } from "@/lib/payments";
 
 // Rayado diagonal del horario de atención que ya pasó (sincronizado con day-view.tsx).
 const PAST_PATTERN_CLASS =
@@ -24,10 +21,15 @@ const STATUS_ORDER: AppointmentStatus[] = [
 
 export interface AppointmentLegendProps {
   /**
-   * Si incluye bloques libres y horario fuera de franja (true en calendario, false en agenda del profesional).
+   * Si incluye bloques libres (true en calendario y vista mes, false en agenda del profesional).
    * @default true
    */
   showFreeBlocks?: boolean;
+  /**
+   * Si incluye la referencia de fuera de horario (vistas horarias con franjas).
+   * @default true si showFreeBlocks es true
+   */
+  showOffHours?: boolean;
   /**
    * Si los bloques libres aceptan clic para dar turno (vista día del calendario).
    * @default false
@@ -51,12 +53,14 @@ export interface AppointmentLegendProps {
  */
 export function AppointmentLegend({
   showFreeBlocks = true,
+  showOffHours,
   freeClickable = false,
   showPastHours,
   showPayments = false,
   className,
 }: AppointmentLegendProps) {
   const includePast = showPastHours ?? freeClickable;
+  const includeOffHours = showOffHours ?? showFreeBlocks;
 
   return (
     <ul
@@ -102,17 +106,15 @@ export function AppointmentLegend({
         Atención registrada
       </li>
 
-      {showPayments && (
-        <li className="flex items-center gap-1.5">
-          <span className="inline-flex shrink-0 items-center gap-1">
-            <CircleDollarSign className="text-primary size-3.5" />
-            <FileCheck className="text-primary size-3.5" />
-          </span>
-          Cobrado / Autorizado
-        </li>
-      )}
+      {showPayments &&
+        PAYMENT_STATES.map((state) => (
+          <li key={state} className="flex items-center gap-1.5">
+            <PaymentStateIcon state={state} />
+            {PAYMENT_STATE_LABEL[state]}
+          </li>
+        ))}
 
-      {showFreeBlocks && (
+      {includeOffHours && (
         <li className="flex items-center gap-1.5">
           <span className="bg-muted border-border size-3 shrink-0 rounded-sm border" />
           Fuera de horario

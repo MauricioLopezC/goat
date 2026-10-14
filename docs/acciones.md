@@ -307,7 +307,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Efectos:** ninguno. Lista los turnos sin cerrar (`UnclosedAppointment`): `SCHEDULED` con `endsAt` anterior a ahora, de cualquier profesional. Van del más viejo al más nuevo (`endsAt` e `id` ascendentes), de a 10.
 **Errores:** `FORBIDDEN`.
 **Revalida:** no aplica; lectura desde Server Component.
-**Devuelve:** `Page<UnclosedAppointment>`. Cada turno trae `id`, `startsAt`, `endsAt`, paciente (nombre y documento), profesional, servicio y si tiene un cobro vigente: un turno cobrado no se puede marcar Vencido ([HU-21](hu/HU-21-cobrar-turno.md)).
+**Devuelve:** `Page<UnclosedAppointment>`. Cada turno trae `id`, `startsAt`, `endsAt`, `status`, paciente (nombre y documento), profesional, servicio y si tiene un cobro vigente: un turno cobrado no se puede marcar Vencido ([HU-21](hu/HU-21-cobrar-turno.md)).
 
 No es una Server Action: la usa la pantalla `/appointments/unclosed`. Desde ahí, cada turno se cierra con `completeAppointment` o `expireAppointment`.
 
