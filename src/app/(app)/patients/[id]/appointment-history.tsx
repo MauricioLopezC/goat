@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, History, Stethoscope } from "lucide-react";
+import { AlertTriangle, History, Lock, Stethoscope } from "lucide-react";
 import type {
   HistoryItem,
   PatientAppointmentHistory,
@@ -37,6 +37,7 @@ import {
   Empty,
   EmptyDescription,
   EmptyHeader,
+  EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
 import { ListPagination } from "@/components/list-pagination";
@@ -61,14 +62,51 @@ export function AppointmentHistory({
   query,
   own,
   now,
+  forbidden = false,
 }: {
   patientId: number;
-  history: PatientAppointmentHistory;
+  history: PatientAppointmentHistory | null;
   query: HistoryQuery;
   /// El actor es profesional: ve las notas e indicaciones clínicas.
   own: boolean;
   now: Date;
+  forbidden?: boolean;
 }) {
+  if (forbidden || !history) {
+    return (
+      <Card
+        id={HISTORY_ANCHOR}
+        className="scroll-mt-6 rounded-xl border-border bg-card shadow-xs"
+      >
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle className="text-title-lg flex items-center gap-2 text-foreground">
+              <History className="size-4 text-primary" />
+              Bitácora del paciente
+            </CardTitle>
+            <CardDescription>
+              Bitácora clínica y turnos del paciente.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-1">
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Lock className="size-4" />
+              </EmptyMedia>
+              <EmptyTitle>Acceso restringido a la bitácora</EmptyTitle>
+              <EmptyDescription>
+                Por confidencialidad médica, solo podés acceder a la bitácora de
+                pacientes que atendés o atendiste en el centro.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const { page, attendance, professionals } = history;
   const { upcoming, past } = splitByTiming(page.items, now);
   const filtered =
@@ -235,9 +273,11 @@ function HistoryEntry({
           >
             {APPOINTMENT_STATUS_LABEL[item.status]}
           </Badge>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/appointments/${item.id}`}>Ver turno</Link>
-          </Button>
+          {item.canViewDetail && (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/appointments/${item.id}`}>Ver turno</Link>
+            </Button>
+          )}
         </div>
       </div>
 

@@ -14,10 +14,14 @@ import {
   UserCheck,
   UserX,
 } from "lucide-react";
+import { DomainError } from "@/lib/actions";
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
 import { canAccess } from "@/lib/route-access";
 import { getPatient } from "@/lib/dal/patients";
-import { getPatientAppointmentHistory } from "@/lib/dal/patient-history";
+import {
+  getPatientAppointmentHistory,
+  type PatientAppointmentHistory,
+} from "@/lib/dal/patient-history";
 import { parseHistoryQuery } from "@/lib/patient-history";
 import {
   GENDER_LABEL,
@@ -98,10 +102,20 @@ export default async function PatientDetailPage({
   }
 
   const historyQuery = parseHistoryQuery(await searchParams);
-  const history = await getPatientAppointmentHistory(
-    { patientId, ...historyQuery },
-    actor,
-  );
+  let history: PatientAppointmentHistory | null = null;
+  let historyForbidden = false;
+  try {
+    history = await getPatientAppointmentHistory(
+      { patientId, ...historyQuery },
+      actor,
+    );
+  } catch (error) {
+    if (error instanceof DomainError && error.code === "FORBIDDEN") {
+      historyForbidden = true;
+    } else {
+      throw error;
+    }
+  }
 
   const isManagerOrReceptionist =
     actor.role === "RECEPTIONIST" || actor.role === "MANAGER";
@@ -503,6 +517,7 @@ export default async function PatientDetailPage({
         query={historyQuery}
         own={actor.role === "PROFESSIONAL"}
         now={new Date()}
+        forbidden={historyForbidden}
       />
 
       {/* Bloque de Auditoría y Trazabilidad */}

@@ -299,6 +299,14 @@ async function main() {
           ).page.items,
         ];
         assert.ok(all.every((item) => item.payment === null));
+        // canViewDetail solo es true para turnos propios del profesional
+        for (const item of all) {
+          if (item.professional.id === professionalA.id) {
+            assert.equal(item.canViewDetail, true);
+          } else {
+            assert.equal(item.canViewDetail, false);
+          }
+        }
         // Puede filtrar por colega
         const colleagueFilter = await getPatientAppointmentHistory(
           { patientId: patient.id, professionalId: professionalB.id },
@@ -329,6 +337,9 @@ async function main() {
         const historyRecep = await getPatientAppointmentHistory(
           { patientId: patient.id },
           receptionist,
+        );
+        assert.ok(
+          historyRecep.page.items.every((item) => item.canViewDetail === true),
         );
         const recepItem = historyRecep.page.items.find((i) => i.id === paid.id);
         assert.ok(recepItem?.encounter);

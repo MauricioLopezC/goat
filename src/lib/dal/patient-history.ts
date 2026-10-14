@@ -87,6 +87,9 @@ export type HistoryItem = Omit<HistoryAppointment, "encounter"> & {
   encounter: HistoryEncounter | null;
   /// Siempre `null` para el profesional: el cobro no se le consulta.
   payment: HistoryPayment | null;
+  /// Capacidad de abrir el detalle del turno (/appointments/[id]).
+  /// Para el profesional solo es true en turnos propios; recepción y gerencia ven todos.
+  canViewDetail: boolean;
 };
 
 export type PatientAppointmentHistory = {
@@ -118,6 +121,7 @@ export async function getPatientAppointmentHistory(
   if (!patient) throw new DomainError("NOT_FOUND", "El paciente no existe.");
 
   const isProfessional = actor.role === Role.PROFESSIONAL;
+  let ownProfessionalId: number | null = null;
   let scopedProfessionalId = professionalId;
   if (isProfessional) {
     // Pertenencia (HU-26): el profesional ve la bitácora completa del paciente
@@ -139,6 +143,7 @@ export async function getPatientAppointmentHistory(
         "FORBIDDEN",
         "Solo podés ver la bitácora de pacientes que atendés.",
       );
+    ownProfessionalId = own.id;
     scopedProfessionalId = professionalId;
   }
 
@@ -206,6 +211,8 @@ export async function getPatientAppointmentHistory(
             }
           : null,
         payment: payments.get(item.id) ?? null,
+        canViewDetail:
+          !isProfessional || item.professional.id === ownProfessionalId,
       })),
     },
     attendance: {
