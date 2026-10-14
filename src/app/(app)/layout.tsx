@@ -23,18 +23,20 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
-      <AppSidebar actor={actor} />
+      <div className="print:hidden">
+        <AppSidebar actor={actor} />
+      </div>
       {/* `SidebarInset` ya es el <main>. `min-w-0` evita que el contenido
           ancho (la grilla del calendario) empuje la página en vez de hacer
           scroll dentro de su tarjeta. */}
-      <SidebarInset className="min-w-0">
-        <header className="border-border bg-card flex h-12 items-center gap-2 border-b px-4">
+      <SidebarInset className="min-w-0 print:m-0 print:p-0 print:border-none print:shadow-none print:bg-transparent">
+        <header className="border-border bg-card flex h-12 items-center gap-2 border-b px-4 print:hidden">
           <SidebarTrigger />
         </header>
 
         {/* Ancho de lectura por defecto; una página con `data-layout="wide"`
             (el calendario) usa todo el ancho disponible. */}
-        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 has-[[data-layout=wide]]:max-w-none md:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 has-[[data-layout=wide]]:max-w-none md:px-6 lg:px-8 print:max-w-none print:p-0 print:py-0 print:gap-4">
           {children}
         </div>
       </SidebarInset>
