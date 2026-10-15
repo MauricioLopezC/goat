@@ -5,9 +5,11 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { AlertCircle, Stethoscope } from "lucide-react";
 import { APPOINTMENT_STATUS_BORDER_CLASS } from "@/lib/appointment-status";
 import type { PaymentState } from "@/lib/payments";
 import { PaymentStateIcon } from "@/components/payment-state-icon";
+import { AppointmentLegend } from "@/components/appointment-legend";
 import { calendarHref, type CalendarQuery } from "@/lib/calendar";
 import {
   dateToDb,
@@ -18,7 +20,6 @@ import {
 } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import type { CalendarDay, ProfessionalDay } from "./calendar-model";
-import { Legend } from "./day-view";
 
 // Vista semana del calendario del centro (HU-11): una fila por profesional y
 // una columna por día. Cada celda abre ese día.
@@ -134,6 +135,16 @@ export function WeekView({
                         Cerrado: {day.holiday}
                       </span>
                     )}
+                    {!day.holiday && day.partialHolidays.length > 0 && (
+                      <span
+                        className="mt-0.5 rounded bg-holiday/15 border border-holiday/30 px-1 py-0.5 text-[10px] font-medium text-holiday-foreground truncate max-w-[140px]"
+                        title={`Cierre parcial: ${day.partialHolidays.map((h) => `${formatMinute(h.startMinute)}–${formatMinute(h.endMinute)} (${h.description})`).join(", ")}`}
+                      >
+                        Cierre parcial:{" "}
+                        {formatMinute(day.partialHolidays[0].startMinute)}–
+                        {formatMinute(day.partialHolidays[0].endMinute)}
+                      </span>
+                    )}
                   </Link>
                 </th>
               ))}
@@ -206,12 +217,12 @@ export function WeekView({
                             key={appointment.id}
                             className={cn(
                               "truncate rounded-sm border border-l-4 px-1.5 py-0.5 text-xs font-medium shadow-2xs",
-                              APPOINTMENT_STATUS_BORDER_CLASS[
-                                appointment.status
-                              ],
                               appointment.status === "CANCELLED"
                                 ? "bg-muted text-muted-foreground line-through"
                                 : "bg-card",
+                              APPOINTMENT_STATUS_BORDER_CLASS[
+                                appointment.status
+                              ],
                             )}
                           >
                             <span className="tabular-nums font-semibold">
@@ -220,11 +231,23 @@ export function WeekView({
                               )}
                             </span>{" "}
                             {appointment.priority === "URGENT" && (
-                              <span className="mr-1 inline-block rounded-xs border border-destructive-soft-border bg-destructive-soft px-1 py-0.2 text-[10px] font-semibold uppercase tracking-wider text-destructive-soft-foreground">
-                                Urgente
+                              <span
+                                title={
+                                  appointment.priorityReason
+                                    ? `Urgente: ${appointment.priorityReason}`
+                                    : "Prioridad urgente"
+                                }
+                                className="mr-1 inline-flex items-center text-destructive align-[-1px]"
+                              >
+                                <AlertCircle className="size-3 text-destructive" />
                               </span>
                             )}
                             {appointment.patient.lastName}
+                            {appointment.encounter && (
+                              <span title="Atención médica registrada">
+                                <Stethoscope className="ml-1 inline size-3 text-primary align-[-2px]" />
+                              </span>
+                            )}
                             {paymentStates[appointment.id] && (
                               <PaymentStateIcon
                                 state={paymentStates[appointment.id]}
@@ -267,7 +290,7 @@ export function WeekView({
           </tbody>
         </table>
       </div>
-      <Legend freeClickable={false} />
+      <AppointmentLegend freeClickable={false} showPayments />
     </div>
   );
 }

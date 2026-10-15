@@ -3,8 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { patientHistoryHref } from "@/lib/patient-history";
-import { Calendar, Clock, FileText, User } from "lucide-react";
+import {
+  AlertCircle,
+  Calendar,
+  Clock,
+  FileText,
+  Stethoscope,
+  User,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  APPOINTMENT_STATUS_BADGE_CLASS,
+  APPOINTMENT_STATUS_BORDER_CLASS,
+  APPOINTMENT_STATUS_LABEL,
+} from "@/lib/appointment-status";
+import { AppointmentLegend } from "@/components/appointment-legend";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,7 +45,7 @@ const HOUR_HEIGHT = 48;
 
 export function WeeklyAgendaGrid({
   data,
-  paymentStates = {},
+  paymentStates,
 }: {
   data: AgendaData;
   /// Marca de cobro (HU-21). Solo la pasa el calendario del centro: el
@@ -85,7 +98,17 @@ export function WeeklyAgendaGrid({
                 timeZone: "UTC",
                 month: "short",
               }).format(dateObj);
-              const holiday = data.holidays.find((h) => h.date === day.date);
+              const fullDayHoliday = data.holidays.find(
+                (h) =>
+                  h.date === day.date &&
+                  (h.startMinute === null || h.endMinute === null),
+              );
+              const partialHolidays = data.holidays.filter(
+                (h) =>
+                  h.date === day.date &&
+                  h.startMinute !== null &&
+                  h.endMinute !== null,
+              );
               const dayExceptions = data.exceptions.filter(
                 (e) => e.date === day.date,
               );
@@ -99,9 +122,9 @@ export function WeeklyAgendaGrid({
                   className={cn(
                     "pb-2 text-center transition-colors flex flex-col items-center justify-start rounded-t-lg",
                     isToday &&
-                      !holiday &&
+                      !fullDayHoliday &&
                       "bg-primary-soft/40 border-b-2 border-primary pt-1",
-                    holiday &&
+                    fullDayHoliday &&
                       "bg-holiday/15 border-b-2 border-holiday/60 pt-1",
                   )}
                 >
@@ -126,18 +149,29 @@ export function WeeklyAgendaGrid({
                     )}
                   </div>
 
-                  {/* Cierre del centro en la cabecera (sin pisar las franjas) */}
-                  {holiday && (
+                  {/* Cierre del centro de día completo en la cabecera */}
+                  {fullDayHoliday && (
                     <span
                       className="mt-1 w-full max-w-[130px] truncate rounded bg-holiday/15 border border-holiday/30 px-1 py-0.5 text-[10px] font-semibold text-holiday-muted-foreground"
-                      title={`Centro cerrado: ${holiday.description}`}
+                      title={`Centro cerrado: ${fullDayHoliday.description}`}
                     >
-                      Cerrado: {holiday.description}
+                      Cerrado: {fullDayHoliday.description}
+                    </span>
+                  )}
+
+                  {/* Cierre parcial del centro en la cabecera */}
+                  {!fullDayHoliday && partialHolidays.length > 0 && (
+                    <span
+                      className="mt-1 w-full max-w-[130px] truncate rounded bg-holiday/15 border border-holiday/30 px-1 py-0.5 text-[10px] font-semibold text-holiday-foreground"
+                      title={`Centro cerrado: ${formatMinute(partialHolidays[0].startMinute!)}–${formatMinute(partialHolidays[0].endMinute!)} (${partialHolidays[0].description})`}
+                    >
+                      Cerrado: {formatMinute(partialHolidays[0].startMinute!)}–
+                      {formatMinute(partialHolidays[0].endMinute!)}
                     </span>
                   )}
 
                   {/* Ausencia de día completo en la cabecera */}
-                  {!holiday && fullDayException && (
+                  {!fullDayHoliday && fullDayException && (
                     <span
                       className="mt-1 w-full max-w-[130px] truncate rounded bg-destructive/10 border border-destructive/25 px-1 py-0.5 text-[10px] font-semibold text-destructive"
                       title={`Ausencia: ${fullDayException.reason}`}
@@ -170,7 +204,17 @@ export function WeeklyAgendaGrid({
               const dayAppointments = data.appointments.filter(
                 (a) => toLocalSlot(a.startsAt).date === day.date,
               );
-              const holiday = data.holidays.find((h) => h.date === day.date);
+              const fullDayHoliday = data.holidays.find(
+                (h) =>
+                  h.date === day.date &&
+                  (h.startMinute === null || h.endMinute === null),
+              );
+              const partialHolidays = data.holidays.filter(
+                (h) =>
+                  h.date === day.date &&
+                  h.startMinute !== null &&
+                  h.endMinute !== null,
+              );
               const dayExceptions = data.exceptions.filter(
                 (e) => e.date === day.date,
               );
@@ -181,7 +225,7 @@ export function WeeklyAgendaGrid({
                 (e) => e.startMinute !== null && e.endMinute !== null,
               );
 
-              if (holiday) {
+              if (fullDayHoliday) {
                 return (
                   <div
                     key={day.date}
@@ -193,7 +237,7 @@ export function WeeklyAgendaGrid({
                         Centro cerrado
                       </span>
                       <span className="text-xs font-bold text-holiday-foreground mt-1.5 max-w-[120px] line-clamp-2">
-                        {holiday.description}
+                        {fullDayHoliday.description}
                       </span>
                       <span className="text-[10px] text-holiday-muted-foreground/80 mt-1 max-w-[120px] leading-tight font-medium">
                         Sin turnos para ningún profesional
@@ -216,6 +260,25 @@ export function WeeklyAgendaGrid({
                       className="border-border/40 pointer-events-none absolute inset-x-0 border-t"
                       style={{ top: offset(hour * 60) }}
                     />
+                  ))}
+
+                  {/* Cierres parciales del centro */}
+                  {partialHolidays.map((h) => (
+                    <div
+                      key={h.id}
+                      className="bg-holiday/20 border-holiday/50 text-holiday-foreground absolute inset-x-1 z-15 overflow-hidden rounded border border-dashed p-1 text-[11px] font-semibold"
+                      style={{
+                        top: offset(h.startMinute!),
+                        height: Math.max(
+                          offset(h.endMinute!) - offset(h.startMinute!),
+                          24,
+                        ),
+                      }}
+                      title={`Centro cerrado: ${h.description}`}
+                    >
+                      Centro cerrado ({formatMinute(h.startMinute!)}–
+                      {formatMinute(h.endMinute!)}): {h.description}
+                    </div>
                   ))}
 
                   {/* Ausencias / Excepciones parciales por hora */}
@@ -311,7 +374,6 @@ export function WeeklyAgendaGrid({
                     const cardHeight = Math.max(rawHeight - 1, 24);
 
                     const isCancelled = appointment.status === "CANCELLED";
-                    const isCompleted = appointment.status === "COMPLETED";
 
                     return (
                       <button
@@ -319,15 +381,13 @@ export function WeeklyAgendaGrid({
                         type="button"
                         onClick={() => setSelectedAppointment(appointment)}
                         title={`Clic para ver turno: ${appointment.patient.lastName}, ${appointment.patient.firstName}`}
-                        className={`group absolute inset-x-0.5 flex items-center justify-between overflow-hidden rounded border border-l-4 px-1.5 py-0.5 text-left text-xs transition-all hover:scale-[1.01] hover:shadow-xs cursor-pointer ${
-                          // Opaco para tapar el rótulo de la franja; debajo de
-                          // los turnos activos si el horario se volvió a dar
+                        className={cn(
+                          "group absolute inset-x-0.5 flex items-center justify-between overflow-hidden rounded border border-l-4 px-1.5 py-0.5 text-left text-xs transition-all hover:scale-[1.01] hover:shadow-xs cursor-pointer",
                           isCancelled
-                            ? "z-19 border-border border-l-destructive bg-muted text-muted-foreground line-through"
-                            : isCompleted
-                              ? "z-20 border-border border-l-emerald-600 bg-card text-foreground shadow-2xs hover:border-emerald-600"
-                              : "z-20 border-border border-l-primary bg-card text-foreground shadow-2xs hover:border-primary"
-                        }`}
+                            ? "z-19 border-input bg-muted text-muted-foreground line-through"
+                            : "z-20 bg-card text-foreground shadow-2xs",
+                          APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
+                        )}
                         style={{
                           top,
                           height: cardHeight,
@@ -335,37 +395,46 @@ export function WeeklyAgendaGrid({
                       >
                         <div className="flex items-center gap-1.5 overflow-hidden w-full">
                           <span
-                            className={`font-bold tabular-nums text-[11px] shrink-0 ${isCancelled ? "" : "text-foreground"}`}
+                            className={cn(
+                              "font-bold tabular-nums text-[11px] shrink-0",
+                              !isCancelled && "text-foreground",
+                            )}
                           >
                             {formatMinute(startMinute)}–
                             {formatMinute(endMinute)}
                           </span>
                           {appointment.priority === "URGENT" && (
-                            <span className="shrink-0 rounded bg-destructive-soft px-1 text-[9px] font-bold text-destructive-soft-foreground border border-destructive-soft-border">
-                              Urgente
+                            <span
+                              title={
+                                appointment.priorityReason
+                                  ? `Urgente: ${appointment.priorityReason}`
+                                  : "Prioridad urgente"
+                              }
+                              className="inline-flex items-center text-destructive shrink-0"
+                            >
+                              <AlertCircle className="size-3 text-destructive" />
                             </span>
                           )}
                           <span
-                            className={`font-medium text-[11px] truncate ${isCancelled ? "" : "text-foreground/90"}`}
+                            className={cn(
+                              "font-medium text-[11px] truncate",
+                              !isCancelled && "text-foreground/90",
+                            )}
                           >
                             {appointment.patient.lastName},{" "}
                             {appointment.patient.firstName}
                           </span>
-                          {paymentStates[appointment.id] && (
+                          {appointment.encounter && (
+                            <span title="Atención médica registrada">
+                              <Stethoscope className="size-3 text-primary shrink-0" />
+                            </span>
+                          )}
+                          {paymentStates?.[appointment.id] && (
                             <PaymentStateIcon
                               state={paymentStates[appointment.id]}
                             />
                           )}
                         </div>
-                        <span
-                          className={`size-1.5 rounded-full shrink-0 ml-1 ${
-                            isCancelled
-                              ? "bg-destructive"
-                              : isCompleted
-                                ? "bg-emerald-600"
-                                : "bg-primary"
-                          }`}
-                        />
                       </button>
                     );
                   })}
@@ -375,6 +444,11 @@ export function WeeklyAgendaGrid({
           </div>
         </div>
       </div>
+
+      <AppointmentLegend
+        showFreeBlocks={false}
+        showPayments={Boolean(paymentStates)}
+      />
 
       {/* Modal interactivo con los datos del turno en concreto */}
       {selectedAppointment && (
@@ -395,27 +469,29 @@ export function WeeklyAgendaGrid({
                   {selectedAppointment.priority === "URGENT" && (
                     <Badge
                       variant="outline"
-                      className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
+                      className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border flex items-center gap-1"
                     >
+                      <AlertCircle className="size-3" />
                       Urgente
                     </Badge>
                   )}
                   <Badge
                     variant="outline"
                     className={
-                      selectedAppointment.status === "CANCELLED"
-                        ? "bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
-                        : selectedAppointment.status === "COMPLETED"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                          : "bg-primary-soft text-primary-soft-foreground border-primary-soft-border"
+                      APPOINTMENT_STATUS_BADGE_CLASS[selectedAppointment.status]
                     }
                   >
-                    {selectedAppointment.status === "CANCELLED"
-                      ? "Cancelado"
-                      : selectedAppointment.status === "COMPLETED"
-                        ? "Completado"
-                        : "Programado"}
+                    {APPOINTMENT_STATUS_LABEL[selectedAppointment.status]}
                   </Badge>
+                  {selectedAppointment.encounter && (
+                    <Badge
+                      variant="outline"
+                      className="border-primary/40 bg-primary-soft text-primary flex items-center gap-1"
+                    >
+                      <Stethoscope className="size-3" />
+                      Atención registrada
+                    </Badge>
+                  )}
                 </div>
               </div>
               <DialogDescription>
@@ -525,7 +601,10 @@ export function WeeklyAgendaGrid({
               </DialogClose>
               <Button asChild size="sm">
                 <Link href={`/appointments/${selectedAppointment.id}`}>
-                  Ver turno completo #{selectedAppointment.id}
+                  {selectedAppointment.encounter
+                    ? "Ver turno y atención"
+                    : "Ver turno completo"}{" "}
+                  #{selectedAppointment.id}
                 </Link>
               </Button>
             </DialogFooter>

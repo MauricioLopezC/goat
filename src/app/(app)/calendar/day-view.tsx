@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Ban } from "lucide-react";
+import { AlertCircle, Ban, Stethoscope } from "lucide-react";
+import { AppointmentLegend } from "@/components/appointment-legend";
 import {
   Empty,
   EmptyDescription,
@@ -57,8 +58,11 @@ export function DayView({
   paymentStates: Record<number, PaymentState>;
 }) {
   const filtered = Boolean(query.professionalId || query.serviceId);
-  const nobodyAttends = !day.professionals.some((item) => item.attends);
-  const { firstHour, lastHour } = hourRange(day.professionals);
+  const nobodyAttends = day.professionals.length === 0;
+  const { firstHour, lastHour } = hourRange(
+    day.professionals,
+    day.partialHolidays,
+  );
   const hours = Array.from(
     { length: lastHour - firstHour },
     (_, index) => firstHour + index,
@@ -86,7 +90,7 @@ export function DayView({
             ningún profesional.
           </p>
         </div>
-        <Legend freeClickable />
+        <AppointmentLegend freeClickable showPayments />
       </div>
     );
   }
@@ -232,6 +236,22 @@ export function DayView({
                       Ausencia: {absence.reason}
                     </div>
                   ))}
+                  {day.partialHolidays.map((holiday) => (
+                    <div
+                      key={holiday.id}
+                      title={`Centro cerrado: ${holiday.description}`}
+                      className="bg-holiday/15 text-holiday-foreground border-holiday/40 absolute inset-x-1 z-20 overflow-hidden rounded-sm border border-dashed p-1 text-xs"
+                      style={{
+                        top: offset(holiday.startMinute),
+                        height:
+                          offset(holiday.endMinute) -
+                          offset(holiday.startMinute),
+                      }}
+                    >
+                      <span className="font-semibold">Centro cerrado:</span>{" "}
+                      {holiday.description}
+                    </div>
+                  ))}
                   {item.freeBlocks.map((block) => {
                     const label = `${formatMinute(block.startMinute)}–${formatMinute(block.endMinute)}`;
                     const blockHeight = Math.max(
@@ -293,10 +313,10 @@ export function DayView({
                         title={`${formatMinute(start.minute)} · ${patient} · ${appointment.service.name} · ${APPOINTMENT_STATUS_LABEL[appointment.status]}${appointment.priority === "URGENT" ? " · Urgente" : ""}${paymentState ? ` · ${PAYMENT_STATE_LABEL[paymentState]}` : ""}`}
                         className={cn(
                           "focus-visible:ring-ring absolute z-10 flex flex-col overflow-hidden rounded-sm border border-l-4 px-1.5 py-0.5 text-xs shadow-sm outline-none hover:shadow-md focus-visible:ring-2",
-                          APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
                           appointment.status === "CANCELLED"
                             ? "bg-muted text-muted-foreground border-input"
                             : "bg-card",
+                          APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
                         )}
                         style={{
                           ...(occupies
@@ -314,8 +334,15 @@ export function DayView({
                             {formatMinute(start.minute)}
                           </span>{" "}
                           {appointment.priority === "URGENT" && (
-                            <span className="mr-1 inline-block rounded-xs border border-destructive-soft-border bg-destructive-soft px-1 py-0.2 text-[10px] font-semibold uppercase tracking-wider text-destructive-soft-foreground">
-                              Urgente
+                            <span
+                              title={
+                                appointment.priorityReason
+                                  ? `Urgente: ${appointment.priorityReason}`
+                                  : "Prioridad urgente"
+                              }
+                              className="mr-1 inline-flex items-center text-destructive align-[-1px]"
+                            >
+                              <AlertCircle className="size-3 text-destructive" />
                             </span>
                           )}
                           <span
@@ -333,6 +360,11 @@ export function DayView({
                         </span>
                         <span className="text-muted-foreground flex items-center gap-1 truncate">
                           {APPOINTMENT_STATUS_LABEL[appointment.status]}
+                          {appointment.encounter && (
+                            <span title="Atención médica registrada">
+                              <Stethoscope className="size-3 text-primary shrink-0" />
+                            </span>
+                          )}
                           {paymentState && (
                             <>
                               {" · "}
@@ -352,48 +384,9 @@ export function DayView({
           </div>
         </div>
       )}
-      <Legend freeClickable />
+      <AppointmentLegend freeClickable showPayments />
     </div>
   );
 }
 
-export function Legend({ freeClickable }: { freeClickable: boolean }) {
-  return (
-    <ul
-      aria-label="Referencias"
-      className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm"
-    >
-      <li className="flex items-center gap-1.5">
-        <span className="border-primary/60 bg-primary-soft size-3.5 rounded-sm border-2 border-dashed" />
-        {freeClickable ? "Bloque libre (clic para dar turno)" : "Bloque libre"}
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="border-holiday/40 bg-holiday/25 size-3.5 rounded-sm border-2 border-dashed" />
-        Centro cerrado (feriado o día excepcional)
-      </li>
-      {(["SCHEDULED", "COMPLETED", "EXPIRED", "CANCELLED"] as const).map(
-        (status) => (
-          <li key={status} className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                "bg-card size-3 rounded-sm border border-l-4",
-                APPOINTMENT_STATUS_BORDER_CLASS[status],
-              )}
-            />
-            {APPOINTMENT_STATUS_LABEL[status]}
-          </li>
-        ),
-      )}
-      <li className="flex items-center gap-1.5">
-        <span className="bg-muted size-3 rounded-sm border" />
-        Fuera de horario
-      </li>
-      {freeClickable && (
-        <li className="flex items-center gap-1.5">
-          <span className={cn("size-3 rounded-sm border", PAST)} />
-          Horario pasado
-        </li>
-      )}
-    </ul>
-  );
-}
+export { AppointmentLegend as Legend } from "@/components/appointment-legend";

@@ -3,6 +3,14 @@ import { patientHistoryHref } from "@/lib/patient-history";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EncounterDialog } from "@/app/(app)/appointments/[id]/encounter-dialog";
+import { AlertCircle, Stethoscope } from "lucide-react";
+import {
+  APPOINTMENT_STATUS_BADGE_CLASS,
+  APPOINTMENT_STATUS_BORDER_CLASS,
+  APPOINTMENT_STATUS_LABEL,
+} from "@/lib/appointment-status";
+import { AppointmentLegend } from "@/components/appointment-legend";
 import {
   Empty,
   EmptyDescription,
@@ -29,7 +37,15 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
   const dayAppointments = data.appointments.filter(
     (a) => toLocalSlot(a.startsAt).date === selectedDate,
   );
-  const holiday = data.holidays.find((h) => h.date === selectedDate);
+  const fullDayHoliday = data.holidays.find(
+    (h) =>
+      h.date === selectedDate &&
+      (h.startMinute === null || h.endMinute === null),
+  );
+  const partialHolidays = data.holidays.filter(
+    (h) =>
+      h.date === selectedDate && h.startMinute !== null && h.endMinute !== null,
+  );
   const exceptions = data.exceptions.filter((e) => e.date === selectedDate);
 
   const windowStartHours = dayWindows.map((w) =>
@@ -65,11 +81,21 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
           {WEEKDAY_LABEL[weekday]} {formatDate(selectedDate)}
         </p>
 
-        {holiday && (
+        {fullDayHoliday && (
           <div className="bg-holiday/15 border-holiday/30 text-holiday-muted-foreground mb-3 rounded-lg border p-2 text-xs font-medium">
-            Centro cerrado: {holiday.description}
+            Centro cerrado: {fullDayHoliday.description}
           </div>
         )}
+
+        {partialHolidays.map((h) => (
+          <div
+            key={h.id}
+            className="bg-holiday/15 border-holiday/30 text-holiday-foreground mb-3 rounded-lg border p-2 text-xs font-medium"
+          >
+            Centro cerrado: {h.description} ({formatMinute(h.startMinute!)}–
+            {formatMinute(h.endMinute!)})
+          </div>
+        ))}
 
         {exceptions.map((exc) => (
           <div
@@ -101,19 +127,19 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
           <div
             className={cn(
               "relative rounded-lg border transition-colors",
-              holiday
+              fullDayHoliday
                 ? "bg-holiday/10 border-holiday/30"
                 : "bg-muted/30 border-border",
             )}
             style={{ height }}
           >
-            {holiday ? (
+            {fullDayHoliday ? (
               <div className="absolute inset-1 flex flex-col items-center justify-center rounded-md border-2 border-dashed border-holiday/40 bg-holiday/15 p-4 text-center">
                 <span className="rounded-full bg-holiday/25 border border-holiday/40 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-holiday-foreground">
                   Centro cerrado
                 </span>
                 <span className="text-sm font-bold text-holiday-foreground mt-2">
-                  {holiday.description}
+                  {fullDayHoliday.description}
                 </span>
                 <p className="text-xs text-holiday-muted-foreground/80 mt-1 max-w-[200px] leading-tight font-medium">
                   Cerrado todo el día, sin turnos para ningún profesional.
@@ -127,6 +153,29 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                     className="border-border/40 pointer-events-none absolute inset-x-0 border-t"
                     style={{ top: offset(hour * 60) }}
                   />
+                ))}
+
+                {/* Cierres parciales del centro */}
+                {partialHolidays.map((h) => (
+                  <div
+                    key={h.id}
+                    className="bg-holiday/20 border-holiday/50 text-holiday-foreground absolute inset-x-1 z-15 flex flex-col justify-between overflow-hidden rounded-lg border-2 border-dashed p-1.5 shadow-xs"
+                    style={{
+                      top: offset(h.startMinute!),
+                      height: Math.max(
+                        offset(h.endMinute!) - offset(h.startMinute!),
+                        28,
+                      ),
+                    }}
+                  >
+                    <p className="font-semibold tabular-nums text-xs">
+                      Centro cerrado: {h.description}
+                    </p>
+                    <p className="text-[10px] font-medium">
+                      {formatMinute(h.startMinute!)}–
+                      {formatMinute(h.endMinute!)}
+                    </p>
+                  </div>
                 ))}
 
                 {/* Franjas del profesional */}
@@ -163,18 +212,17 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                     48,
                   );
                   const isCancelled = appointment.status === "CANCELLED";
-                  const isCompleted = appointment.status === "COMPLETED";
 
                   return (
                     <div
                       key={appointment.id}
-                      className={`absolute inset-x-1 z-25 flex flex-col justify-between rounded-md border p-1.5 text-xs shadow-xs ${
+                      className={cn(
+                        "absolute inset-x-1 z-25 flex flex-col justify-between rounded-md border border-l-4 p-1.5 text-xs shadow-xs",
                         isCancelled
-                          ? "bg-card/90 text-muted-foreground border-border border-l-destructive line-through opacity-75 border-l-4"
-                          : isCompleted
-                            ? "bg-card text-foreground border-border border-l-emerald-600 border-l-4"
-                            : "bg-card text-foreground border-border border-l-primary border-l-4"
-                      }`}
+                          ? "bg-muted text-muted-foreground border-input line-through opacity-75"
+                          : "bg-card text-foreground",
+                        APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
+                      )}
                       style={{ top, height: cardHeight }}
                     >
                       <div className="flex items-center justify-between gap-1">
@@ -183,8 +231,20 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                         </span>
                         <div className="flex items-center gap-1 truncate">
                           {appointment.priority === "URGENT" && (
-                            <span className="shrink-0 rounded bg-destructive-soft px-1 text-[9px] font-bold text-destructive-soft-foreground border border-destructive-soft-border">
-                              Urgente
+                            <span
+                              title={
+                                appointment.priorityReason
+                                  ? `Urgente: ${appointment.priorityReason}`
+                                  : "Prioridad urgente"
+                              }
+                              className="inline-flex items-center text-destructive shrink-0"
+                            >
+                              <AlertCircle className="size-3 text-destructive" />
+                            </span>
+                          )}
+                          {appointment.encounter && (
+                            <span title="Atención médica registrada">
+                              <Stethoscope className="size-3 text-primary shrink-0" />
                             </span>
                           )}
                           <span className="text-[10px] text-muted-foreground truncate">
@@ -209,13 +269,13 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
           </h3>
         </div>
 
-        {holiday ? (
+        {fullDayHoliday ? (
           <div className="bg-holiday/10 border-holiday/30 text-holiday-foreground flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center shadow-xs">
             <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-holiday/40 bg-holiday/25 px-3 py-1 text-xs font-bold uppercase tracking-wider text-holiday-muted-foreground">
               Centro cerrado
             </span>
             <h4 className="text-xl font-bold text-holiday-foreground sm:text-2xl">
-              {holiday.description}
+              {fullDayHoliday.description}
             </h4>
             <p className="mt-2 max-w-md text-sm font-medium text-holiday-muted-foreground/80">
               El centro permanece cerrado todo el día: no se ofrecen turnos para
@@ -239,17 +299,21 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
               const endMinute = toLocalSlot(appointment.endsAt).minute;
               const isCancelled = appointment.status === "CANCELLED";
               const isCompleted = appointment.status === "COMPLETED";
+              const now = new Date();
+              const canRegisterEncounter =
+                (isCompleted ||
+                  (appointment.status === "SCHEDULED" &&
+                    new Date(appointment.startsAt) <= now)) &&
+                !appointment.encounter;
 
               return (
                 <Card
                   key={appointment.id}
-                  className={`overflow-hidden border transition-shadow hover:shadow-md ${
-                    isCancelled
-                      ? "border-destructive/30 bg-muted/20 opacity-80"
-                      : isCompleted
-                        ? "border-emerald-200 dark:border-emerald-800"
-                        : "border-border"
-                  }`}
+                  className={cn(
+                    "overflow-hidden border border-l-4 transition-shadow hover:shadow-md",
+                    APPOINTMENT_STATUS_BORDER_CLASS[appointment.status],
+                    isCancelled && "bg-muted/30 opacity-80",
+                  )}
                 >
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center justify-between gap-2">
@@ -260,27 +324,29 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                         {appointment.priority === "URGENT" && (
                           <Badge
                             variant="outline"
-                            className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
+                            className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border flex items-center gap-1"
                           >
+                            <AlertCircle className="size-3" />
                             Urgente
                           </Badge>
                         )}
                         <Badge
                           variant="outline"
                           className={
-                            isCancelled
-                              ? "bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border"
-                              : isCompleted
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                                : "bg-primary-soft text-primary-soft-foreground border-primary-soft-border"
+                            APPOINTMENT_STATUS_BADGE_CLASS[appointment.status]
                           }
                         >
-                          {isCancelled
-                            ? "Cancelado"
-                            : isCompleted
-                              ? "Completado"
-                              : "Programado"}
+                          {APPOINTMENT_STATUS_LABEL[appointment.status]}
                         </Badge>
+                        {appointment.encounter && (
+                          <Badge
+                            variant="outline"
+                            className="border-primary/40 bg-primary-soft text-primary flex items-center gap-1"
+                          >
+                            <Stethoscope className="size-3" />
+                            Atención registrada
+                          </Badge>
+                        )}
                       </div>
                     </CardTitle>
                   </CardHeader>
@@ -322,12 +388,24 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                       </div>
                     )}
 
-                    <div className="pt-2 border-t border-border flex items-center justify-between">
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={`/appointments/${appointment.id}`}>
-                          Ver turno #{appointment.id}
-                        </Link>
-                      </Button>
+                    <div className="pt-2 border-t border-border flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canRegisterEncounter && (
+                          <EncounterDialog
+                            appointmentId={appointment.id}
+                            summary={`${appointment.service.name} · ${appointment.patient.lastName}, ${appointment.patient.firstName}`}
+                            triggerLabel="Registrar atención"
+                          />
+                        )}
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/appointments/${appointment.id}`}>
+                            {appointment.encounter
+                              ? "Ver turno y atención"
+                              : "Ver turno"}{" "}
+                            #{appointment.id}
+                          </Link>
+                        </Button>
+                      </div>
                       <Button asChild variant="ghost" size="sm">
                         <Link href={patientHistoryHref(appointment.patient.id)}>
                           Historial del paciente
@@ -340,6 +418,10 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
             })}
           </div>
         )}
+      </div>
+
+      <div className="lg:col-span-12">
+        <AppointmentLegend showFreeBlocks={false} showPayments={false} />
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { parsePageParam } from "@/lib/pagination";
 export type HistoryQuery = {
   status?: AppointmentStatus;
   professionalId?: number;
+  withEncounter?: boolean;
   page: number;
 };
 
@@ -25,6 +26,8 @@ type SearchParams = Record<string, string | string[] | undefined>;
 export function parseHistoryQuery(params: SearchParams): HistoryQuery {
   const status = params.status;
   const professionalId = params.professionalId;
+  const withEncounter = params.withEncounter;
+  const parsedWithEncounter = withEncounter === "true";
   return {
     status:
       typeof status === "string" &&
@@ -36,6 +39,7 @@ export function parseHistoryQuery(params: SearchParams): HistoryQuery {
       /^[1-9]\d{0,8}$/.test(professionalId)
         ? Number(professionalId)
         : undefined,
+    ...(parsedWithEncounter ? { withEncounter: true } : {}),
     page: parsePageParam(params.page),
   };
 }
@@ -45,6 +49,7 @@ export function historyParams(query: HistoryQuery) {
   return {
     status: query.status,
     professionalId: query.professionalId?.toString(),
+    ...(query.withEncounter ? { withEncounter: "true" } : {}),
   };
 }
 

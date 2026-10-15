@@ -2,9 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePageRole } from "@/lib/dal/auth";
 import { listUnclosedAppointments } from "@/lib/dal/appointments";
-import { APPOINTMENT_STATUS_LABEL } from "@/lib/appointment-status";
+import {
+  APPOINTMENT_STATUS_LABEL,
+  APPOINTMENT_STATUS_ROW_CLASS,
+} from "@/lib/appointment-status";
 import { parsePageParam } from "@/lib/pagination";
 import { formatDate, formatMinute, toLocalSlot } from "@/lib/schedule";
+import { cn } from "@/lib/utils";
 import { ListPagination } from "@/components/list-pagination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
@@ -95,7 +99,12 @@ export default async function UnclosedAppointmentsPage({
                     const when = `${formatDate(start.date)}, ${formatMinute(start.minute)}–${formatMinute(end.minute)}`;
                     const summary = `${appointment.patient.lastName}, ${appointment.patient.firstName} · ${appointment.professional.lastName}, ${appointment.professional.firstName} · ${appointment.service.name} · ${when}`;
                     return (
-                      <TableRow key={appointment.id}>
+                      <TableRow
+                        key={appointment.id}
+                        className={cn(
+                          APPOINTMENT_STATUS_ROW_CLASS[appointment.status],
+                        )}
+                      >
                         <TableCell className="tabular-nums">{when}</TableCell>
                         <TableCell>
                           <Link

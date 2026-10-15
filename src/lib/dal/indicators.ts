@@ -5,11 +5,14 @@ import { DomainError } from "@/lib/actions";
 import { assertRole, type Actor } from "@/lib/dal/auth";
 import { Role } from "@/generated/prisma/enums";
 import { appointmentInstant } from "@/lib/appointment-slots";
+import { calculateCenterMetrics } from "@/lib/center-metrics";
 import {
   calculateIndicators,
   hasActivity,
   periodBounds,
   periodDays,
+  periodMonthCount,
+  shiftMonthKey,
   sumIndicators,
 } from "@/lib/indicators";
 import { addDays, dateFromDb, dateToDb, toLocalSlot } from "@/lib/schedule";
@@ -24,6 +27,11 @@ const personSelect = {
   lastName: true,
   active: true,
 } as const;
+
+function decimalCents(amount: { toString(): string }) {
+  const [whole, fraction = ""] = amount.toString().split(".");
+  return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+}
 
 /// Ocupación, ausentismo, cancelaciones y turnos sin cerrar del período, del
 /// centro y por profesional (HU-22). Lee franjas, ausencias, feriados y
@@ -45,7 +53,7 @@ export async function getCenterIndicators(
   const days = periodDays(period);
   const onlyProfessional = professionalId ? { id: professionalId } : {};
 
-  const [professionals, holidays, appointments, professionalOptions] =
+  const [professionals, holidays, appointments, professionalOptions, payments] =
     await Promise.all([
       prisma.professional.findMany({
         where: onlyProfessional,
@@ -57,14 +65,30 @@ export async function getCenterIndicators(
             select: { weekday: true, startMinute: true, endMinute: true },
           },
           exceptions: {
-            where: { startDate: { gte: dateToDb(first), lte: dateToDb(last) } },
-            select: { startDate: true, startMinute: true, endMinute: true },
+            where: {
+              startDate: { lte: dateToDb(last) },
+              endDate: { gte: dateToDb(first) },
+            },
+            select: {
+              startDate: true,
+              endDate: true,
+              startMinute: true,
+              endMinute: true,
+            },
           },
         },
       }),
       prisma.holiday.findMany({
-        where: { startDate: { gte: dateToDb(first), lte: dateToDb(last) } },
-        select: { startDate: true },
+        where: {
+          startDate: { lte: dateToDb(last) },
+          endDate: { gte: dateToDb(first) },
+        },
+        select: {
+          startDate: true,
+          endDate: true,
+          startMinute: true,
+          endMinute: true,
+        },
       }),
       // Un turno pertenece al período por su inicio, en hora del centro.
       prisma.appointment.findMany({
@@ -77,6 +101,15 @@ export async function getCenterIndicators(
         },
         select: {
           professionalId: true,
+          patientId: true,
+          serviceId: true,
+          service: {
+            select: {
+              name: true,
+              specialtyId: true,
+              specialty: { select: { name: true } },
+            },
+          },
           startsAt: true,
           endsAt: true,
           status: true,
@@ -86,27 +119,86 @@ export async function getCenterIndicators(
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
         select: personSelect,
       }),
+      prisma.payment.findMany({
+        where: {
+          status: "PAID",
+          createdAt: {
+            gte: appointmentInstant(
+              `${shiftMonthKey(from, -periodMonthCount(period))}-01`,
+              0,
+            ),
+            lt: appointmentInstant(`${shiftMonthKey(to, 1)}-01`, 0),
+          },
+          ...(professionalId ? { appointment: { professionalId } } : {}),
+        },
+        select: {
+          createdAt: true,
+          amount: true,
+          paymentMethod: { select: { name: true } },
+        },
+      }),
     ]);
   if (professionalId && professionals.length === 0)
     throw new DomainError("NOT_FOUND", "El profesional no existe.");
 
-  const closedDays = new Set(
-    holidays.map((holiday) => dateFromDb(holiday.startDate)),
-  );
+  const closedDays = new Set<string>();
+  const holidayRanges: {
+    date: string;
+    startMinute: number | null;
+    endMinute: number | null;
+  }[] = [];
+
+  for (const holiday of holidays) {
+    const hStart = dateFromDb(holiday.startDate);
+    const hEnd = dateFromDb(holiday.endDate);
+    const fromDay = hStart < first ? first : hStart;
+    const toDay = hEnd > last ? last : hEnd;
+    for (let day = fromDay; day <= toDay; day = addDays(day, 1)) {
+      if (holiday.startMinute === null || holiday.endMinute === null) {
+        closedDays.add(day);
+      } else {
+        holidayRanges.push({
+          date: day,
+          startMinute: holiday.startMinute,
+          endMinute: holiday.endMinute,
+        });
+      }
+    }
+  }
+
   const now = new Date();
   const rows = professionals.flatMap(
     ({ availabilityWindows, exceptions, deactivatedAt, ...professional }) => {
       const own = appointments.filter(
         (appointment) => appointment.professionalId === professional.id,
       );
+
+      const expandedExceptions: {
+        date: string;
+        startMinute: number | null;
+        endMinute: number | null;
+      }[] = [];
+
+      for (const exception of exceptions) {
+        const eStart = dateFromDb(exception.startDate);
+        const eEnd = dateFromDb(exception.endDate);
+        const fromDay = eStart < first ? first : eStart;
+        const toDay = eEnd > last ? last : eEnd;
+        for (let day = fromDay; day <= toDay; day = addDays(day, 1)) {
+          expandedExceptions.push({
+            date: day,
+            startMinute: exception.startMinute,
+            endMinute: exception.endMinute,
+          });
+        }
+      }
+
       const indicators = calculateIndicators({
         days,
         holidays: closedDays,
+        holidayRanges,
         windows: availabilityWindows,
-        exceptions: exceptions.map((exception) => ({
-          ...exception,
-          date: dateFromDb(exception.startDate),
-        })),
+        exceptions: expandedExceptions,
         // La baja tiene fecha efectiva: desde ese día no atiende (HU-03).
         deactivatedOn:
           !professional.active && deactivatedAt
@@ -126,5 +218,24 @@ export async function getCenterIndicators(
     center: sumIndicators(rows),
     professionals: rows,
     professionalOptions,
+    details: calculateCenterMetrics(
+      period,
+      appointments.map((appointment) => ({
+        professionalId: appointment.professionalId,
+        patientId: appointment.patientId,
+        serviceId: appointment.serviceId,
+        serviceName: appointment.service.name,
+        specialtyId: appointment.service.specialtyId,
+        specialtyName: appointment.service.specialty?.name ?? null,
+        startsAt: appointment.startsAt,
+        endsAt: appointment.endsAt,
+        status: appointment.status,
+      })),
+      payments.map((payment) => ({
+        createdAt: payment.createdAt,
+        amountCents: decimalCents(payment.amount),
+        methodName: payment.paymentMethod.name,
+      })),
+    ),
   };
 }
