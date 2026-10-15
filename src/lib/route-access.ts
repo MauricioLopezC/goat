@@ -19,6 +19,7 @@ const FRONT_DESK: readonly Role[] = ["RECEPTIONIST", "MANAGER"];
 const ROUTE_RULES: RouteRule[] = [
   { pattern: /^\/cash\/history(\/|$)/, roles: ["MANAGER"] },
   { pattern: /^\/cash(\/|$)/, roles: FRONT_DESK },
+  { pattern: /^\/statements(\/|$)/, roles: ["MANAGER", "PROFESSIONAL"] },
   { pattern: /^\/portal(\/|$)/, roles: ["PATIENT"] },
   { pattern: /^\/appointments\/new(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/appointments\/unclosed(\/|$)/, roles: FRONT_DESK },

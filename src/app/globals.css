@@ -230,8 +230,49 @@
     color: var(--foreground) !important;
   }
 
-  tr,
+  /* Evitar barras de desplazamiento y cortes en impresión/PDF */
+  [data-slot="table-container"],
+  [data-slot="card"],
+  [data-slot="card-content"] {
+    overflow: visible !important;
+  }
+
+  /* Desactivar corte rígido en tarjetas para permitir que las tablas se paginen naturalmente */
   [data-slot="card"] {
+    break-inside: auto;
+  }
+
+  /* Solo las tarjetas de resumen y métricas evitan partirse en páginas distintas */
+  .grid > [data-slot="card"] {
     break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  table {
+    width: 100% !important;
+    table-layout: auto !important;
+  }
+
+  th,
+  td {
+    white-space: normal !important;
+  }
+
+  /* Las columnas de montos y números conservan tabular-nums y no se parten a la mitad */
+  .tabular-nums {
+    white-space: nowrap !important;
+  }
+
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
   }
 }

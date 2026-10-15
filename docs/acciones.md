@@ -1135,4 +1135,27 @@ No es una Server Action: la usa el Server Component del detalle del turno `/appo
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** `string[]` con las fechas pendientes de cierre en formato AAAA-MM-DD.
 
+### `getProfessionalStatement`
+
+**Historia de usuario:** [HU-28 — Ver la rendición por profesional](hu/HU-28-rendicion-por-profesional.md)
+**Roles:** `MANAGER`, `PROFESSIONAL`.
+**Entrada:** `from` (AAAA-MM-DD, fecha válida), `to` (AAAA-MM-DD, fecha válida), `professionalId?` (entero positivo opcional).
+**Precondiciones:**
+- Rol autorizado (`MANAGER` o `PROFESSIONAL`).
+- `from <= to` y rango de hasta tres meses (máximo 93 días).
+- Si el actor es `PROFESSIONAL`, solo puede consultar su propia rendición (la DAL fuerza `professionalId = prof.id` y rechaza identificadores ajenos).
+**Efectos:** ninguno; operación de lectura.
+- Consulta los turnos completados (`status: COMPLETED`) cuya fecha local (`startsAt`) caiga en el período `[from, to]`.
+- Calcula para cada profesional:
+  - **Producido:** cantidad de pacientes atendidos (turnos completados), sin distinguir particular de obra social.
+  - **Cobrado:** ingresos por cobros vigentes (`status: PAID`) a pacientes particulares.
+  - **Comisión del centro:** 15 % de lo cobrado (`cobrado * 0.15`), con dos decimales y redondeo al centavo.
+  - **Neto del profesional:** `cobrado - comision`.
+- Para `MANAGER`: si no se elige un profesional, devuelve el resumen de todos los profesionales y los totales del centro (atendidos, cobrado, comisiones, neto). Al seleccionar uno, devuelve el detalle por servicio, por cobertura (particular y obras sociales), por medio de pago y la lista detallada de turnos con su cobro asociado.
+- Para `PROFESSIONAL`: devuelve únicamente su propia rendición detallada con los desgloses por servicio, cobertura, medio de pago y la lista de turnos propios con su cobro, comisión y neto.
+**Errores:** `FORBIDDEN` (rol no autorizado o intento de consultar rendición ajena siendo profesional), `VALIDATION` (fechas inválidas o rango superior a 3 meses), `NOT_FOUND` (profesional inexistente o sin perfil profesional vinculado).
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `ProfessionalStatementResult` con `{ period, isManager, centerTotals, professionalsSummary, professionalOptions, selectedStatement }`.
+
+
 
