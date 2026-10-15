@@ -31,6 +31,7 @@ test("cada rol ve exactamente sus links", () => {
     "Nuevo turno",
     "Turnos de hoy",
     "Turnos sin cerrar",
+    "Caja",
     "Agendas",
     "Pacientes",
     "Profesionales",
@@ -52,6 +53,7 @@ test("cada rol ve exactamente sus links", () => {
     "Nuevo turno",
     "Turnos de hoy",
     "Turnos sin cerrar",
+    "Caja",
     "Agendas",
     "Pacientes",
     "Profesionales",
@@ -132,4 +134,24 @@ test("canAccess replica los permisos de las páginas", () => {
   assert.equal(canAccess("/portal", "RECEPTIONIST"), false);
   assert.equal(canAccess("/portal", "PROFESSIONAL"), false);
   assert.equal(canAccess("/portal", "MANAGER"), false);
+});
+
+test("caja conserva sus permisos y la regla específica del historial", () => {
+  const roles: Role[] = [...STAFF, "PATIENT"];
+  for (const role of roles) {
+    for (const pathname of ["/cash", "/cash/"]) {
+      assert.equal(
+        canAccess(pathname, role),
+        role === "RECEPTIONIST" || role === "MANAGER",
+        `${role}: ${pathname}`,
+      );
+    }
+    for (const pathname of ["/cash/history", "/cash/history/"]) {
+      assert.equal(
+        canAccess(pathname, role),
+        role === "MANAGER",
+        `${role}: ${pathname}`,
+      );
+    }
+  }
 });

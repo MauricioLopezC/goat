@@ -1,5 +1,6 @@
 import { AppointmentStatus, CoverageType } from "@/generated/prisma/enums";
 import { toLocalSlot } from "@/lib/schedule";
+import { normalizeSearchText } from "@/lib/services";
 
 // Estado de cobro o autorización de un turno (HU-21). No se persiste: se
 // calcula del paciente, del servicio, del cobro vigente y de la autorización.
@@ -69,4 +70,18 @@ const currency = new Intl.NumberFormat("es-AR", {
 /// Monto en pesos a partir del texto decimal que devuelve la DAL ("15000.00").
 export function formatAmount(amount: string): string {
   return currency.format(Number(amount));
+}
+
+/// Identifica si un cobro o medio de pago corresponde a efectivo de forma estable (HU-27).
+export function isCashPayment(p: {
+  isCash?: boolean;
+  paymentMethod?: { isCash?: boolean; name?: string };
+}): boolean {
+  if (typeof p.isCash === "boolean") return p.isCash;
+  if (typeof p.paymentMethod?.isCash === "boolean")
+    return p.paymentMethod.isCash;
+  if (p.paymentMethod?.name) {
+    return normalizeSearchText(p.paymentMethod.name).includes("efectivo");
+  }
+  return false;
 }

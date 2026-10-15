@@ -802,6 +802,7 @@ async function seedAppointments(
                 create: {
                   paymentMethod: { connect: { name: a.payment } },
                   amount: service.price,
+                  isCash: a.payment === "Efectivo",
                   createdBy: { connect: { id: userId } },
                   createdAt: startsAt,
                 },

@@ -17,6 +17,8 @@ const FRONT_DESK: readonly Role[] = ["RECEPTIONIST", "MANAGER"];
 /// específicas van antes que su prefijo. Lo que no está acá solo requiere
 /// sesión.
 const ROUTE_RULES: RouteRule[] = [
+  { pattern: /^\/cash\/history(\/|$)/, roles: ["MANAGER"] },
+  { pattern: /^\/cash(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/portal(\/|$)/, roles: ["PATIENT"] },
   { pattern: /^\/appointments\/new(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/appointments\/unclosed(\/|$)/, roles: FRONT_DESK },

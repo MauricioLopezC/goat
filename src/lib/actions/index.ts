@@ -31,7 +31,8 @@ export type ErrorCode =
   | "APPOINTMENT_HAS_PAYMENT"
   | "CANCELLATION_WINDOW_EXPIRED"
   | "PORTAL_APPOINTMENT_LIMIT"
-  | "DEADLINE_EXCEEDED";
+  | "DEADLINE_EXCEEDED"
+  | "CASH_CLOSED";
 
 export type ActionError = {
   code: ErrorCode;

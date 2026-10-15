@@ -910,21 +910,21 @@ No es una Server Action: la usa el formulario de cobro de HU-21 (ADR 0001).
 **Historia de usuario:** [HU-21 — Cobrar un turno en el mostrador](hu/HU-21-cobrar-turno.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`.
 **Entrada:** `appointmentId` (entero positivo), `paymentMethodId` (entero positivo).
-**Precondiciones:** el turno existe y está habilitado para cobrar: `SCHEDULED` con inicio hoy (hora de Argentina) o `COMPLETED`. El paciente es particular (`coverageType` `PRIVATE`). El servicio tiene `price` cargado. El medio de pago existe y está activo. El turno no tiene otro `Payment` en `PAID`.
-**Efectos:** en una transacción `Serializable`, crea un `Payment` en `PAID` con `amount` igual a `Service.price` en ese momento, `createdById` (actor) y `createdAt` (ahora). El monto no cambia si después cambia el valor del servicio. Si dos cobros llegan a la vez, el índice único parcial `Payment_one_paid_per_appointment` deja pasar uno solo.
-**Errores:** `VALIDATION` (entrada inválida, o medio de pago inexistente o inactivo, con `fieldErrors.paymentMethodId`), `FORBIDDEN`, `NOT_FOUND` (el turno no existe), `INVALID_STATUS_TRANSITION` (el turno no está habilitado para cobrar), `PATIENT_HAS_HEALTH_INSURANCE`, `SERVICE_WITHOUT_PRICE`, `APPOINTMENT_ALREADY_PAID`.
-**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`.
+**Precondiciones:** el turno existe y está habilitado para cobrar: `SCHEDULED` con inicio hoy (hora de Argentina) o `COMPLETED`. El paciente es particular (`coverageType` `PRIVATE`). El servicio tiene `price` cargado. El medio de pago existe y está activo. El turno no tiene otro `Payment` en `PAID`. La caja del día no fue cerrada previamente.
+**Efectos:** en una transacción `Serializable`, crea un `Payment` en `PAID` con `amount` igual a `Service.price` en ese momento, `createdById` (actor) y `createdAt` (ahora). Guarda `isCash` del medio utilizado para garantizar cálculos estables de arqueo. El monto no cambia si después cambia el valor del servicio. Si dos cobros llegan a la vez, el índice único parcial `Payment_one_paid_per_appointment` deja pasar uno solo.
+**Errores:** `VALIDATION` (entrada inválida, o medio de pago inexistente o inactivo, con `fieldErrors.paymentMethodId`), `FORBIDDEN`, `NOT_FOUND` (el turno no existe), `INVALID_STATUS_TRANSITION` (el turno no está habilitado para cobrar), `PATIENT_HAS_HEALTH_INSURANCE`, `SERVICE_WITHOUT_PRICE`, `APPOINTMENT_ALREADY_PAID`, `CASH_CLOSED` (la caja del día ya fue cerrada).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`, `/cash`.
 **Devuelve:** `{ id, receiptNumber, amount }`, con `amount` como texto decimal (`"15000.00"`).
 
 ### `voidPayment`
 
-**Historia de usuario:** [HU-21 — Cobrar un turno en el mostrador](hu/HU-21-cobrar-turno.md)
-**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Historia de usuario:** [HU-21 — Cobrar un turno en el mostrador](hu/HU-21-cobrar-turno.md), [HU-27 — Cerrar la caja del día](hu/HU-27-cierre-de-caja.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`. Sobre un cobro de una caja ya cerrada, solo `MANAGER`.
 **Entrada:** `paymentId` (entero positivo), `reason` (1–500 caracteres, obligatorio).
-**Precondiciones:** el cobro existe y está en `PAID`.
-**Efectos:** pasa el `Payment` a `VOIDED` y carga juntos `voidedAt` (ahora), `voidedById` (actor) y `voidReason`, con un `UPDATE` condicionado a que siga en `PAID`: dos anulaciones simultáneas no se pisan. El cobro no se borra. El turno queda pendiente de cobro y se puede volver a cobrar.
-**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `REASON_REQUIRED` (falta el motivo), `INVALID_STATUS_TRANSITION` (el cobro ya estaba anulado).
-**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`.
+**Precondiciones:** el cobro existe y está en `PAID`. Si pertenece a una caja cerrada (`cashClosingId !== null`), el actor debe tener rol `MANAGER`.
+**Efectos:** pasa el `Payment` a `VOIDED` y carga juntos `voidedAt` (ahora), `voidedById` (actor) y `voidReason`, con un `UPDATE` condicionado a que siga en `PAID` y a que no pertenezca a caja cerrada si quien anula es recepcionista: dos operaciones simultáneas no se pisan ni permiten que recepción anule cobros ya cerrados. El cobro no se borra. Si el cobro estaba vinculado a una caja cerrada, la caja no se reabre: se registra como ajuste posterior y se expone el total corregido. El turno queda pendiente de cobro y se puede volver a cobrar (cayendo ese nuevo cobro en la caja del día en que se cobre).
+**Errores:** `VALIDATION`, `FORBIDDEN` (rol no autorizado, o `RECEPTIONIST` intentando anular un cobro de una caja cerrada), `NOT_FOUND`, `REASON_REQUIRED` (falta el motivo), `INVALID_STATUS_TRANSITION` (el cobro ya estaba anulado).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`, `/cash`, `/cash/history`.
 **Devuelve:** `{ id, appointmentId }`.
 
 ### `registerAuthorization`
@@ -1090,4 +1090,49 @@ No es una Server Action: la usa el Server Component de `/dashboard` (ADR 0001).
 **Devuelve:** datos de la atención o `null` si el turno aún no tiene atención.
 
 No es una Server Action: la usa el Server Component del detalle del turno `/appointments/[id]` (ADR 0001).
+
+### `getCashSummary`
+
+**Historia de usuario:** [HU-27 — Cerrar la caja del día](hu/HU-27-cierre-de-caja.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`. La recepcionista accede a la caja de hoy (abierta o cerrada) y a cajas de días abiertos; el gerente consulta además cualquier caja cerrada histórica.
+**Entrada:** `date` (AAAA-MM-DD, fecha en formato calendario local).
+**Precondiciones:** rol autorizado; fecha válida en el calendario.
+**Efectos:** ninguno. Si no está cerrada, calcula en vivo los cobros vigentes (`PAID`) de ese día local (de 00:00 a 23:59:59.999 hora de Argentina): cantidad, total general, total por medio de pago, total por profesional y efectivo esperado. Lista los cobros del día y los cobros anulados durante el día. Si está cerrada, lee los totales y arqueo registrados en `CashClosing` y calcula los ajustes posteriores (cobros de esa caja anulados luego del cierre por gerencia) junto a los totales corregidos.
+**Errores:** `FORBIDDEN`, `VALIDATION` (fecha inválida).
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ date, isClosed, closing, summary, payments, voidedPayments, subsequentAdjustments, correctedTotals }`. Todos los importes en formato decimal string ("15000.00").
+
+### `closeCash`
+
+**Historia de usuario:** [HU-27 — Cerrar la caja del día](hu/HU-27-cierre-de-caja.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `date` (AAAA-MM-DD), `countedCashAmount` (decimal no negativo), `notes` (hasta 500 caracteres, opcional; obligatorio si hay diferencia).
+**Precondiciones:** rol autorizado; la fecha es hoy o un día anterior; la caja de esa fecha no fue cerrada previamente (`CashClosing` no existe para esa fecha).
+**Efectos:** en una transacción `Serializable`, calcula los cobros vigentes `PAID` creados en esa fecha local, suma el efectivo esperado, calcula `difference = countedCashAmount - expectedCashAmount`. Si `difference !== 0`, valida que `notes` no esté vacío. Registra `CashClosing` con los totales originales y el usuario autor, y asocia `cashClosingId = closing.id` en todos los pagos de esa fecha.
+**Errores:** `VALIDATION` (fecha inválida o futura, importe negativo, o diferencia distinta de cero sin observaciones), `FORBIDDEN`, `DUPLICATE` (la caja de esa fecha ya estaba cerrada).
+**Revalida:** `/cash`, `/today`, `/cash/history`.
+**Devuelve:** `{ id, date }`.
+
+### `listCashClosings`
+
+**Historia de usuario:** [HU-27 — Cerrar la caja del día](hu/HU-27-cierre-de-caja.md)
+**Roles:** `MANAGER`.
+**Entrada:** `page` (entero positivo, desde 1).
+**Precondiciones:** rol autorizado.
+**Efectos:** ninguno. Pagina los cierres de caja de a 10 registros, ordenados por `date` descendente e `id` descendente.
+**Errores:** `FORBIDDEN`, `VALIDATION`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `Page<CashClosingListItem>` con `{ items, total, page, pageSize, pageCount }`. Cada ítem incluye fecha, totales originales, efectivo esperado, contado, diferencia, autor del cierre, fecha de cierre, cantidad de ajustes posteriores y total corregido.
+
+### `getUnclosedCashDays`
+
+**Historia de usuario:** [HU-27 — Cerrar la caja del día](hu/HU-27-cierre-de-caja.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** ninguna.
+**Precondiciones:** rol autorizado.
+**Efectos:** ninguno. Consulta las fechas locales anteriores a hoy que tengan cobros registrados (`Payment`) con `cashClosingId === null`, excluyendo las fechas que ya cuenten con un cierre de caja registrado (`CashClosing`).
+**Errores:** `FORBIDDEN`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `string[]` con las fechas pendientes de cierre en formato AAAA-MM-DD.
+
 

@@ -14,6 +14,12 @@ import {
   voidPayment,
 } from "../src/lib/dal/payments";
 import {
+  closeCash,
+  getCashSummary,
+  listCashClosings,
+  getUnclosedCashDays,
+} from "../src/lib/dal/cash";
+import {
   cancelAppointment,
   cancelProfessionalAppointment,
   completeAppointment,
@@ -85,12 +91,15 @@ async function main() {
     services.push(priced.id, unpriced.id, referral.id);
 
     const cash = await prisma.paymentMethod.create({
-      data: { name: `${tag}-efectivo` },
+      data: { name: `${tag}-efectivo`, isCash: true },
     });
     const inactive = await prisma.paymentMethod.create({
       data: { name: `${tag}-inactivo`, active: false },
     });
-    paymentMethods.push(cash.id, inactive.id);
+    const debit = await prisma.paymentMethod.create({
+      data: { name: `${tag}-debito`, isCash: false },
+    });
+    paymentMethods.push(cash.id, inactive.id, debit.id);
 
     const professional = await prisma.professional.create({
       data: {
@@ -551,6 +560,323 @@ async function main() {
       );
     });
 
+    await verify(
+      "HU-27: Arqueo, cierre de caja, restricciones y ajustes posteriores de gerencia",
+      async () => {
+        // Buscar dos fechas pasadas consecutivas que no tengan ni cierres ni cobros existentes
+        let candidateDaysAgo = 60;
+        let testDate = "";
+        let testDate2 = "";
+        while (candidateDaysAgo < 1000) {
+          const d1 = new Date();
+          d1.setDate(d1.getDate() - candidateDaysAgo);
+          const s1 = toLocalSlot(d1).date;
+
+          const d2 = new Date();
+          d2.setDate(d2.getDate() - candidateDaysAgo + 1);
+          const s2 = toLocalSlot(d2).date;
+
+          const closings = await prisma.cashClosing.count({
+            where: { date: { in: [dateToDb(s1), dateToDb(s2)] } },
+          });
+          const payments = await prisma.payment.count({
+            where: {
+              createdAt: {
+                gte: appointmentInstant(s1, 0),
+                lt: appointmentInstant(s2, 1440),
+              },
+            },
+          });
+          if (closings === 0 && payments === 0) {
+            testDate = s1;
+            testDate2 = s2;
+            break;
+          }
+          candidateDaysAgo++;
+        }
+        assert.ok(
+          testDate && testDate2,
+          "Se deben encontrar dos fechas de prueba consecutivas sin datos",
+        );
+
+        // Crear turnos completados en esa fecha
+        const appt1 = await appointment({
+          status: "COMPLETED",
+          date: testDate,
+        });
+        const appt2 = await appointment({
+          status: "COMPLETED",
+          date: testDate,
+        });
+        const apptDebit = await appointment({
+          status: "COMPLETED",
+          date: testDate,
+        });
+        const apptH4 = await appointment({
+          status: "COMPLETED",
+          date: testDate,
+        });
+
+        const payDate1 = new Date(appointmentInstant(testDate, 600));
+        const payDate2 = new Date(appointmentInstant(testDate, 660));
+
+        // Cobrar turnos con fechas en testDate
+        const pay1 = await registerPayment(
+          {
+            appointmentId: appt1,
+            paymentMethodId: cash.id,
+            now: payDate1,
+          },
+          receptionist,
+        );
+        const pay2 = await registerPayment(
+          {
+            appointmentId: appt2,
+            paymentMethodId: cash.id,
+            now: payDate2,
+          },
+          receptionist,
+        );
+        const payDebit = await registerPayment(
+          {
+            appointmentId: apptDebit,
+            paymentMethodId: debit.id,
+            now: payDate1,
+          },
+          receptionist,
+        );
+        const payH4 = await registerPayment(
+          {
+            appointmentId: apptH4,
+            paymentMethodId: cash.id,
+            now: payDate1,
+          },
+          receptionist,
+        );
+
+        // H4: Anular payH4 en testDate2 (día siguiente).
+        // Debe aparecer en los cobros anulados del día 2 (por voidedAt), NO en el día 1.
+        const voidDate2 = new Date(appointmentInstant(testDate2, 600));
+        await voidPayment(
+          {
+            paymentId: payH4.id,
+            reason: "Anulado al día siguiente",
+            now: voidDate2,
+          },
+          receptionist,
+        );
+
+        const summaryDay1 = await getCashSummary(testDate, receptionist);
+        assert.ok(!summaryDay1.voidedPayments.some((p) => p.id === payH4.id));
+
+        const summaryDay2 = await getCashSummary(testDate2, receptionist);
+        assert.ok(summaryDay2.voidedPayments.some((p) => p.id === payH4.id));
+
+        // getCashSummary muestra cobros activos en vivo (efectivo suma, débito no suma a expectedCash)
+        const summaryOpen = await getCashSummary(testDate, receptionist);
+        assert.equal(summaryOpen.isClosed, false);
+        assert.equal(summaryOpen.summary.paymentCount, 3);
+        assert.equal(summaryOpen.summary.totalAmount, "45000.00");
+        assert.equal(summaryOpen.summary.expectedCashAmount, "30000.00");
+
+        // getUnclosedCashDays detecta que testDate tiene cobros sin cerrar
+        const unclosed = await getUnclosedCashDays(receptionist);
+        assert.ok(unclosed.includes(testDate));
+
+        // Intento de cerrar con fecha futura falla
+        await rejects(
+          () =>
+            closeCash(
+              { date: "2099-01-01", countedCashAmount: 30000 },
+              receptionist,
+            ),
+          "VALIDATION",
+        );
+
+        // Intento de cerrar con diferencia sin notas falla
+        await rejects(
+          () =>
+            closeCash(
+              { date: testDate, countedCashAmount: 25000, notes: "" },
+              receptionist,
+            ),
+          "VALIDATION",
+        );
+
+        // Cierre con diferencia y observaciones obligatorias pasa
+        const closingResult = await closeCash(
+          {
+            date: testDate,
+            countedCashAmount: 28000,
+            notes: "Faltante de $2000 por cambio",
+          },
+          receptionist,
+        );
+        assert.equal(closingResult.date, testDate);
+
+        // Reintentar cerrar el mismo día falla con DUPLICATE
+        await rejects(
+          () =>
+            closeCash(
+              { date: testDate, countedCashAmount: 28000, notes: "reintento" },
+              receptionist,
+            ),
+          "DUPLICATE",
+        );
+
+        // Verificar que los pagos quedaron vinculados a la caja
+        const linkedPayments = await prisma.payment.findMany({
+          where: { id: { in: [pay1.id, pay2.id, payDebit.id] } },
+          select: { cashClosingId: true },
+        });
+        assert.equal(linkedPayments[0].cashClosingId, closingResult.id);
+        assert.equal(linkedPayments[1].cashClosingId, closingResult.id);
+        assert.equal(linkedPayments[2].cashClosingId, closingResult.id);
+
+        // Una vez cerrada, testDate ya no aparece en getUnclosedCashDays
+        const unclosedAfter = await getUnclosedCashDays(receptionist);
+        assert.ok(!unclosedAfter.includes(testDate));
+
+        // H1: Intento de registrar cobro en día con caja cerrada rechaza con CASH_CLOSED
+        const apptClosedDay = await appointment({
+          status: "COMPLETED",
+          date: testDate,
+        });
+        await rejects(
+          () =>
+            registerPayment(
+              {
+                appointmentId: apptClosedDay,
+                paymentMethodId: cash.id,
+                now: payDate1,
+              },
+              receptionist,
+            ),
+          "CASH_CLOSED",
+        );
+
+        // H2: La recepcionista no puede anular cobros de una caja cerrada
+        await rejects(
+          () =>
+            voidPayment(
+              { paymentId: pay1.id, reason: "Error de cobro" },
+              receptionist,
+            ),
+          "FORBIDDEN",
+        );
+
+        // H5: Renombrar el medio de pago en efectivo a "Contado" y verificar que la anulación
+        // de gerencia conserve la clasificación de efectivo en correctedCashAmount.
+        await prisma.paymentMethod.update({
+          where: { id: cash.id },
+          data: { name: `${tag}-contado` },
+        });
+
+        // El gerente SÍ puede anular un cobro de una caja cerrada (corrección)
+        await voidPayment(
+          { paymentId: pay1.id, reason: "Corrección autorizada por gerencia" },
+          manager,
+        );
+
+        // R1: Verificar que voidedAt de la anulación es posterior a closedAt
+        const pay1Row = await prisma.payment.findUniqueOrThrow({
+          where: { id: pay1.id },
+          select: { voidedAt: true },
+        });
+        const closingRow = await prisma.cashClosing.findUniqueOrThrow({
+          where: { id: closingResult.id },
+          select: { closedAt: true },
+        });
+        assert.ok(
+          pay1Row.voidedAt && pay1Row.voidedAt > closingRow.closedAt,
+          "R1: voidedAt debe ser estrictamente posterior a closedAt",
+        );
+
+        // Consultar el resumen como gerente: la caja sigue cerrada, muestra el ajuste posterior
+        // y el total corregido junto al original
+        const summaryClosed = await getCashSummary(testDate, manager);
+        assert.equal(summaryClosed.isClosed, true);
+        assert.equal(summaryClosed.closing?.totalAmount, "45000.00");
+        assert.equal(summaryClosed.closing?.expectedCashAmount, "30000.00");
+        assert.equal(summaryClosed.closing?.countedCashAmount, "28000.00");
+        assert.equal(summaryClosed.closing?.difference, "-2000.00");
+        assert.equal(summaryClosed.subsequentAdjustments.length, 1);
+        assert.equal(summaryClosed.subsequentAdjustments[0].id, pay1.id);
+        assert.equal(
+          summaryClosed.correctedTotals?.correctedTotalAmount,
+          "30000.00",
+        );
+        assert.equal(
+          summaryClosed.correctedTotals?.correctedCashAmount,
+          "15000.00",
+        );
+        assert.equal(summaryClosed.correctedTotals?.correctedPaymentCount, 2);
+
+        // R2: Renombrar débito (isCash=false) a "Efectivo alternativo" y anularlo como gerente.
+        // El flag Payment.isCash=false debe proteger el cálculo: correctedCashAmount NO debe caer a 0.
+        await prisma.paymentMethod.update({
+          where: { id: debit.id },
+          data: { name: `${tag}-efectivo-alternativo` },
+        });
+
+        await voidPayment(
+          { paymentId: payDebit.id, reason: "Corrección autorizada débito" },
+          manager,
+        );
+
+        const summaryClosedR2 = await getCashSummary(testDate, manager);
+        assert.equal(summaryClosedR2.subsequentAdjustments.length, 2);
+        assert.equal(
+          summaryClosedR2.correctedTotals?.correctedTotalAmount,
+          "15000.00",
+        );
+        // Debe seguir siendo 15000.00 (el efectivo esperado restante), no 0.00
+        assert.equal(
+          summaryClosedR2.correctedTotals?.correctedCashAmount,
+          "15000.00",
+        );
+        assert.equal(summaryClosedR2.correctedTotals?.correctedPaymentCount, 1);
+
+        // Restaurar los nombres originales para no alterar verificaciones posteriores
+        await prisma.paymentMethod.update({
+          where: { id: cash.id },
+          data: { name: `${tag}-efectivo` },
+        });
+        await prisma.paymentMethod.update({
+          where: { id: debit.id },
+          data: { name: `${tag}-debito` },
+        });
+
+        // listCashClosings funciona para gerente y falla para recepcionista
+        const page1 = await listCashClosings(1, manager);
+        assert.ok(page1.total > 0);
+        let foundClosing = page1.items.some((c) => c.id === closingResult.id);
+        let pageNum = 2;
+        while (!foundClosing && pageNum <= page1.pageCount) {
+          const next = await listCashClosings(pageNum, manager);
+          foundClosing = next.items.some((c) => c.id === closingResult.id);
+          pageNum++;
+        }
+        assert.ok(
+          foundClosing,
+          "El cierre creado debe aparecer en listCashClosings",
+        );
+        const closingItem = page1.items.find((c) => c.id === closingResult.id);
+        if (closingItem) {
+          assert.equal(closingItem.adjustmentsCount, 2);
+          assert.equal(closingItem.correctedTotalAmount, "15000.00");
+        }
+        await rejects(() => listCashClosings(1, receptionist), "FORBIDDEN");
+
+        // El turno del cobro anulado puede volver a cobrarse (HU-27)
+        const newPay = await registerPayment(
+          { appointmentId: appt1, paymentMethodId: cash.id },
+          receptionist,
+        );
+        assert.ok(newPay.id);
+      },
+    );
+
     // 13. Comprobante de cobro (HU-24)
     await verify(
       "comprobante: activo, anulado, correlativo y permisos (HU-24)",
@@ -665,7 +991,153 @@ async function main() {
       },
     );
 
-    console.log(`\n${passed} verificaciones de HU-21 y HU-24 pasaron.`);
+    // 16. Concurrencia del cierre con un cobro (H1), una anulación de recepción (H2)
+    // y una anulación de gerencia (R1). El orden en que se intercalan no es fijo,
+    // así que se repite la carrera y se verifican invariantes que valen en cualquier
+    // orden: el cierre confirma, ningún error llega crudo y la foto del cierre es
+    // coherente con lo que quedó vinculado a la caja.
+    await verify(
+      "cierre concurrente con cobro (H1) y con anulación de recepción (H2) y gerencia (R1)",
+      async () => {
+        const isDomainError = (reason: unknown, codes: string[]) =>
+          reason instanceof DomainError && codes.includes(reason.code);
+        // VALIDATION es el mensaje de conflicto si se agotan los reintentos.
+        const settledAs = (
+          result: PromiseSettledResult<unknown>,
+          codes: string[],
+          label: string,
+        ) => {
+          if (result.status === "rejected")
+            assert.ok(
+              isDomainError(result.reason, [...codes, "VALIDATION"]),
+              `${label}: error inesperado ${String(result.reason)}`,
+            );
+        };
+
+        let daysAgo = 60;
+        for (let round = 0; round < 5; round++) {
+          let date = "";
+          for (; daysAgo < 400 && !date; daysAgo++) {
+            const d = new Date();
+            d.setDate(d.getDate() - daysAgo);
+            const s = toLocalSlot(d).date;
+            const [closings, payments] = await Promise.all([
+              prisma.cashClosing.count({ where: { date: dateToDb(s) } }),
+              prisma.payment.count({
+                where: {
+                  createdAt: {
+                    gte: appointmentInstant(s, 0),
+                    lt: appointmentInstant(s, 1440),
+                  },
+                },
+              }),
+            ]);
+            if (closings === 0 && payments === 0) date = s;
+          }
+          assert.ok(date, "Se debe encontrar una fecha libre");
+
+          const instant = new Date(appointmentInstant(date, 600));
+          const [apptA, apptB, apptC] = [
+            await appointment({ status: "COMPLETED", date }),
+            await appointment({ status: "COMPLETED", date }),
+            await appointment({ status: "COMPLETED", date }),
+          ];
+          const payA = await registerPayment(
+            { appointmentId: apptA, paymentMethodId: cash.id, now: instant },
+            receptionist,
+          );
+          const payB = await registerPayment(
+            { appointmentId: apptB, paymentMethodId: cash.id, now: instant },
+            receptionist,
+          );
+
+          const [closeRes, payRes, voidRecepRes, voidMgrRes] =
+            await Promise.allSettled([
+              closeCash(
+                {
+                  date,
+                  countedCashAmount: 30000,
+                  notes: "Cierre concurrente de prueba",
+                },
+                receptionist,
+              ),
+              registerPayment(
+                {
+                  appointmentId: apptC,
+                  paymentMethodId: cash.id,
+                  now: instant,
+                },
+                receptionist,
+              ),
+              voidPayment(
+                { paymentId: payA.id, reason: "Anulación de recepción" },
+                receptionist,
+              ),
+              voidPayment(
+                { paymentId: payB.id, reason: "Anulación de gerencia" },
+                manager,
+              ),
+            ]);
+
+          assert.equal(
+            closeRes.status,
+            "fulfilled",
+            `El cierre debe confirmar: ${closeRes.status === "rejected" ? String(closeRes.reason) : ""}`,
+          );
+          settledAs(payRes, ["CASH_CLOSED"], "Cobro");
+          settledAs(voidRecepRes, ["FORBIDDEN"], "Anulación de recepción");
+          settledAs(voidMgrRes, [], "Anulación de gerencia");
+
+          const closing = await prisma.cashClosing.findUniqueOrThrow({
+            where: { date: dateToDb(date) },
+          });
+          const dayPayments = await prisma.payment.findMany({
+            where: {
+              createdAt: {
+                gte: appointmentInstant(date, 0),
+                lt: appointmentInstant(date, 1440),
+              },
+            },
+          });
+
+          // H1: ningún cobro del día queda fuera de la caja cerrada.
+          for (const p of dayPayments)
+            assert.equal(p.cashClosingId, closing.id, "H1: cobro sin caja");
+          if (payRes.status === "rejected")
+            assert.ok(!dayPayments.some((p) => p.appointmentId === apptC));
+
+          // La foto cuenta exactamente los cobros vigentes al cerrar: los que
+          // siguen pagados más los anulados después del cierre (R1: una
+          // anulación con voidedAt anterior al cierre no puede estar contada).
+          const afterClose = (p: (typeof dayPayments)[number]) =>
+            p.voidedAt !== null && p.voidedAt > closing.closedAt;
+          const atClose = dayPayments.filter(
+            (p) => p.status === "PAID" || afterClose(p),
+          );
+          assert.equal(closing.paymentCount, atClose.length, "R1: foto");
+
+          // H2: recepción nunca anula después del cierre.
+          for (const p of dayPayments.filter(afterClose))
+            assert.equal(p.voidedById, manager.id, "H2: anulación tardía");
+
+          // R1: la anulación de gerencia posterior al cierre figura como ajuste.
+          const summary = await getCashSummary(date, manager);
+          assert.deepEqual(
+            summary.subsequentAdjustments.map((a) => a.id).sort(),
+            dayPayments
+              .filter(afterClose)
+              .map((p) => p.id)
+              .sort(),
+          );
+          assert.equal(
+            summary.correctedTotals?.correctedPaymentCount,
+            dayPayments.filter((p) => p.status === "PAID").length,
+          );
+        }
+      },
+    );
+
+    console.log(`\n${passed} verificaciones de HU-21, HU-24 y HU-27 pasaron.`);
   } finally {
     const appointments = await prisma.appointment.findMany({
       where: { createdById: { in: users } },
@@ -673,7 +1145,17 @@ async function main() {
     });
     const appointmentIds = appointments.map((a) => a.id);
     await prisma.payment.deleteMany({
-      where: { appointmentId: { in: appointmentIds } },
+      where: {
+        OR: [
+          { appointmentId: { in: appointmentIds } },
+          { createdById: { in: users } },
+        ],
+      },
+    });
+    await prisma.cashClosing.deleteMany({
+      where: {
+        closedById: { in: users },
+      },
     });
     await prisma.appointment.deleteMany({
       where: { id: { in: appointmentIds } },

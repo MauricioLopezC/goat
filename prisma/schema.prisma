@@ -550,6 +550,8 @@ model CashClosing {
 model PaymentMethod {
   id     Int     @id @default(autoincrement())
   name   String  @unique
+  /// Identifica de forma estable si el medio rinde en efectivo (HU-27).
+  isCash Boolean @default(false)
   active Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -578,6 +580,8 @@ model Payment {
   /// Lo que pagó el paciente: el valor del servicio en el momento del cobro.
   /// No cambia si después cambia `Service.price`.
   amount Decimal       @db.Decimal(12, 2)
+  /// Guarda de forma inmutable si el cobro se realizó en efectivo (HU-27).
+  isCash Boolean       @default(false)
   status PaymentStatus @default(PAID)
 
   /// Quién cobró y cuándo.

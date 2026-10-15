@@ -215,6 +215,7 @@ erDiagram
     PaymentMethod {
         int id PK
         string name UK
+        boolean isCash "identifica si rinde en efectivo"
         boolean active
     }
 
@@ -225,6 +226,7 @@ erDiagram
         int appointmentId FK "un solo PAID por turno"
         int paymentMethodId FK
         decimal amount "monto del momento"
+        boolean isCash "cobrado en efectivo"
         PaymentStatus status
         int createdById FK
         timestamptz createdAt

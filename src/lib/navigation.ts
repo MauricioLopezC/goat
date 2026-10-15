@@ -6,6 +6,7 @@ import {
   CalendarPlus,
   ClipboardList,
   Clock,
+  Coins,
   ConciergeBell,
   CreditCard,
   LayoutDashboard,
@@ -69,6 +70,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/appointments/unclosed",
         label: "Turnos sin cerrar",
         icon: CalendarClock,
+        roles: FRONT_DESK,
+      },
+      {
+        href: "/cash",
+        label: "Caja",
+        icon: Coins,
         roles: FRONT_DESK,
       },
       // Misma pantalla: el profesional ve la suya y el resto elige de quién

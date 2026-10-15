@@ -216,3 +216,22 @@
     @apply font-sans;
   }
 }
+
+@media print {
+  [data-slot="sidebar"],
+  [data-slot="sidebar-container"],
+  [data-slot="sidebar-gap"],
+  aside {
+    display: none !important;
+  }
+
+  body {
+    background: var(--background) !important;
+    color: var(--foreground) !important;
+  }
+
+  tr,
+  [data-slot="card"] {
+    break-inside: avoid;
+  }
+}

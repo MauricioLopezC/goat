@@ -38,6 +38,7 @@ function revalidateAppointment(appointmentId: number) {
   revalidatePath("/agenda");
   revalidatePath(`/appointments/${appointmentId}`);
   revalidatePath("/today");
+  revalidatePath("/cash");
 }
 
 // Cerrar un turno cambia la lista de turnos sin cerrar y los indicadores
@@ -104,6 +105,7 @@ export const voidPayment = defineAction({
   handler: async (input, actor) => {
     const result = await voidPaymentInDal(input, actor);
     revalidateAppointment(result.appointmentId);
+    revalidatePath("/cash/history");
     return result;
   },
 });
