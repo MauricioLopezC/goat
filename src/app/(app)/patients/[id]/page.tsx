@@ -40,6 +40,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { AppointmentHistory } from "./appointment-history";
+import { PortalAccessCard } from "./portal-access-card";
 
 interface PatientDetailPageProps {
   params: Promise<{ id: string }>;
@@ -510,6 +511,15 @@ export default async function PatientDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      {isManagerOrReceptionist && (
+        <PortalAccessCard
+          patientId={patient.id}
+          patientActive={patient.active}
+          patientEmail={patient.email}
+          user={patient.user}
+        />
+      )}
 
       <AppointmentHistory
         patientId={patient.id}

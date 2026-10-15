@@ -366,3 +366,9 @@ export const updatePatientSchema = z
   });
 
 export type UpdatePatientInput = z.infer<typeof updatePatientSchema>;
+
+export const patientAccessSchema = z.object({
+  patientId: z.number().int().positive("ID de paciente inválido"),
+});
+
+export type PatientAccessInput = z.infer<typeof patientAccessSchema>;

@@ -2,7 +2,11 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
-import { assertRole, type Actor } from "@/lib/dal/auth";
+import {
+  assertPasswordNotTemporary,
+  assertRole,
+  type Actor,
+} from "@/lib/dal/auth";
 import { assertNoActivePayment } from "@/lib/dal/payments";
 import { serializableTransaction } from "@/lib/dal/transactions";
 import { centerProfile } from "@/lib/center-profile";
@@ -21,6 +25,10 @@ import {
   calculateAvailableSlots,
   rangesOverlap,
 } from "@/lib/appointment-slots";
+import {
+  canPatientCancelAppointment,
+  hasMinimumCancellationNotice,
+} from "@/lib/portal";
 import {
   addDays,
   dateFromDb,
@@ -1406,8 +1414,16 @@ export async function getProfessionalAgenda(
 export async function cancelAppointment(
   input: CancelAppointmentInput,
   actor: Actor,
+  now = new Date(),
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
+  assertRole(
+    actor,
+    Role.RECEPTIONIST,
+    Role.MANAGER,
+    Role.PROFESSIONAL,
+    Role.PATIENT,
+  );
+  assertPasswordNotTemporary(actor);
   const parsed = cancelAppointmentSchema.safeParse(input);
   if (!parsed.success)
     throw new DomainError("VALIDATION", "Revisá los datos ingresados.");
@@ -1418,13 +1434,23 @@ export async function cancelAppointment(
       "El motivo de cancelación es obligatorio.",
     );
   }
+  const requestedBy =
+    actor.role === Role.PATIENT ? "El paciente" : data.requestedBy?.trim();
+  if (!requestedBy) {
+    throw new DomainError(
+      "VALIDATION",
+      "Indicá quién solicitó la cancelación.",
+    );
+  }
   return serializableTransaction(async (tx) => {
     const appointment = await tx.appointment.findUnique({
       where: { id: data.appointmentId },
       select: {
         id: true,
+        startsAt: true,
         status: true,
         professional: { select: { userId: true } },
+        patient: { select: { userId: true } },
       },
     });
     if (!appointment) throw new DomainError("NOT_FOUND", "El turno no existe.");
@@ -1437,11 +1463,29 @@ export async function cancelAppointment(
         "Solo podés cancelar tus propios turnos.",
       );
     }
+    if (
+      actor.role === Role.PATIENT &&
+      appointment.patient.userId !== actor.id
+    ) {
+      throw new DomainError(
+        "FORBIDDEN",
+        "Solo podés cancelar tus propios turnos.",
+      );
+    }
     if (appointment.status !== AppointmentStatus.SCHEDULED)
       throw new DomainError(
         "INVALID_STATUS_TRANSITION",
         "Solo se puede cancelar un turno en estado Programado.",
       );
+    if (
+      actor.role === Role.PATIENT &&
+      !hasMinimumCancellationNotice(appointment.startsAt, now)
+    ) {
+      throw new DomainError(
+        "CANCELLATION_WINDOW_EXPIRED",
+        "Los turnos solo pueden cancelarse desde el portal con al menos 24 horas de anticipación. Comunicate con el centro.",
+      );
+    }
     await assertNoActivePayment(tx, appointment.id, "cancelarlo");
     await tx.appointment.update({
       where: { id: appointment.id },
@@ -1452,7 +1496,7 @@ export async function cancelAppointment(
         appointmentId: appointment.id,
         type: AppointmentEventType.CANCELLED,
         reason: data.reason,
-        requestedBy: data.requestedBy,
+        requestedBy,
         userId: actor.id,
       },
     });
@@ -1838,4 +1882,123 @@ export async function listUnclosedAppointments(page: number, actor: Actor) {
 export async function countUnclosedAppointments(actor: Actor) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
   return prisma.appointment.count({ where: unclosedWhere(new Date()) });
+}
+
+/// Turnos del propio paciente autenticado en el portal (HU-31), separados en
+/// próximos (`SCHEDULED` con inicio futuro, del más cercano al más lejano) y
+/// anteriores (del más reciente al más antiguo). No expone notas internas,
+/// atención clínica ni datos de otros pacientes.
+export async function listMyAppointments(actor: Actor, now = new Date()) {
+  assertRole(actor, Role.PATIENT);
+  assertPasswordNotTemporary(actor);
+  const patient = await prisma.patient.findFirst({
+    where: { userId: actor.id, active: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      documentType: true,
+      documentNumber: true,
+      appointments: {
+        orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+        select: {
+          id: true,
+          startsAt: true,
+          endsAt: true,
+          status: true,
+          professional: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              licenseNumber: true,
+              titles: { select: { name: true } },
+            },
+          },
+          service: {
+            select: {
+              id: true,
+              name: true,
+              durationMinutes: true,
+              price: true,
+              specialty: { select: { name: true } },
+            },
+          },
+          payments: {
+            where: { status: PaymentStatus.PAID },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: {
+              id: true,
+              amount: true,
+              createdAt: true,
+              paymentMethod: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!patient) {
+    throw new DomainError("NOT_FOUND", "No encontramos tu ficha de paciente.");
+  }
+
+  const mapped = patient.appointments.map(({ payments, service, ...a }) => {
+    const paid = payments[0] ?? null;
+    const withinNoticeWindow = hasMinimumCancellationNotice(a.startsAt, now);
+    return {
+      ...a,
+      service: {
+        id: service.id,
+        name: service.name,
+        durationMinutes: service.durationMinutes,
+        price: service.price !== null ? Number(service.price) : null,
+        specialtyName: service.specialty?.name ?? null,
+      },
+      paidPayment: paid
+        ? {
+            id: paid.id,
+            amount: Number(paid.amount),
+            methodName: paid.paymentMethod.name,
+            paidAt: paid.createdAt,
+          }
+        : null,
+      withinNoticeWindow,
+      canCancel: canPatientCancelAppointment(
+        {
+          status: a.status,
+          startsAt: a.startsAt,
+          hasActivePayment: Boolean(paid),
+        },
+        now,
+      ),
+    };
+  });
+
+  const upcoming = mapped.filter(
+    (a) =>
+      a.status === AppointmentStatus.SCHEDULED &&
+      a.startsAt.getTime() > now.getTime(),
+  );
+
+  const past = mapped
+    .filter(
+      (a) =>
+        a.status !== AppointmentStatus.SCHEDULED ||
+        a.startsAt.getTime() <= now.getTime(),
+    )
+    .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime() || b.id - a.id);
+
+  return {
+    patient: {
+      id: patient.id,
+      firstName: patient.firstName,
+      lastName: patient.lastName,
+      documentType: patient.documentType,
+      documentNumber: patient.documentNumber,
+    },
+    upcoming,
+    past,
+  };
 }
