@@ -6,9 +6,12 @@ import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
 import { assertRole, type Actor } from "@/lib/dal/auth";
 import { paginate } from "@/lib/pagination";
+import { hashPassword } from "@/lib/password";
 import { isPatientDocumentChange } from "@/lib/patients";
+import { generateTemporaryPassword } from "@/lib/portal";
 import type {
   CreatePatientInput,
+  PatientAccessInput,
   UpdatePatientInput,
 } from "@/lib/validation/patients";
 
@@ -261,7 +264,7 @@ function patientSearchConditions(trimmed: string) {
   return orConditions;
 }
 
-/// Ficha completa del paciente por ID (HU-08).
+/// Ficha completa del paciente por ID (HU-08, HU-17, HU-31).
 export async function getPatient(id: number, actor: Actor) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
 
@@ -275,6 +278,15 @@ export async function getPatient(id: number, actor: Actor) {
               healthInsurer: true,
             },
           },
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          email: true,
+          active: true,
+          mustChangePassword: true,
+          createdAt: true,
         },
       },
       createdBy: {
@@ -301,7 +313,7 @@ export async function getPatient(id: number, actor: Actor) {
   return patient;
 }
 
-/// Modificación de datos y cobertura de un paciente (HU-08).
+/// Modificación de datos y cobertura de un paciente (HU-08, HU-17, HU-31).
 export async function updatePatient(
   input: UpdatePatientInput,
   actor: Actor,
@@ -352,6 +364,24 @@ export async function updatePatient(
     }
   }
 
+  const normalizedEmail = input.email.trim().toLowerCase();
+  if (existing.userId) {
+    const emailCollision = await prisma.user.findFirst({
+      where: {
+        email: normalizedEmail,
+        id: { not: existing.userId },
+      },
+      select: { id: true },
+    });
+    if (emailCollision) {
+      throw new DomainError(
+        "EMAIL_TAKEN",
+        "Ya existe otro usuario registrado con ese email.",
+        { email: ["Ya existe otro usuario con ese email."] },
+      );
+    }
+  }
+
   const birthDate = new Date(`${input.birthDate}T00:00:00.000Z`);
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -359,6 +389,18 @@ export async function updatePatient(
     if (input.coverageType === "PRIVATE" && existing.coverage) {
       await tx.coverage.delete({
         where: { patientId: input.id },
+      });
+    }
+
+    if (existing.userId) {
+      await tx.user.update({
+        where: { id: existing.userId },
+        data: {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          phone: input.phone,
+          email: normalizedEmail,
+        },
       });
     }
 
@@ -370,7 +412,7 @@ export async function updatePatient(
         gender: input.gender,
         birthDate,
         phone: input.phone,
-        email: input.email,
+        email: normalizedEmail,
         coverageType: input.coverageType,
         guardianName: input.guardianName,
         guardianPhone: input.guardianPhone,
@@ -418,5 +460,171 @@ export async function updatePatient(
     lastName: updated.lastName,
     documentType: updated.documentType,
     documentNumber: updated.documentNumber,
+  };
+}
+
+export type EnabledPatientAccess = {
+  patientId: number;
+  userId: number;
+  email: string;
+  temporaryPassword: string;
+};
+
+/// Habilita (o restablece) el acceso al portal de un paciente generando una
+/// contraseña temporal que deberá cambiar en su primer ingreso (HU-31).
+export async function enablePatientAccess(
+  input: PatientAccessInput,
+  actor: Actor,
+): Promise<EnabledPatientAccess> {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+
+  const patient = await prisma.patient.findUnique({
+    where: { id: input.patientId },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      active: true,
+      userId: true,
+    },
+  });
+
+  if (!patient) {
+    throw new DomainError("NOT_FOUND", "El paciente no existe.");
+  }
+
+  if (!patient.active) {
+    throw new DomainError(
+      "VALIDATION",
+      "No se puede habilitar el acceso al portal a un paciente inactivo.",
+    );
+  }
+
+  const normalizedEmail = patient.email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    throw new DomainError(
+      "VALIDATION",
+      "El paciente debe tener un correo electrónico registrado en su ficha.",
+    );
+  }
+
+  const temporaryPassword = generateTemporaryPassword(10);
+  const passwordHash = await hashPassword(temporaryPassword);
+
+  let userId = patient.userId ?? 0;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const collision = await tx.user.findFirst({
+        where: {
+          email: normalizedEmail,
+          ...(patient.userId ? { id: { not: patient.userId } } : {}),
+        },
+        select: { id: true },
+      });
+
+      if (collision) {
+        throw new DomainError(
+          "EMAIL_TAKEN",
+          "Ya existe otro usuario en el sistema con el correo electrónico de este paciente.",
+          { email: ["Ya existe otro usuario con ese correo electrónico."] },
+        );
+      }
+
+      if (patient.userId) {
+        userId = patient.userId;
+        await tx.user.update({
+          where: { id: patient.userId },
+          data: {
+            email: normalizedEmail,
+            firstName: patient.firstName,
+            lastName: patient.lastName,
+            phone: patient.phone,
+            passwordHash,
+            mustChangePassword: true,
+            active: true,
+            role: Role.PATIENT,
+          },
+        });
+      } else {
+        const createdUser = await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            firstName: patient.firstName,
+            lastName: patient.lastName,
+            phone: patient.phone,
+            passwordHash,
+            mustChangePassword: true,
+            active: true,
+            role: Role.PATIENT,
+          },
+          select: { id: true },
+        });
+        userId = createdUser.id;
+
+        await tx.patient.update({
+          where: { id: patient.id },
+          data: { userId: createdUser.id },
+        });
+      }
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new DomainError(
+        "EMAIL_TAKEN",
+        "Ya existe otro usuario en el sistema con el correo electrónico de este paciente.",
+        { email: ["Ya existe otro usuario con ese correo electrónico."] },
+      );
+    }
+    throw error;
+  }
+
+  return {
+    patientId: patient.id,
+    userId,
+    email: normalizedEmail,
+    temporaryPassword,
+  };
+}
+
+/// Desactiva el acceso al portal de un paciente (HU-31).
+export async function disablePatientAccess(
+  input: PatientAccessInput,
+  actor: Actor,
+): Promise<{ patientId: number; active: false }> {
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+
+  const patient = await prisma.patient.findUnique({
+    where: { id: input.patientId },
+    select: {
+      id: true,
+      user: { select: { id: true, active: true } },
+    },
+  });
+
+  if (!patient) {
+    throw new DomainError("NOT_FOUND", "El paciente no existe.");
+  }
+
+  if (!patient.user || !patient.user.active) {
+    throw new DomainError(
+      "VALIDATION",
+      "El paciente no tiene un acceso activo al portal.",
+    );
+  }
+
+  await prisma.user.update({
+    where: { id: patient.user.id },
+    data: { active: false },
+  });
+
+  return {
+    patientId: patient.id,
+    active: false,
   };
 }

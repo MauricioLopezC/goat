@@ -17,12 +17,15 @@ const FRONT_DESK: readonly Role[] = ["RECEPTIONIST", "MANAGER"];
 /// específicas van antes que su prefijo. Lo que no está acá solo requiere
 /// sesión.
 const ROUTE_RULES: RouteRule[] = [
+  { pattern: /^\/portal(\/|$)/, roles: ["PATIENT"] },
   { pattern: /^\/appointments\/new(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/appointments\/unclosed(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/appointments\/[^/]+\/reschedule(\/|$)/, roles: STAFF },
   { pattern: /^\/appointments\/[^/]+\/certificate(\/|$)/, roles: FRONT_DESK },
+  { pattern: /^\/appointments(\/|$)/, roles: STAFF },
   { pattern: /^\/patients\/new(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/patients\/[^/]+\/edit(\/|$)/, roles: FRONT_DESK },
+  { pattern: /^\/patients(\/|$)/, roles: STAFF },
   { pattern: /^\/professionals\/new(\/|$)/, roles: ["MANAGER"] },
   { pattern: /^\/professionals\/[^/]+\/edit(\/|$)/, roles: ["MANAGER"] },
   // El detalle y las franjas de un profesional los ve todo el personal.

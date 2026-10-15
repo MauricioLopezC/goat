@@ -9,7 +9,11 @@ import { readSession, startSession, clearSession } from "@/lib/session";
 import { dummyHash, hashPassword, verifyPassword } from "@/lib/password";
 import { DomainError } from "@/lib/actions";
 import { paginate } from "@/lib/pagination";
-import type { SignInInput, CreateUserInput } from "@/lib/validation/auth";
+import type {
+  SignInInput,
+  CreateUserInput,
+  ChangePasswordInput,
+} from "@/lib/validation/auth";
 
 export { STAFF_ROLES };
 
@@ -24,6 +28,7 @@ export type Actor = {
   lastName: string;
   email: string;
   role: Role;
+  mustChangePassword?: boolean;
 };
 
 const ACTOR_FIELDS = {
@@ -33,6 +38,13 @@ const ACTOR_FIELDS = {
   email: true,
   role: true,
   active: true,
+  mustChangePassword: true,
+  patient: {
+    select: {
+      id: true,
+      active: true,
+    },
+  },
 } as const;
 
 /// Devuelve el usuario de la sesión, o `null` si no hay sesión, el usuario ya
@@ -52,6 +64,7 @@ export const getSession = cache(async (): Promise<Actor | null> => {
   });
 
   if (!user?.active) return null;
+  if (user.role === Role.PATIENT && !user.patient?.active) return null;
 
   return {
     id: user.id,
@@ -59,6 +72,7 @@ export const getSession = cache(async (): Promise<Actor | null> => {
     lastName: user.lastName,
     email: user.email,
     role: user.role,
+    mustChangePassword: user.mustChangePassword,
   };
 });
 
@@ -93,7 +107,7 @@ export function assertRole(actor: Actor, ...roles: [Role, ...Role[]]): void {
   }
 }
 
-/// Ruta inicial de cada rol al ingresar (HU-01).
+/// Ruta inicial de cada rol al ingresar (HU-01, HU-31).
 export function landingPath(role: Role): string {
   switch (role) {
     case Role.RECEPTIONIST:
@@ -104,9 +118,7 @@ export function landingPath(role: Role): string {
       // El tablero de indicadores (HU-22).
       return "/dashboard";
     case Role.PATIENT:
-      // El paciente no accede al sistema en el Inc. 1 y `createUser` no permite
-      // ese rol. Devolver "/" haría un bucle, porque "/" manda acá.
-      return "/login";
+      return "/portal";
   }
 }
 
@@ -136,7 +148,14 @@ export async function requirePageRole(...roles: Role[]): Promise<Actor> {
 export async function signIn(input: SignInInput): Promise<string> {
   const user = await prisma.user.findUnique({
     where: { email: input.email },
-    select: { id: true, passwordHash: true, role: true, active: true },
+    select: {
+      id: true,
+      passwordHash: true,
+      role: true,
+      active: true,
+      mustChangePassword: true,
+      patient: { select: { active: true } },
+    },
   });
 
   const matches = await verifyPassword(
@@ -144,7 +163,10 @@ export async function signIn(input: SignInInput): Promise<string> {
     user?.passwordHash ?? (await dummyHash()),
   );
 
-  if (!user || !user.active || !matches) {
+  const patientActive =
+    user?.role !== Role.PATIENT || Boolean(user.patient?.active);
+
+  if (!user || !user.active || !patientActive || !matches) {
     throw new DomainError(
       "INVALID_CREDENTIALS",
       "El email o la contraseña no son correctos.",
@@ -152,11 +174,71 @@ export async function signIn(input: SignInInput): Promise<string> {
   }
 
   await startSession({ userId: user.id, role: user.role });
+  if (user.mustChangePassword) {
+    return "/portal/change-password";
+  }
   return landingPath(user.role);
 }
 
 export async function signOut(): Promise<void> {
   await clearSession();
+}
+
+/// Cambio de contraseña del propio usuario (HU-31: obligatorio al primer ingreso
+/// con contraseña temporal).
+export async function changePassword(
+  input: ChangePasswordInput,
+  actor: Actor,
+): Promise<{ updated: true }> {
+  assertRole(
+    actor,
+    Role.PATIENT,
+    Role.RECEPTIONIST,
+    Role.PROFESSIONAL,
+    Role.MANAGER,
+  );
+
+  const user = await prisma.user.findUnique({
+    where: { id: actor.id },
+    select: { id: true, passwordHash: true, active: true },
+  });
+
+  if (!user || !user.active) {
+    throw new DomainError(
+      "FORBIDDEN",
+      "No tenés permiso para realizar esta operación.",
+    );
+  }
+
+  const matches = await verifyPassword(
+    input.currentPassword,
+    user.passwordHash,
+  );
+  if (!matches) {
+    throw new DomainError(
+      "INVALID_CREDENTIALS",
+      "La contraseña actual no es correcta.",
+      { currentPassword: ["La contraseña actual no es correcta."] },
+    );
+  }
+
+  if (input.currentPassword === input.newPassword) {
+    throw new DomainError(
+      "VALIDATION",
+      "La nueva contraseña debe ser distinta de la actual.",
+      { newPassword: ["La nueva contraseña debe ser distinta de la actual."] },
+    );
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash: await hashPassword(input.newPassword),
+      mustChangePassword: false,
+    },
+  });
+
+  return { updated: true };
 }
 
 /// Listado de usuarios del centro, paginado. Solo el gerente.

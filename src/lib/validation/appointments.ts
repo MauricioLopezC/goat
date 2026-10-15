@@ -69,9 +69,10 @@ export const cancelAppointmentSchema = z.object({
     .string()
     .trim()
     .min(1, "Indicá quién solicitó la cancelación.")
-    .max(100),
+    .max(100)
+    .optional(),
 });
-export type CancelAppointmentInput = z.infer<typeof cancelAppointmentSchema>;
+export type CancelAppointmentInput = z.input<typeof cancelAppointmentSchema>;
 
 export const rescheduleAppointmentSchema = z.object({
   appointmentId: z.number().int().positive(),
