@@ -15,6 +15,7 @@ import {
   AppointmentEventType,
   AppointmentPriority,
   AppointmentStatus,
+  CoverageType,
   PaymentStatus,
   Role,
 } from "@/generated/prisma/enums";
@@ -26,8 +27,10 @@ import {
   rangesOverlap,
 } from "@/lib/appointment-slots";
 import {
+  canPatientBookAppointment,
   canPatientCancelAppointment,
   hasMinimumCancellationNotice,
+  MAX_PORTAL_FUTURE_APPOINTMENTS,
 } from "@/lib/portal";
 import {
   addDays,
@@ -68,6 +71,10 @@ const occupiedStatuses = [
   AppointmentStatus.COMPLETED,
 ];
 const personSelect = { id: true, firstName: true, lastName: true } as const;
+const userCreatorSelect = {
+  ...personSelect,
+  role: true,
+} as const;
 const patientSelect = {
   ...personSelect,
   documentType: true,
@@ -85,7 +92,7 @@ const summarySelect = {
   patient: { select: patientSelect },
   professional: { select: personSelect },
   service: { select: { id: true, name: true } },
-  createdBy: { select: personSelect },
+  createdBy: { select: userCreatorSelect },
   encounter: { select: { id: true } },
 } satisfies Prisma.AppointmentSelect;
 
@@ -228,7 +235,16 @@ export async function listAvailableDates(
   >,
   actor: Actor,
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
+  assertRole(
+    actor,
+    Role.RECEPTIONIST,
+    Role.MANAGER,
+    Role.PROFESSIONAL,
+    Role.PATIENT,
+  );
+  if (actor.role === Role.PATIENT) {
+    assertPasswordNotTemporary(actor);
+  }
   const parsed = availableSlotsSchema.omit({ date: true }).safeParse(input);
   if (!parsed.success)
     throw new DomainError(
@@ -254,11 +270,11 @@ export async function listAvailableDates(
       ] = await Promise.all([
         tx.patient.findFirst({
           where: { id: patientId, active: true },
-          select: { id: true },
+          select: { id: true, userId: true },
         }),
         tx.service.findFirst({
           where: { id: serviceId, active: true },
-          select: { durationMinutes: true },
+          select: { durationMinutes: true, requiresReferral: true },
         }),
         tx.professional.findFirst({
           where: {
@@ -321,6 +337,20 @@ export async function listAvailableDates(
           "NOT_FOUND",
           "El paciente, servicio o profesional ya no está disponible, o el profesional no presta ese servicio.",
         );
+      if (actor.role === Role.PATIENT) {
+        if (patient.userId !== actor.id) {
+          throw new DomainError(
+            "FORBIDDEN",
+            "Solo podés consultar turnos para vos mismo.",
+          );
+        }
+        if (service.requiresReferral) {
+          throw new DomainError(
+            "VALIDATION",
+            "Los servicios que requieren orden médica no se pueden solicitar desde el portal. Acercate al mostrador o comunicate con el centro.",
+          );
+        }
+      }
       const dates: string[] = [];
       const day = dateToDb(bounds.min);
       while (dateFromDb(day) <= bounds.max) {
@@ -369,7 +399,13 @@ async function loadAvailability(
   actor: Actor,
   now: Date,
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
+  assertRole(
+    actor,
+    Role.RECEPTIONIST,
+    Role.MANAGER,
+    Role.PROFESSIONAL,
+    Role.PATIENT,
+  );
   validateDate(input.date, now);
   const dayStart = appointmentInstant(input.date, 0);
   const dayEnd = appointmentInstant(input.date, 1440);
@@ -384,11 +420,11 @@ async function loadAvailability(
   ] = await Promise.all([
     tx.patient.findFirst({
       where: { id: input.patientId, active: true },
-      select: { id: true },
+      select: { id: true, userId: true },
     }),
     tx.service.findFirst({
       where: { id: input.serviceId, active: true },
-      select: { durationMinutes: true },
+      select: { durationMinutes: true, requiresReferral: true },
     }),
     tx.professional.findFirst({
       where: {
@@ -450,6 +486,20 @@ async function loadAvailability(
       "NOT_FOUND",
       "El paciente, servicio o profesional ya no está disponible, o el profesional no presta ese servicio.",
     );
+  if (actor.role === Role.PATIENT) {
+    if (patient.userId !== actor.id) {
+      throw new DomainError(
+        "FORBIDDEN",
+        "Solo podés consultar turnos para vos mismo.",
+      );
+    }
+    if (service.requiresReferral) {
+      throw new DomainError(
+        "VALIDATION",
+        "Los servicios que requieren orden médica no se pueden solicitar desde el portal. Acercate al mostrador o comunicate con el centro.",
+      );
+    }
+  }
   const isFullHoliday = holiday.some(
     (h) => h.startMinute === null || h.endMinute === null,
   );
@@ -469,7 +519,16 @@ export async function listAvailableSlots(
   input: AvailableSlotsInput,
   actor: Actor,
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PROFESSIONAL);
+  assertRole(
+    actor,
+    Role.RECEPTIONIST,
+    Role.MANAGER,
+    Role.PROFESSIONAL,
+    Role.PATIENT,
+  );
+  if (actor.role === Role.PATIENT) {
+    assertPasswordNotTemporary(actor);
+  }
   const parsed = availableSlotsSchema.safeParse(input);
   if (!parsed.success)
     throw new DomainError(
@@ -500,7 +559,10 @@ export async function listEarliestSlots(
   input: EarliestSlotsInput,
   actor: Actor,
 ): Promise<EarliestSlot[]> {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PATIENT);
+  if (actor.role === Role.PATIENT) {
+    assertPasswordNotTemporary(actor);
+  }
   const parsed = earliestSlotsSchema.safeParse(input);
   if (!parsed.success)
     throw new DomainError(
@@ -518,11 +580,11 @@ export async function listEarliestSlots(
       const [patient, service, professionals, holidays] = await Promise.all([
         tx.patient.findFirst({
           where: { id: patientId, active: true },
-          select: { id: true },
+          select: { id: true, userId: true },
         }),
         tx.service.findFirst({
           where: { id: serviceId, active: true },
-          select: { id: true, durationMinutes: true },
+          select: { id: true, durationMinutes: true, requiresReferral: true },
         }),
         tx.professional.findMany({
           where: {
@@ -564,6 +626,21 @@ export async function listEarliestSlots(
           "NOT_FOUND",
           "El paciente o el servicio ya no está disponible.",
         );
+      }
+
+      if (actor.role === Role.PATIENT) {
+        if (patient.userId !== actor.id) {
+          throw new DomainError(
+            "FORBIDDEN",
+            "Solo podés consultar turnos para vos mismo.",
+          );
+        }
+        if (service.requiresReferral) {
+          throw new DomainError(
+            "VALIDATION",
+            "Los servicios que requieren orden médica no se pueden solicitar desde el portal. Acercate al mostrador o comunicate con el centro.",
+          );
+        }
       }
 
       const activeProviders = professionals.filter(
@@ -708,16 +785,59 @@ export async function createAppointment(
   input: CreateAppointmentInput,
   actor: Actor,
 ) {
-  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
+  assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PATIENT);
+  if (actor.role === Role.PATIENT) {
+    assertPasswordNotTemporary(actor);
+  }
   const parsed = createAppointmentSchema.safeParse(input);
   if (!parsed.success)
     throw new DomainError("VALIDATION", "Revisá los datos del turno.");
   const data = parsed.data;
+
+  if (actor.role === Role.PATIENT && data.priority === "URGENT") {
+    throw new DomainError(
+      "VALIDATION",
+      "Los turnos desde el portal solo pueden tener prioridad normal.",
+      { priority: ["Solo se permite prioridad normal desde el portal."] },
+    );
+  }
+
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
       return await prisma.$transaction(
         async (tx) => {
           const now = new Date();
+          if (actor.role === Role.PATIENT) {
+            const ownPatient = await tx.patient.findUnique({
+              where: { userId: actor.id },
+              select: { id: true, active: true },
+            });
+            if (!ownPatient || !ownPatient.active) {
+              throw new DomainError(
+                "FORBIDDEN",
+                "No tenés una ficha de paciente activa.",
+              );
+            }
+            if (data.patientId !== ownPatient.id) {
+              throw new DomainError(
+                "FORBIDDEN",
+                "Solo podés sacar turnos para vos mismo.",
+              );
+            }
+            const futureCount = await tx.appointment.count({
+              where: {
+                patientId: ownPatient.id,
+                status: AppointmentStatus.SCHEDULED,
+                startsAt: { gt: now },
+              },
+            });
+            if (futureCount >= MAX_PORTAL_FUTURE_APPOINTMENTS) {
+              throw new DomainError(
+                "PORTAL_APPOINTMENT_LIMIT",
+                "Solo podés tener hasta dos turnos futuros programados desde el portal. Si necesitás otro turno, comunicate con el centro.",
+              );
+            }
+          }
           const availability = await loadAvailability(tx, data, actor, now);
           const startsAt = appointmentInstant(
             data.date,
@@ -767,12 +887,16 @@ export async function createAppointment(
               endsAt,
               status: AppointmentStatus.SCHEDULED,
               priority:
-                (data.priority as AppointmentPriority) ??
-                AppointmentPriority.NORMAL,
+                actor.role === Role.PATIENT
+                  ? AppointmentPriority.NORMAL
+                  : ((data.priority as AppointmentPriority) ??
+                    AppointmentPriority.NORMAL),
               priorityReason:
-                data.priority === "URGENT"
-                  ? (data.priorityReason ?? null)
-                  : null,
+                actor.role === Role.PATIENT
+                  ? null
+                  : data.priority === "URGENT"
+                    ? (data.priorityReason ?? null)
+                    : null,
               notes: data.notes || null,
               createdById: actor.id,
             },
@@ -2000,5 +2124,129 @@ export async function listMyAppointments(actor: Actor, now = new Date()) {
     },
     upcoming,
     past,
+  };
+}
+
+export type PortalBookingOptions = {
+  patient: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    coverageType: CoverageType;
+  };
+  futureAppointmentsCount: number;
+  canBook: boolean;
+  services: {
+    id: number;
+    name: string;
+    description: string | null;
+    durationMinutes: number;
+    price: number | null;
+    specialty: { id: number; name: string } | null;
+  }[];
+  professionals: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    licenseNumber: string;
+    services: { id: number }[];
+  }[];
+};
+
+/// Opciones y catálogo para la pantalla de reserva de turnos desde el portal (HU-32).
+/// Solo expone servicios activos sin orden médica (`requiresReferral: false`)
+/// que tengan profesionales activos con franjas habilitadas.
+export async function getPortalBookingOptions(
+  actor: Actor,
+  serviceId?: number,
+  now = new Date(),
+): Promise<PortalBookingOptions> {
+  assertRole(actor, Role.PATIENT);
+  assertPasswordNotTemporary(actor);
+
+  const patient = await prisma.patient.findUnique({
+    where: { userId: actor.id },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      coverageType: true,
+      active: true,
+    },
+  });
+
+  if (!patient || !patient.active) {
+    throw new DomainError(
+      "FORBIDDEN",
+      "No tenés una ficha de paciente activa.",
+    );
+  }
+
+  const [futureAppointmentsCount, services, professionals] = await Promise.all([
+    prisma.appointment.count({
+      where: {
+        patientId: patient.id,
+        status: AppointmentStatus.SCHEDULED,
+        startsAt: { gt: now },
+      },
+    }),
+    prisma.service.findMany({
+      where: {
+        active: true,
+        requiresReferral: false,
+        professionals: {
+          some: {
+            active: true,
+            availabilityWindows: { some: {} },
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        durationMinutes: true,
+        price: true,
+        specialty: { select: { id: true, name: true } },
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.professional.findMany({
+      where: {
+        active: true,
+        availabilityWindows: { some: {} },
+        ...(serviceId
+          ? { services: { some: { id: serviceId, active: true } } }
+          : { services: { some: { active: true, requiresReferral: false } } }),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        licenseNumber: true,
+        services: { select: { id: true } },
+      },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    }),
+  ]);
+
+  return {
+    patient: {
+      id: patient.id,
+      firstName: patient.firstName,
+      lastName: patient.lastName,
+      coverageType: patient.coverageType,
+    },
+    futureAppointmentsCount,
+    canBook: canPatientBookAppointment(futureAppointmentsCount, actor),
+    services: services.map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      durationMinutes: s.durationMinutes,
+      price: s.price !== null ? Number(s.price) : null,
+      specialty: s.specialty,
+    })),
+    professionals,
   };
 }

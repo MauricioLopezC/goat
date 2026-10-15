@@ -142,6 +142,7 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `AUTHORIZATION_NOT_REQUIRED` | Se intenta registrar una autorización en un turno de un paciente particular o de un servicio que no requiere orden (HU-21). |
 | `APPOINTMENT_HAS_PAYMENT` | El turno tiene un cobro vigente y no se puede cancelar, reprogramar ni marcar Vencido: primero se anula el cobro (HU-21). |
 | `CANCELLATION_WINDOW_EXPIRED` | El paciente intenta cancelar un turno desde el portal con menos de 24 horas de anticipación (HU-31). |
+| `PORTAL_APPOINTMENT_LIMIT` | El paciente intenta sacar un turno desde el portal pero ya cuenta con dos turnos futuros programados (HU-32). |
 
 Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
 
@@ -180,13 +181,13 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 ### `createAppointment`
 
-**Historia de usuario:** [HU-09 — Asignar un turno](hu/HU-09-asignar-turno.md), [HU-19 — Dar un turno prioritario](hu/HU-19-turno-prioritario.md)
-**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Historia de usuario:** [HU-09 — Asignar un turno](hu/HU-09-asignar-turno.md), [HU-19 — Dar un turno prioritario](hu/HU-19-turno-prioritario.md), [HU-32 — Sacar un turno desde el portal](hu/HU-32-sacar-turno-desde-el-portal.md).
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PATIENT`.
 **Entrada:** `patientId`, `professionalId`, `serviceId` (enteros positivos), `date` (AAAA-MM-DD), `startTime` (HH:MM), `notes` (hasta 500 caracteres, opcional), `priority` (`"NORMAL" | "URGENT"`, opcional, por defecto `"NORMAL"`), `priorityReason` (hasta 500 caracteres, obligatorio si `priority === "URGENT"`).
-**Precondiciones:** paciente, servicio y profesional activos; profesional asociado al servicio. Fecha desde hoy hasta dos meses inclusive y hora futura. El bloque calculado entra en una franja habilitada, sin feriados ni ausencias. No se superpone con turnos Programados o Completados del profesional ni del paciente. Si la prioridad es `URGENT`, debe indicarse el motivo de la urgencia.
-**Efectos:** transacción Serializable que relee todas las reglas y crea un `Appointment` Programado con autor, fecha, prioridad y motivo de urgencia (si aplica). Restricciones de exclusión y de validación de PostgreSQL (`Appointment_urgent_has_reason`) respaldan la integridad concurrente. Se reintenta ante conflictos de serialización; nunca se envía un aviso antes de confirmar la transacción.
-**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `OUTSIDE_AVAILABILITY_WINDOW`, `APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`. Un conflicto refresca la grilla en el cliente.
-**Revalida:** `/calendar`, `/agenda`, `/appointments/new`, ficha del profesional.
+**Precondiciones:** paciente, servicio y profesional activos; profesional asociado al servicio. Fecha desde hoy hasta dos meses inclusive y hora futura. El bloque calculado entra en una franja habilitada, sin feriados ni ausencias. No se superpone con turnos Programados o Completados del profesional ni del paciente. Si la prioridad es `URGENT`, debe indicarse el motivo de la urgencia. Si el actor es `PATIENT`: el paciente debe tener contraseña definitiva (`mustChangePassword === false`), `patientId` debe coincidir con su propia ficha, la prioridad debe ser `NORMAL`, el servicio no debe requerir orden médica (`requiresReferral === false`), y el paciente no puede tener 2 o más turnos futuros programados desde el portal.
+**Efectos:** transacción Serializable que relee todas las reglas y crea un `Appointment` Programado con autor, fecha, prioridad y motivo de urgencia (si aplica). Con `PATIENT`, el autor es el usuario del paciente (`Appointment.createdById`) y la traza lo refleja como emitido desde el portal. Restricciones de exclusión y de validación de PostgreSQL (`Appointment_urgent_has_reason`) respaldan la integridad concurrente. Se reintenta ante conflictos de serialización; nunca se envía un aviso antes de confirmar la transacción.
+**Errores:** `VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `OUTSIDE_AVAILABILITY_WINDOW`, `APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`, `PORTAL_APPOINTMENT_LIMIT` (el paciente ya tiene dos turnos futuros programados desde el portal). Un conflicto refresca la grilla en el cliente.
+**Revalida:** `/calendar`, `/agenda`, `/appointments/new`, `/portal`, ficha del profesional.
 **Devuelve:** `{ id }` para consultar el resumen autorizado.
 
 ### `getAppointmentOptions`
@@ -200,12 +201,23 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Revalida:** no aplica.
 **Devuelve:** pacientes identificados por nombre y documento, indicador de página siguiente, paciente elegido (con su `coverageType`), servicios (con duración, si requieren orden y especialidad `{ id, name } | null`), profesionales habilitados. Con obra social y un servicio que requiere orden, la página avisa "Recordale al paciente traer la orden" ([HU-21](hu/HU-21-cobrar-turno.md)).
 
+### `getPortalBookingOptions`
+
+**Historia de usuario:** [HU-32 — Sacar un turno desde el portal](hu/HU-32-sacar-turno-desde-el-portal.md).
+**Roles:** `PATIENT`.
+**Entrada:** `serviceId?` (entero positivo opcional).
+**Precondiciones:** actor autenticado con rol `PATIENT`, con ficha activa y contraseña definitiva (`mustChangePassword === false`).
+**Efectos:** ninguno. Obtiene los datos necesarios para la pantalla de reserva del portal: ficha del paciente (`id`, `firstName`, `lastName`, `coverageType`), cantidad de turnos futuros programados (`futureAppointmentsCount`), si puede reservar (`canBook: count < 2`), los servicios activos que no requieren orden médica (`requiresReferral === false`) con al menos un profesional activo habilitado, y los profesionales activos asociados.
+**Errores:** `FORBIDDEN`.
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ patient, futureAppointmentsCount, canBook, services, professionals }`.
+
 ### `listAvailableDates`
 
-**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), [HU-16](hu/HU-16-reprogramar-turno.md).
-**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
+**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), [HU-16](hu/HU-16-reprogramar-turno.md), [HU-32](hu/HU-32-sacar-turno-desde-el-portal.md).
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`, `PATIENT`.
 **Entrada:** `professionalId`, `serviceId`, `patientId`, `excludeAppointmentId?` (ID del turno que se reprograma, opcional).
-**Precondiciones:** entidades activas y relacionadas.
+**Precondiciones:** entidades activas y relacionadas. Con rol `PATIENT`, el paciente no puede tener clave temporal pendiente, `patientId` debe ser el suyo propio y el servicio no debe requerir orden médica.
 **Efectos:** ninguno. Calcula en una lectura consistente las fechas con al menos un bloque libre entre hoy y dos meses, aplicando las mismas reglas de `listAvailableSlots` para el servicio y el paciente elegidos. Si se pasa `excludeAppointmentId`, no cuenta ese turno como ocupado.
 **Errores:** `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`.
 **Revalida:** no aplica; lectura desde Server Component.
@@ -213,10 +225,10 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 ### `listAvailableSlots`
 
-**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), [HU-16](hu/HU-16-reprogramar-turno.md).
-**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
+**Historia de usuario:** [HU-09](hu/HU-09-asignar-turno.md), [HU-16](hu/HU-16-reprogramar-turno.md), [HU-32](hu/HU-32-sacar-turno-desde-el-portal.md).
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`, `PATIENT`.
 **Entrada:** `professionalId`, `serviceId`, `patientId`, `date`, `excludeAppointmentId?` (ID del turno que se reprograma, opcional).
-**Precondiciones:** entidades activas y relacionadas, fecha válida en el horizonte permitido.
+**Precondiciones:** entidades activas y relacionadas, fecha válida en el horizonte permitido. Con rol `PATIENT`, el paciente no puede tener clave temporal pendiente, `patientId` debe ser el suyo propio y el servicio no debe requerir orden médica.
 **Efectos:** ninguno. Calcula bloques según duración del servicio desde el inicio de cada franja; descarta pasado, feriados, ausencias y ambos solapamientos. Si se pasa `excludeAppointmentId`, no cuenta ese turno como ocupado para permitir moverlo dentro del mismo día.
 **Errores:** `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`.
 **Revalida:** no aplica; lectura desde Server Component.
@@ -224,10 +236,10 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 ### `listEarliestSlots`
 
-**Historia de usuario:** [HU-19 — Dar un turno prioritario](hu/HU-19-turno-prioritario.md)
-**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Historia de usuario:** [HU-19 — Dar un turno prioritario](hu/HU-19-turno-prioritario.md), [HU-32 — Sacar un turno desde el portal](hu/HU-32-sacar-turno-desde-el-portal.md).
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PATIENT`.
 **Entrada:** `serviceId` (entero positivo), `patientId` (entero positivo), `limit?` (entero de 1 a 20, por defecto 5).
-**Precondiciones:** paciente y servicio activos; existan profesionales activos asociados al servicio con franjas habilitadas.
+**Precondiciones:** paciente y servicio activos; existan profesionales activos asociados al servicio con franjas habilitadas. Con rol `PATIENT`, el paciente no puede tener clave temporal pendiente, `patientId` debe ser el suyo propio y el servicio no debe requerir orden médica.
 **Efectos:** ninguno. Calcula en lectura consistente los primeros horarios libres a partir de hoy (en hora de Argentina) entre todos los profesionales habilitados que prestan el servicio. Descarta horarios pasados, feriados, ausencias de cada profesional y solapamientos con turnos existentes tanto del profesional como del paciente. Devuelve hasta el límite solicitado en estricto orden cronológico.
 **Errores:** `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`.
 **Revalida:** no aplica; lectura desde Server Component.

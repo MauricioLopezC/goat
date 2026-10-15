@@ -62,3 +62,21 @@ export function generateTemporaryPassword(length = 10): string {
   }
   return password;
 }
+
+/// Cantidad máxima de turnos futuros programados que un paciente puede tener simultáneamente desde el portal (HU-32).
+export const MAX_PORTAL_FUTURE_APPOINTMENTS = 2;
+
+/// ¿Puede el paciente sacar otro turno desde el portal? (HU-32)
+/// Exige no tener pendiente el cambio de contraseña y tener menos de MAX_PORTAL_FUTURE_APPOINTMENTS turnos futuros.
+export function canPatientBookAppointment(
+  currentFutureCount: number,
+  actor?: {
+    role?: string;
+    mustChangePassword?: boolean;
+  },
+): boolean {
+  if (mustPatientChangePassword(actor)) {
+    return false;
+  }
+  return currentFutureCount < MAX_PORTAL_FUTURE_APPOINTMENTS;
+}

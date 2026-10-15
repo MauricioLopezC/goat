@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, History, Lock, Stethoscope } from "lucide-react";
+import { Role } from "@/generated/prisma/enums";
 import type {
   HistoryItem,
   PatientAppointmentHistory,
@@ -428,8 +429,9 @@ function HistoryEntry({
       )}
       <ul className="flex flex-col gap-1 border-t border-border pt-2 text-body-sm text-muted-foreground">
         <li>
-          Registrado por {personName(item.createdBy)} ·{" "}
-          {formatInstant(item.createdAt)}
+          Registrado por {personName(item.createdBy)}
+          {item.createdBy.role === Role.PATIENT &&
+            " (Portal del paciente)"} · {formatInstant(item.createdAt)}
         </li>
         {item.events.map((event) => (
           <li key={event.id}>
