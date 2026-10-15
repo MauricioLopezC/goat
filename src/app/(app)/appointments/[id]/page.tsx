@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { patientHistoryHref } from "@/lib/patient-history";
 import { notFound } from "next/navigation";
+import { Role } from "@/generated/prisma/enums";
 import { requirePageRole } from "@/lib/dal/auth";
 import { getAppointment } from "@/lib/dal/appointments";
 import { getAppointmentBilling } from "@/lib/dal/payments";
@@ -288,8 +289,14 @@ export default async function AppointmentPage({
               <dt className="text-muted-foreground">Registrado por</dt>
               <dd>
                 {appointment.createdBy.lastName},{" "}
-                {appointment.createdBy.firstName} ·{" "}
-                {formatInstant(appointment.createdAt)}
+                {appointment.createdBy.firstName}
+                {appointment.createdBy.role === Role.PATIENT && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    (Portal del paciente)
+                  </span>
+                )}{" "}
+                · {formatInstant(appointment.createdAt)}
               </dd>
             </div>
             <div>

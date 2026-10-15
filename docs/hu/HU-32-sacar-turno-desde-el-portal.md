@@ -31,8 +31,9 @@
 
 ## Operaciones
 
-- `createAppointment` — suma el rol `PATIENT`: el paciente es siempre el de la sesión.
-- `listEarliestSlots`, `listAvailableSlots` — suman el rol `PATIENT`.
+- `createAppointment` — suma el rol `PATIENT`: el paciente es siempre el de la sesión, no permite orden médica ni urgencias, y rechaza con `PORTAL_APPOINTMENT_LIMIT` si ya tiene dos turnos futuros programados.
+- `listEarliestSlots`, `listAvailableSlots`, `listAvailableDates` — suman el rol `PATIENT` para consulta de disponibilidad propia.
+- `getPortalBookingOptions` — nueva, consulta datos y servicios habilitados para la pantalla de reserva del portal.
 
 ## A conversar
 

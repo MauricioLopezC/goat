@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, KeyRound, LogOut } from "lucide-react";
+import { CalendarDays, CalendarPlus, KeyRound, LogOut } from "lucide-react";
 import logo from "@/assets/logo-goat.png";
 import { Role } from "@/generated/prisma/enums";
 import { requirePageRole } from "@/lib/dal/auth";
@@ -47,6 +47,12 @@ export default async function PortalLayout({
                   </Link>
                 </Button>
                 <Button asChild variant="ghost" size="sm" className="gap-1.5">
+                  <Link href="/portal/appointments/new">
+                    <CalendarPlus className="size-4" />
+                    Sacar turno
+                  </Link>
+                </Button>
+                <Button asChild variant="ghost" size="sm" className="gap-1.5">
                   <Link href="/portal/change-password">
                     <KeyRound className="size-4" />
                     Cambiar contraseña
@@ -67,18 +73,32 @@ export default async function PortalLayout({
             </div>
 
             {!actor.mustChangePassword && (
-              <Button
-                asChild
-                variant="ghost"
-                size="icon-sm"
-                className="md:hidden"
-                title="Cambiar contraseña"
-              >
-                <Link href="/portal/change-password">
-                  <KeyRound className="size-4" />
-                  <span className="sr-only">Cambiar contraseña</span>
-                </Link>
-              </Button>
+              <>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon-sm"
+                  className="md:hidden"
+                  title="Sacar turno"
+                >
+                  <Link href="/portal/appointments/new">
+                    <CalendarPlus className="size-4" />
+                    <span className="sr-only">Sacar turno</span>
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon-sm"
+                  className="md:hidden"
+                  title="Cambiar contraseña"
+                >
+                  <Link href="/portal/change-password">
+                    <KeyRound className="size-4" />
+                    <span className="sr-only">Cambiar contraseña</span>
+                  </Link>
+                </Button>
+              </>
             )}
 
             <form action={signOut}>

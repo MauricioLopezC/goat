@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import {
   CalendarCheck2,
   CalendarClock,
+  CalendarPlus,
   Clock,
   FileText,
   PhoneCall,
@@ -19,6 +20,7 @@ import {
   APPOINTMENT_STATUS_LABEL,
 } from "@/lib/appointment-status";
 import { DOCUMENT_TYPE_LABEL } from "@/lib/patients";
+import { MAX_PORTAL_FUTURE_APPOINTMENTS } from "@/lib/portal";
 import { formatDate, formatMinute, toLocalSlot } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -52,16 +54,35 @@ export default async function PortalHomePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-display-lg font-bold tracking-tight text-foreground">
-          Mis turnos
-        </h1>
-        <p className="text-body-md text-muted-foreground">
-          {patient.lastName}, {patient.firstName} ·{" "}
-          <span className="font-mono font-medium text-foreground">
-            {DOCUMENT_TYPE_LABEL[patient.documentType]} {patient.documentNumber}
-          </span>
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-display-lg font-bold tracking-tight text-foreground">
+            Mis turnos
+          </h1>
+          <p className="text-body-md text-muted-foreground">
+            {patient.lastName}, {patient.firstName} ·{" "}
+            <span className="font-mono font-medium text-foreground">
+              {DOCUMENT_TYPE_LABEL[patient.documentType]}{" "}
+              {patient.documentNumber}
+            </span>
+          </p>
+        </div>
+
+        {upcoming.length < MAX_PORTAL_FUTURE_APPOINTMENTS ? (
+          <Button asChild className="gap-1.5 shadow-xs">
+            <Link href="/portal/appointments/new">
+              <CalendarPlus className="size-4" />
+              Sacar turno
+            </Link>
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2 rounded-lg border border-warning-soft-border bg-warning-soft px-3 py-2 text-xs font-medium text-warning-soft-foreground">
+            <span>
+              Tenés {MAX_PORTAL_FUTURE_APPOINTMENTS} turnos futuros (límite del
+              portal alcanzado)
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Próximos turnos */}
@@ -82,10 +103,18 @@ export default async function PortalHomePage() {
               <EmptyHeader>
                 <EmptyTitle>No tenés próximos turnos programados</EmptyTitle>
                 <EmptyDescription>
-                  Cuando tengas un turno agendado en el centro, aparecerá en
-                  esta sección.
+                  Podés solicitar un turno online eligiendo el servicio y el
+                  horario que mejor te quede.
                 </EmptyDescription>
               </EmptyHeader>
+              <div className="mt-4 flex justify-center">
+                <Button asChild size="sm" className="gap-1.5">
+                  <Link href="/portal/appointments/new">
+                    <CalendarPlus className="size-4" />
+                    Sacar un turno
+                  </Link>
+                </Button>
+              </div>
             </Empty>
           ) : (
             <ul className="flex flex-col gap-3">
@@ -185,15 +214,15 @@ export default async function PortalHomePage() {
         </CardContent>
       </Card>
 
-      {/* Turnos anteriores */}
+      {/* Otros turnos */}
       <Card className="rounded-xl border-border bg-card shadow-xs">
         <CardHeader className="pb-3">
           <CardTitle className="text-title-lg flex items-center gap-2 text-foreground">
             <CalendarCheck2 className="size-4 text-primary" />
-            Turnos anteriores ({past.length})
+            Otros turnos ({past.length})
           </CardTitle>
           <CardDescription>
-            Historial de tus turnos pasados, completados o cancelados, del más
+            Historial de turnos pasados, completados o cancelados, del más
             reciente al más antiguo.
           </CardDescription>
         </CardHeader>
@@ -201,9 +230,10 @@ export default async function PortalHomePage() {
           {past.length === 0 ? (
             <Empty className="border bg-muted/20 py-8">
               <EmptyHeader>
-                <EmptyTitle>Sin turnos anteriores</EmptyTitle>
+                <EmptyTitle>Sin otros turnos</EmptyTitle>
                 <EmptyDescription>
-                  Todavía no registrás atenciones o turnos pasados en el centro.
+                  Todavía no registrás atenciones o turnos pasados ni cancelados
+                  en el centro.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
