@@ -2,7 +2,11 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
-import { assertRole, type Actor } from "@/lib/dal/auth";
+import {
+  assertPasswordNotTemporary,
+  assertRole,
+  type Actor,
+} from "@/lib/dal/auth";
 import { assertNoActivePayment } from "@/lib/dal/payments";
 import { serializableTransaction } from "@/lib/dal/transactions";
 import { centerProfile } from "@/lib/center-profile";
@@ -1419,6 +1423,7 @@ export async function cancelAppointment(
     Role.PROFESSIONAL,
     Role.PATIENT,
   );
+  assertPasswordNotTemporary(actor);
   const parsed = cancelAppointmentSchema.safeParse(input);
   if (!parsed.success)
     throw new DomainError("VALIDATION", "Revisá los datos ingresados.");
@@ -1875,6 +1880,7 @@ export async function countUnclosedAppointments(actor: Actor) {
 /// atención clínica ni datos de otros pacientes.
 export async function listMyAppointments(actor: Actor, now = new Date()) {
   assertRole(actor, Role.PATIENT);
+  assertPasswordNotTemporary(actor);
   const patient = await prisma.patient.findFirst({
     where: { userId: actor.id, active: true },
     select: {

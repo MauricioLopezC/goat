@@ -14,6 +14,7 @@ import type {
   CreateUserInput,
   ChangePasswordInput,
 } from "@/lib/validation/auth";
+import { mustPatientChangePassword } from "@/lib/portal";
 
 export { STAFF_ROLES };
 
@@ -104,6 +105,19 @@ export async function requireRole(...roles: Role[]): Promise<Actor> {
 export function assertRole(actor: Actor, ...roles: [Role, ...Role[]]): void {
   if (!roles.includes(actor.role)) {
     throw new DomainError("FORBIDDEN", FORBIDDEN_MESSAGE);
+  }
+}
+
+/// Barrera de contraseña temporal de la DAL (HU-31): un paciente con clave
+/// temporal pendiente de cambio (`mustChangePassword: true`) no puede operar en
+/// el portal. Las funciones de negocio de la DAL la llaman para cortar cualquier
+/// operación antes de que el paciente establezca su contraseña definitiva.
+export function assertPasswordNotTemporary(actor: Actor): void {
+  if (mustPatientChangePassword(actor)) {
+    throw new DomainError(
+      "FORBIDDEN",
+      "Debés cambiar tu contraseña temporal antes de operar en el portal.",
+    );
   }
 }
 

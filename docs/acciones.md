@@ -271,9 +271,9 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Historia de usuario:** [HU-10 — Cancelar un turno](hu/HU-10-cancelar-turno.md), [HU-31 — Ingresar como paciente y ver o cancelar mis turnos](hu/HU-31-portal-del-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`, `PATIENT`.
 **Entrada:** `appointmentId` (entero positivo), `reason` (1–500 caracteres, obligatorio), `requestedBy` (1–100 caracteres; obligatorio para el personal del centro; para `PATIENT` la DAL fija `"El paciente"`).
-**Precondiciones:** el turno existe y está en estado `SCHEDULED`. Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`). Si el actor es `PATIENT`, el turno debe pertenecer a su ficha (`patient.userId === actor.id`) y faltar al menos 24 horas para `startsAt`. El turno no tiene cobro vigente (`PAID`).
+**Precondiciones:** el turno existe y está en estado `SCHEDULED`. Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`). Si el actor es `PATIENT`, el turno debe pertenecer a su ficha (`patient.userId === actor.id`), faltar al menos 24 horas para `startsAt` y no tener pendiente el cambio obligatorio de contraseña temporal (`mustChangePassword !== true`). El turno no tiene cobro vigente (`PAID`).
 **Efectos:** transacción `Serializable` que actualiza `Appointment.status` a `CANCELLED` y crea un `AppointmentEvent` de tipo `CANCELLED` con `reason`, `requestedBy`, `userId` (actor) y `createdAt` (ahora). El horario queda libre de inmediato.
-**Errores:** `VALIDATION` (campo vacío o ID inválido), `FORBIDDEN` (rol no autorizado, o profesional/paciente intentando cancelar un turno ajeno), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`), `REASON_REQUIRED` (falta el motivo de cancelación), `CANCELLATION_WINDOW_EXPIRED` (el paciente intenta cancelar con menos de 24 horas de anticipación; [HU-31](hu/HU-31-portal-del-paciente.md)), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente; [HU-21](hu/HU-21-cobrar-turno.md)).
+**Errores:** `VALIDATION` (campo vacío o ID inválido), `FORBIDDEN` (rol no autorizado, profesional/paciente intentando cancelar un turno ajeno, o paciente con cambio de contraseña temporal pendiente), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`), `REASON_REQUIRED` (falta el motivo de cancelación), `CANCELLATION_WINDOW_EXPIRED` (el paciente intenta cancelar con menos de 24 horas de anticipación; [HU-31](hu/HU-31-portal-del-paciente.md)), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente; [HU-21](hu/HU-21-cobrar-turno.md)).
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`, `/portal`.
 **Devuelve:** `{ id }`.
 
@@ -282,9 +282,9 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Historia de usuario:** [HU-31 — Ingresar como paciente y ver o cancelar mis turnos](hu/HU-31-portal-del-paciente.md)
 **Roles:** `PATIENT`.
 **Entrada:** el `actor`.
-**Precondiciones:** el actor tiene rol `PATIENT` y está vinculado a un `Patient` activo (`patient.userId === actor.id`).
+**Precondiciones:** el actor tiene rol `PATIENT`, está vinculado a un `Patient` activo (`patient.userId === actor.id`) y no tiene pendiente el cambio obligatorio de contraseña temporal (`mustChangePassword !== true`).
 **Efectos:** ninguno. Es una lectura de todos los turnos propios del paciente. No consulta ni devuelve notas clínicas (`Encounter`), observaciones administrativas (`Appointment.notes`, `Patient.notes`) ni datos de otros pacientes.
-**Errores:** `FORBIDDEN` (el rol no es `PATIENT`), `NOT_FOUND` (el usuario no tiene ficha de paciente activa vinculada).
+**Errores:** `FORBIDDEN` (el rol no es `PATIENT` o el paciente tiene pendiente el cambio de contraseña temporal), `NOT_FOUND` (el usuario no tiene ficha de paciente activa vinculada).
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** `{ patient: { id, firstName, lastName, email, coverageType }, upcoming: PortalAppointmentItem[], past: PortalAppointmentItem[] }`. `upcoming` contiene los turnos `SCHEDULED` con `startsAt > now` ordenados del más próximo al más lejano (`startsAt` e `id` ascendentes), incluyendo `canCancel` (verdadero si faltan al menos 24 h y no tiene cobro vigente). `past` contiene el resto de los turnos ordenados del más reciente al más antiguo (`startsAt` e `id` descendentes). Cada ítem incluye `id`, `startsAt`, `endsAt`, `status`, `service` (`{ id, name, durationMinutes }`), `professional` (`{ id, firstName, lastName }`) y `activePayment` (`{ id, receiptNumber, amount }` si tiene un cobro `PAID`, o `null`).
 
@@ -970,9 +970,9 @@ No es una Server Action: la usa la pantalla *Turnos de hoy* (ADR 0001).
 **Historia de usuario:** [HU-24 — Emitir el comprobante de un cobro](hu/HU-24-comprobante-de-cobro.md)
 **Roles:** `RECEPTIONIST`, `MANAGER` (y `PATIENT` para sus propios turnos en HU-31). `PROFESSIONAL` sin acceso.
 **Entrada:** `paymentId` (entero positivo).
-**Precondiciones:** el cobro existe. Si el actor es `PATIENT`, el turno debe pertenecer al paciente. Si es `PROFESSIONAL`, se rechaza con `FORBIDDEN`.
+**Precondiciones:** el cobro existe. Si el actor es `PATIENT`, el turno debe pertenecer al paciente y no debe tener pendiente el cambio de contraseña temporal (`mustChangePassword !== true`). Si es `PROFESSIONAL`, se rechaza con `FORBIDDEN`.
 **Efectos:** ninguno.
-**Errores:** `VALIDATION` (ID inválido), `FORBIDDEN` (rol no autorizado o paciente ajeno), `NOT_FOUND` (cobro inexistente).
+**Errores:** `VALIDATION` (ID inválido), `FORBIDDEN` (rol no autorizado, paciente ajeno o paciente con contraseña temporal pendiente), `NOT_FOUND` (cobro inexistente).
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** los datos completos del comprobante: `receiptNumber`, `paymentId`, `status` (`PAID` o `VOIDED`), `amount` como texto decimal, `paymentMethod`, `createdAt`, `createdBy` (`{ id, firstName, lastName }`), datos de anulación si está anulado (`voidedAt`, `voidReason`, `voidedBy`), datos del turno (`appointment`: `{ id, startsAt, endsAt, service, professional }`), datos del paciente (`patient`: `{ id, firstName, lastName, documentType, documentNumber, email, coverageType, healthInsurer, healthPlan, affiliateNumber }`) y datos del centro (`centerProfile`).
 

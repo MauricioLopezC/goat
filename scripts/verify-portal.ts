@@ -199,6 +199,17 @@ async function main() {
           mustChangePassword: true,
         };
 
+        // Un paciente con contraseña temporal pendiente no puede cancelar ni listar turnos (HU-31)
+        await rejects(
+          () =>
+            cancelAppointment(
+              { appointmentId: 1, reason: "Intento previo al cambio de clave" },
+              patientActorA,
+            ),
+          "FORBIDDEN",
+        );
+        await rejects(() => listMyAppointments(patientActorA), "FORBIDDEN");
+
         // Cambiar contraseña en el primer ingreso
         await rejects(
           () =>

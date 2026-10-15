@@ -5,6 +5,7 @@ import {
   canPatientCancelAppointment,
   generateTemporaryPassword,
   hasMinimumCancellationNotice,
+  mustPatientChangePassword,
 } from "../src/lib/portal";
 
 test("hasMinimumCancellationNotice exige al menos 24 horas exactas de anticipación", () => {
@@ -108,4 +109,58 @@ test("generateTemporaryPassword genera claves alfanuméricas sin caracteres ambi
   const pwd = generateTemporaryPassword(12);
   assert.equal(pwd.length, 12);
   assert.match(pwd, /^[A-HJ-NP-Za-km-z2-9]+$/);
+});
+
+test("mustPatientChangePassword solo aplica al rol PATIENT con flag activo", () => {
+  assert.equal(
+    mustPatientChangePassword({ role: "PATIENT", mustChangePassword: true }),
+    true,
+  );
+  assert.equal(
+    mustPatientChangePassword({ role: "PATIENT", mustChangePassword: false }),
+    false,
+  );
+  assert.equal(mustPatientChangePassword({ role: "PATIENT" }), false);
+  assert.equal(
+    mustPatientChangePassword({
+      role: "RECEPTIONIST",
+      mustChangePassword: true,
+    }),
+    false,
+  );
+  assert.equal(
+    mustPatientChangePassword({ role: "MANAGER", mustChangePassword: true }),
+    false,
+  );
+  assert.equal(mustPatientChangePassword(undefined), false);
+});
+
+test("canPatientCancelAppointment bloquea la cancelación si el paciente debe cambiar su clave temporal", () => {
+  const now = new Date("2026-06-10T10:00:00.000Z");
+  const startsIn48h = new Date(
+    now.getTime() + 2 * PORTAL_CANCELLATION_ADVANCE_MS,
+  );
+  const appt = {
+    status: "SCHEDULED" as const,
+    startsAt: startsIn48h,
+    hasActivePayment: false,
+  };
+
+  // Con contraseña temporal pendiente -> bloqueado
+  assert.equal(
+    canPatientCancelAppointment(appt, now, {
+      role: "PATIENT",
+      mustChangePassword: true,
+    }),
+    false,
+  );
+
+  // Tras cambiar la contraseña -> permitido
+  assert.equal(
+    canPatientCancelAppointment(appt, now, {
+      role: "PATIENT",
+      mustChangePassword: false,
+    }),
+    true,
+  );
 });

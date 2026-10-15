@@ -15,8 +15,17 @@ export function hasMinimumCancellationNotice(
   return startsAt.getTime() - now.getTime() >= PORTAL_CANCELLATION_ADVANCE_MS;
 }
 
+/// ¿Debe el actor cambiar obligatoriamente su contraseña temporal antes de operar? (HU-31)
+export function mustPatientChangePassword(actor?: {
+  role?: string;
+  mustChangePassword?: boolean;
+}): boolean {
+  return actor?.role === "PATIENT" && Boolean(actor?.mustChangePassword);
+}
+
 /// ¿Puede el paciente cancelar este turno desde el portal en el instante `now`?
-/// Exige estado `SCHEDULED`, sin cobro vigente (`PAID`) y al menos 24 h de anticipación.
+/// Exige estado `SCHEDULED`, sin cobro vigente (`PAID`), al menos 24 h de anticipación
+/// y que el paciente no tenga pendiente el cambio obligatorio de contraseña (HU-31).
 export function canPatientCancelAppointment(
   appointment: {
     status: AppointmentStatus;
@@ -24,7 +33,14 @@ export function canPatientCancelAppointment(
     hasActivePayment: boolean;
   },
   now: Date = new Date(),
+  actor?: {
+    role?: string;
+    mustChangePassword?: boolean;
+  },
 ): boolean {
+  if (mustPatientChangePassword(actor)) {
+    return false;
+  }
   return (
     appointment.status === AppointmentStatus.SCHEDULED &&
     !appointment.hasActivePayment &&
