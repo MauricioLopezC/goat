@@ -1015,6 +1015,25 @@ El centro suma minutos y cantidades de todos los profesionales y calcula las tas
 
 No es una Server Action: la usa el Server Component de `/dashboard` (ADR 0001).
 
+### `getProfessionalIndicators`
+
+**Historia de usuario:** [HU-30 — Ver mi tablero de profesional](hu/HU-30-tablero-del-profesional.md)
+**Roles:** `PROFESSIONAL`.
+**Entrada:** `input: { from: string, to: string }` (período en meses `AAAA-MM`, hasta 3 meses) y el `actor`.
+**Precondiciones:** el actor tiene rol `PROFESSIONAL` y existe su perfil profesional en la base de datos (`userId === actor.id`). `from` no es posterior a `to` y el período no supera los 3 meses.
+**Efectos:** ninguno. Es una lectura de la actividad clínica y turnos propios del profesional en el período elegido, todo en hora del centro:
+- **Turnos totales y desglose por estado:** cantidad de turnos dados del profesional en el período (`startsAt` dentro del rango) y porcentajes de `COMPLETED`, `EXPIRED` y `CANCELLED` sobre el total.
+- **Turnos por servicio:** cantidad de turnos dados agrupados por prestación brindada, ordenados por cantidad descendente y nombre alfabéticamente, con su porcentaje sobre el total de turnos.
+- **Pacientes atendidos y nuevos:** cantidad de pacientes distintos con al menos un turno `COMPLETED` en el período, y cuántos son nuevos (primer turno completado con este profesional en el centro, sin turnos completados previos con él).
+- **Pacientes por sexo:** porcentaje de distribución de pacientes atendidos según su sexo (`FEMALE`, `MALE`, `OTHER`).
+- **Pacientes por edad:** porcentaje de pacientes atendidos agrupados en 4 rangos etarios calculados a la fecha del turno: menores de 18 años, 18 a 39 años, 40 a 64 años, 65 años o más.
+**Errores:** `FORBIDDEN` (si el actor no es `PROFESSIONAL`), `NOT_FOUND` (no se encuentra el perfil profesional), `VALIDATION` (período inválido o de más de 3 meses).
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ professional: { id, firstName, lastName }, period: { from, to }, metrics: ProfessionalMetrics }`.
+
+No es una Server Action: la usa el Server Component de `/dashboard` (ADR 0001).
+
+
 ### `createEncounter`
 
 **Historia de usuario:** [HU-25 — Registrar la atención](hu/HU-25-registrar-la-atencion.md)

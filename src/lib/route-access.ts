@@ -37,7 +37,7 @@ const ROUTE_RULES: RouteRule[] = [
   { pattern: /^\/today(\/|$)/, roles: FRONT_DESK },
   { pattern: /^\/holidays(\/|$)/, roles: STAFF },
   { pattern: /^\/users(\/|$)/, roles: ["MANAGER"] },
-  { pattern: /^\/dashboard(\/|$)/, roles: ["MANAGER"] },
+  { pattern: /^\/dashboard(\/|$)/, roles: ["MANAGER", "PROFESSIONAL"] },
   { pattern: /^\/agenda(\/|$)/, roles: STAFF },
   { pattern: /^\/my-schedule(\/|$)/, roles: ["PROFESSIONAL"] },
   { pattern: /^\/calendar(\/|$)/, roles: FRONT_DESK },

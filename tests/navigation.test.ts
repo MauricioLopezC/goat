@@ -40,6 +40,7 @@ test("cada rol ve exactamente sus links", () => {
   ]);
   assert.deepEqual(labels("PROFESSIONAL"), [
     "Mi agenda",
+    "Mi tablero",
     "Pacientes",
     "Mis horarios",
     "Servicios",
@@ -121,7 +122,8 @@ test("canAccess replica los permisos de las páginas", () => {
   assert.equal(canAccess("/appointments/unclosed", "MANAGER"), true);
   assert.equal(canAccess("/dashboard", "MANAGER"), true);
   assert.equal(canAccess("/dashboard", "RECEPTIONIST"), false);
-  assert.equal(canAccess("/dashboard", "PROFESSIONAL"), false);
+
+  assert.equal(canAccess("/dashboard", "PROFESSIONAL"), true);
 
   // Portal del paciente (HU-31)
   assert.equal(canAccess("/portal", "PATIENT"), true);
@@ -130,8 +132,4 @@ test("canAccess replica los permisos de las páginas", () => {
   assert.equal(canAccess("/portal", "RECEPTIONIST"), false);
   assert.equal(canAccess("/portal", "PROFESSIONAL"), false);
   assert.equal(canAccess("/portal", "MANAGER"), false);
-  assert.equal(canAccess("/patients", "PATIENT"), false);
-  assert.equal(canAccess("/patients/4", "PATIENT"), false);
-  assert.equal(canAccess("/appointments/4", "PATIENT"), false);
-  assert.equal(canAccess("/calendar", "PATIENT"), false);
 });

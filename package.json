@@ -29,6 +29,7 @@
     "test:schema:db": "tsx scripts/verify-schema-increment-3.ts",
     "test:seed:db": "tsx scripts/verify-seed-demo.ts",
     "test:indicators:db": "node --env-file=.env --import ./scripts/server-only-test-loader.mjs --import tsx scripts/verify-center-metrics.ts",
+    "test:professional-indicators:db": "node --env-file=.env --import ./scripts/server-only-test-loader.mjs --import tsx scripts/verify-professional-indicators.ts",
     "test:encounters:db": "node --env-file=.env --import ./scripts/server-only-test-loader.mjs --import tsx scripts/verify-encounters.ts"
   },
   "dependencies": {
