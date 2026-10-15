@@ -198,9 +198,10 @@ export function CloseCashDialog({
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Aviso importante</AlertTitle>
             <AlertDescription className="text-scheduled-soft-foreground text-xs">
-              Una vez cerrada la caja, se genera la foto del cierre.
-              Posteriormente, solo el gerente podrá anular cobros de este día
-              como ajuste posterior.
+              Una vez cerrada la caja, se genera la foto definitiva del cierre:
+              no se podrán registrar nuevos cobros para este día (ni recobros
+              tras anulación) y posteriormente solo el gerente podrá anular
+              cobros como ajuste posterior.
             </AlertDescription>
           </Alert>
 

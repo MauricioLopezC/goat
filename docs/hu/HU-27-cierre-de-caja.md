@@ -17,19 +17,20 @@
 - Se cierra el día de hoy o un día anterior que haya quedado abierto.
 - Si la diferencia no es cero, las observaciones son obligatorias.
 - Un cobro de una caja cerrada solo lo anula el gerente, con motivo.
+- Una vez cerrada la caja del día, no se admiten nuevos cobros contra esa fecha (incluidos recobros de turnos cuyos cobros fueron anulados).
 
 ## Comportamiento
 
 - La pantalla **Caja** muestra la caja de hoy en vivo: los totales se actualizan con cada cobro y cada anulación, y la lista de cobros abre su comprobante ([HU-24](HU-24-comprobante-de-cobro.md)).
 - **Cerrar caja** pide el efectivo contado, muestra la diferencia y confirma.
 - Un cobro de un turno de un día anterior cae en la caja del día en que se cobra, no en la del turno.
-- **Corrección del gerente:** si anula un cobro de una caja cerrada, la caja no se reabre: muestra la anulación como ajuste posterior, con quién, cuándo y por qué, y el total corregido junto al original. El turno se puede volver a cobrar, y ese cobro cae en la caja del día.
+- **Corrección del gerente:** si anula un cobro de una caja cerrada, la caja no se reabre: muestra la anulación como ajuste posterior, con quién, cuándo y por qué, y el total corregido junto al original. El turno se puede volver a cobrar, y ese cobro cae en la caja del día en que se registre (siempre que la caja de ese día esté abierta).
 - Las cajas cerradas quedan en una lista por fecha con su resumen.
 - Arriba de *Turnos de hoy* se avisa si hay días anteriores con la caja sin cerrar.
 
 ## Confirmación
 
-- Antes de cerrar, muestra totales, efectivo contado y diferencia, y avisa que después solo el gerente podrá anular cobros del día.
+- Antes de cerrar, muestra totales, efectivo contado y diferencia, y avisa que una vez cerrada no se podrán registrar nuevos cobros para este día y que solo el gerente podrá anular cobros del día como ajuste posterior.
 
 ## Permisos
 
@@ -49,3 +50,4 @@
 - Devolución del Inc. 2 (general): "el cierre de caja por profesional, que quede mejor".
 - **Supuesto del equipo:** una sola caja para el centro, no una por recepcionista ni por profesional; el detalle por profesional va dentro de la caja. A confirmar.
 - **Decisión del equipo (05/10/2026):** el gerente corrige un cobro mal cargado después del cierre.
+- **Bloqueo de cobros tras el cierre:** una vez cerrada la caja de un día, no se admite registrar nuevos cobros ni recobros para esa fecha a fin de garantizar la intangibilidad de la rendición. Si un paciente debe volver a abonar un turno tras una corrección, el nuevo cobro debe registrarse en una fecha cuya caja esté abierta. A conversar con el cliente si se requiere una ventana de gracia o reapertura de caja para el mismo día.

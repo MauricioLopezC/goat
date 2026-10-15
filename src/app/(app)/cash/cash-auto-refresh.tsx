@@ -5,13 +5,11 @@ import { useRouter } from "next/navigation";
 
 const REFRESH_INTERVAL_MS = 5000;
 
-export function CashAutoRefresh({ isClosed }: { isClosed: boolean }) {
+export function CashAutoRefresh(_props?: { isClosed?: boolean }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (isClosed) return;
-
-    // 1. Refresco periódico cuando la caja está abierta y la pestaña visible (H6)
+    // 1. Refresco periódico cuando la pestaña está visible (H6, R3)
     const intervalId = setInterval(() => {
       if (document.visibilityState === "visible") {
         router.refresh();
@@ -58,7 +56,7 @@ export function CashAutoRefresh({ isClosed }: { isClosed: boolean }) {
         channel.close();
       }
     };
-  }, [isClosed, router]);
+  }, [router]);
 
   return null;
 }

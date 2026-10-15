@@ -1083,7 +1083,7 @@ No es una Server Action: la usa el Server Component del detalle del turno `/appo
 
 **Historia de usuario:** [HU-27 — Cerrar la caja del día](hu/HU-27-cierre-de-caja.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`. La recepcionista accede a la caja de hoy (abierta o cerrada) y a cajas de días abiertos; el gerente consulta además cualquier caja cerrada histórica.
-**Entrada:** `date` (AAAA-MM-DD, opcional; por defecto la fecha de hoy en hora del centro).
+**Entrada:** `date` (AAAA-MM-DD, fecha en formato calendario local).
 **Precondiciones:** rol autorizado; fecha válida en el calendario.
 **Efectos:** ninguno. Si no está cerrada, calcula en vivo los cobros vigentes (`PAID`) de ese día local (de 00:00 a 23:59:59.999 hora de Argentina): cantidad, total general, total por medio de pago, total por profesional y efectivo esperado. Lista los cobros del día y los cobros anulados durante el día. Si está cerrada, lee los totales y arqueo registrados en `CashClosing` y calcula los ajustes posteriores (cobros de esa caja anulados luego del cierre por gerencia) junto a los totales corregidos.
 **Errores:** `FORBIDDEN`, `VALIDATION` (fecha inválida).
@@ -1118,7 +1118,7 @@ No es una Server Action: la usa el Server Component del detalle del turno `/appo
 **Roles:** `RECEPTIONIST`, `MANAGER`.
 **Entrada:** ninguna.
 **Precondiciones:** rol autorizado.
-**Efectos:** ninguno. Consulta las fechas locales anteriores a hoy que tengan cobros registrados (`Payment`) con `cashClosingId === null`.
+**Efectos:** ninguno. Consulta las fechas locales anteriores a hoy que tengan cobros registrados (`Payment`) con `cashClosingId === null`, excluyendo las fechas que ya cuenten con un cierre de caja registrado (`CashClosing`).
 **Errores:** `FORBIDDEN`.
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** `string[]` con las fechas pendientes de cierre en formato AAAA-MM-DD.

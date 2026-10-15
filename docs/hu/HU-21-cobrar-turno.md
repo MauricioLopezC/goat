@@ -19,6 +19,7 @@
 - El servicio tiene que tener valor cargado ([HU-20](HU-20-aranceles-y-medios-de-pago.md)); si no, el sistema avisa y no cobra.
 - El medio de pago tiene que estar activo. Un cobro se paga con un solo medio.
 - "Hoy" es el día calendario en la hora de Argentina.
+- La caja del día no debe estar cerrada: una vez cerrada la caja diaria ([HU-27](HU-27-cierre-de-caja.md)), no se pueden registrar cobros correspondientes a esa fecha.
 
 ## Comportamiento
 
@@ -74,3 +75,4 @@
   - **Decisión del equipo (01/10/2026):** la pantalla es *Turnos de hoy*, con todos los turnos del día, y no una lista de cobros pendientes: se cobra cuando llega el paciente, así que la recepcionista busca el turno por horario, no por deuda.
 - ¿*Turnos de hoy* muestra también turnos Completados de días anteriores que quedaron sin cobrar?
   - **Supuesto del equipo:** no, solo los de hoy. Los anteriores se cobran desde el detalle del turno. A confirmar.
+- **Bloqueo de cobros tras el cierre:** una vez cerrada la caja diaria ([HU-27](HU-27-cierre-de-caja.md)), el sistema no admite registrar nuevos cobros para esa fecha. A conversar con el cliente el tratamiento de cobros tardíos o recobros del mismo día.

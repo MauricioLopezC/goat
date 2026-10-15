@@ -66,25 +66,53 @@ test("closeCashSchema: trunca y convierte observaciones vacías a null", () => {
   assert.equal(emptyNotes.data.notes, null);
 });
 
-test("isCashPayment: identifica Efectivo por flag isCash o por nombre (H5)", () => {
-  // Con flag isCash en Payment o PaymentMethod (inmune a renombrados)
-  assert.equal(isCashPayment({ isCash: true }), true);
+test("isCashPayment: identifica Efectivo por flag isCash o por nombre (H5, R2)", () => {
+  // 1. Prioridad absoluta del flag persistido en Payment (tanto true como false, inmune a renombrados)
+  assert.equal(
+    isCashPayment({
+      isCash: true,
+      paymentMethod: { isCash: false, name: "Transferencia bancaria" },
+    }),
+    true,
+  );
+  assert.equal(
+    isCashPayment({
+      isCash: true,
+      paymentMethod: { name: "Contado" },
+    }),
+    true,
+  );
+  // R2: Si el pago se registró como débito (isCash=false), renombrar el medio a "Efectivo alternativo" no lo altera
   assert.equal(
     isCashPayment({
       isCash: false,
+      paymentMethod: { isCash: true, name: "Efectivo alternativo" },
+    }),
+    false,
+  );
+  assert.equal(
+    isCashPayment({
+      isCash: false,
+      paymentMethod: { name: "Efectivo alternativo" },
+    }),
+    false,
+  );
+
+  // 2. Prioridad secundaria del flag en PaymentMethod cuando Payment.isCash es undefined
+  assert.equal(
+    isCashPayment({
       paymentMethod: { isCash: true, name: "Contado" },
     }),
     true,
   );
   assert.equal(
     isCashPayment({
-      isCash: false,
-      paymentMethod: { isCash: false, name: "Contado" },
+      paymentMethod: { isCash: false, name: "Efectivo alternativo" },
     }),
     false,
   );
 
-  // Por nombre cuando no hay flag
+  // 3. Por nombre solo cuando ningún flag está definido
   assert.equal(isCashPayment({ paymentMethod: { name: "Efectivo" } }), true);
   assert.equal(isCashPayment({ paymentMethod: { name: "EFECTIVO" } }), true);
   assert.equal(

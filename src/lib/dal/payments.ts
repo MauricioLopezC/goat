@@ -238,10 +238,11 @@ export async function listTodayAppointments(actor: Actor, now = new Date()) {
   });
 }
 
+export type RegisterPaymentDalInput = RegisterPaymentInput & { now?: Date };
+
 export async function registerPayment(
-  input: RegisterPaymentInput,
+  input: RegisterPaymentDalInput,
   actor: Actor,
-  now = new Date(),
 ) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
   const parsed = registerPaymentSchema.safeParse(input);
@@ -250,6 +251,7 @@ export async function registerPayment(
   const { appointmentId, paymentMethodId } = parsed.data;
   try {
     return await serializableTransaction(async (tx) => {
+      const now = input.now ?? new Date();
       const appointment = await tx.appointment.findUnique({
         where: { id: appointmentId },
         select: {
@@ -336,11 +338,9 @@ function alreadyPaidError() {
   );
 }
 
-export async function voidPayment(
-  input: VoidPaymentInput,
-  actor: Actor,
-  now = new Date(),
-) {
+export type VoidPaymentDalInput = VoidPaymentInput & { now?: Date };
+
+export async function voidPayment(input: VoidPaymentDalInput, actor: Actor) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
   const parsed = voidPaymentSchema.safeParse(input);
   if (!parsed.success)
@@ -354,7 +354,12 @@ export async function voidPayment(
   return serializableTransaction(async (tx) => {
     const existing = await tx.payment.findUnique({
       where: { id: paymentId },
-      select: { id: true, status: true, cashClosingId: true },
+      select: {
+        id: true,
+        status: true,
+        cashClosingId: true,
+        cashClosing: { select: { closedAt: true } },
+      },
     });
     if (!existing) throw new DomainError("NOT_FOUND", "El cobro no existe.");
     if (existing.status !== PaymentStatus.PAID)
@@ -367,6 +372,17 @@ export async function voidPayment(
         "FORBIDDEN",
         "Un cobro de una caja cerrada solo puede ser anulado por el gerente.",
       );
+    }
+
+    // Instante efectivo evaluado dentro del intento que realiza la mutación (R1).
+    // Si el cobro pertenecía a una caja ya cerrada, garantizamos que voidedAt > closedAt
+    // para que quede unívocamente registrado como ajuste posterior en resumen e historial.
+    let voidedAt = input.now ?? new Date();
+    if (
+      existing.cashClosing?.closedAt &&
+      voidedAt <= existing.cashClosing.closedAt
+    ) {
+      voidedAt = new Date(existing.cashClosing.closedAt.getTime() + 1000);
     }
 
     // La condición de estado y de caja cerrada van en el mismo UPDATE:
@@ -383,7 +399,7 @@ export async function voidPayment(
       where: whereCondition,
       data: {
         status: PaymentStatus.VOIDED,
-        voidedAt: now,
+        voidedAt,
         voidedById: actor.id,
         voidReason: reason,
       },

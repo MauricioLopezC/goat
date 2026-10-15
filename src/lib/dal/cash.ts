@@ -635,13 +635,12 @@ export async function listCashClosings(
  * Identifica días anteriores a hoy con cobros registrados pero sin cerrar (HU-27).
  * Se utiliza para la advertencia en "Turnos de hoy".
  */
-export async function getUnclosedCashDays(
-  actor: Actor,
-  now = new Date(),
-): Promise<string[]> {
+export async function getUnclosedCashDays(actor: Actor): Promise<string[]> {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
 
+  const now = new Date();
   const todayStr = toLocalSlot(now).date;
+
   const todayStart = appointmentInstant(todayStr, 0);
 
   const [unclosedPayments, closings] = await Promise.all([

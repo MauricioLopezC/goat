@@ -77,8 +77,9 @@ export function isCashPayment(p: {
   isCash?: boolean;
   paymentMethod?: { isCash?: boolean; name?: string };
 }): boolean {
-  if (p.isCash === true) return true;
-  if (p.paymentMethod?.isCash === true) return true;
+  if (typeof p.isCash === "boolean") return p.isCash;
+  if (typeof p.paymentMethod?.isCash === "boolean")
+    return p.paymentMethod.isCash;
   if (p.paymentMethod?.name) {
     return normalizeSearchText(p.paymentMethod.name).includes("efectivo");
   }

@@ -73,6 +73,8 @@ Equivalencias entre el lenguaje del dominio (español, ver `contexto-goat.md`) y
 | Autor de la atención | `Encounter.professionalId` | Profesional que registra las notas. |
 | Cambio de contraseña pendiente | `User.mustChangePassword` | Acceso con contraseña temporal; HU-31 exige cambiarla al ingresar. |
 | Caja del cobro | `Payment.cashClosingId` | Nulo hasta cerrar el día de cobro. |
+| Medio en efectivo | `PaymentMethod.isCash` | Clasificación booleana del medio para determinar si suma al efectivo esperado de la caja ([HU-20](hu/HU-20-aranceles-y-medios-de-pago.md), [HU-27](hu/HU-27-cierre-de-caja.md)). |
+| Cobro en efectivo | `Payment.isCash` | Clasificación booleana inmutable capturada del medio al cobrar; previene que renombrados posteriores alteren arqueos cerrados o esperados ([HU-27](hu/HU-27-cierre-de-caja.md)). |
 | Cantidad y total originales al cierre | `CashClosing.paymentCount`, `totalAmount` | Foto de los cobros vigentes al cerrar; no cambia ante anulaciones posteriores. |
 | Efectivo esperado y contado | `CashClosing.expectedCashAmount`, `countedCashAmount` | Original del sistema frente al conteo físico. |
 | Diferencia de caja | `CashClosing.difference` | Contado menos esperado. Si no es cero exige `notes`. |
