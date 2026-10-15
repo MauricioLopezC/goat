@@ -42,5 +42,35 @@ export const createUserSchema = z.object({
     .transform((value) => value || undefined),
 });
 
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Ingresá tu contraseña actual"),
+    newPassword: z
+      .string()
+      .min(
+        MIN_PASSWORD_LENGTH,
+        `La nueva contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`,
+      )
+      .max(200, "La contraseña es demasiado larga"),
+    confirmPassword: z.string().min(1, "Confirmá tu nueva contraseña"),
+  })
+  .superRefine((data, ctx) => {
+    if (data.newPassword && data.currentPassword === data.newPassword) {
+      ctx.addIssue({
+        code: "custom",
+        message: "La nueva contraseña debe ser distinta de la actual",
+        path: ["newPassword"],
+      });
+    }
+    if (data.confirmPassword && data.newPassword !== data.confirmPassword) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Las contraseñas no coinciden",
+        path: ["confirmPassword"],
+      });
+    }
+  });
+
 export type SignInInput = z.infer<typeof signInSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

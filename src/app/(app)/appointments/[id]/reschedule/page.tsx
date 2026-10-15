@@ -73,26 +73,32 @@ export default async function ReschedulePage({
     );
   }
 
-  // Profesionales activos que prestan este servicio y tienen franjas de atención
-  const professionals = await prisma.professional.findMany({
-    where: {
-      active: true,
-      services: { some: { id: appointment.service.id, active: true } },
-      availabilityWindows: {
-        some: {
-          OR: [
-            { services: { none: {} } },
-            { services: { some: { id: appointment.service.id } } },
-          ],
+  const canChangeProfessional =
+    actor.role === "RECEPTIONIST" || actor.role === "MANAGER";
+
+  // Solo mesa de entradas y gerente necesitan opciones de otras agendas.
+  const professionals = canChangeProfessional
+    ? await prisma.professional.findMany({
+        where: {
+          active: true,
+          services: { some: { id: appointment.service.id, active: true } },
+          availabilityWindows: {
+            some: {
+              OR: [
+                { services: { none: {} } },
+                { services: { some: { id: appointment.service.id } } },
+              ],
+            },
+          },
         },
-      },
-    },
-    select: { id: true, firstName: true, lastName: true },
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-  });
+        select: { id: true, firstName: true, lastName: true },
+        orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      })
+    : [appointment.professional];
 
   const queryProfessionalId = positiveId(query.professionalId);
   const selectedProfessionalId =
+    canChangeProfessional &&
     queryProfessionalId &&
     professionals.some((p) => p.id === queryProfessionalId)
       ? queryProfessionalId
@@ -167,7 +173,9 @@ export default async function ReschedulePage({
           Reprogramar turno #{appointment.id}
         </h1>
         <p className="text-muted-foreground">
-          Elegí un nuevo día, horario u otro profesional para el mismo servicio.
+          {canChangeProfessional
+            ? "Elegí un nuevo día, horario u otro profesional para el mismo servicio."
+            : "Elegí un nuevo día y horario dentro de tu agenda."}{" "}
           El horario actual quedará liberado de inmediato.
         </p>
       </header>
@@ -181,6 +189,7 @@ export default async function ReschedulePage({
         currentStartsAt={appointment.startsAt.toISOString()}
         currentEndsAt={appointment.endsAt.toISOString()}
         professionals={professionals}
+        canChangeProfessional={canChangeProfessional}
         selectedProfessionalId={selectedProfessionalId}
         availableDates={availableDates}
         visibleDates={visibleDates}

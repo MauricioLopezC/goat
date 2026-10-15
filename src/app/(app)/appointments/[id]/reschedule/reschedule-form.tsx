@@ -66,7 +66,8 @@ export function RescheduleForm({
   currentStartsAt,
   currentEndsAt,
   professionals,
-  selectedProfessionalId,
+  canChangeProfessional,
+  selectedProfessionalId: requestedProfessionalId,
   availableDates,
   visibleDates,
   visibleDatePage,
@@ -81,6 +82,7 @@ export function RescheduleForm({
   currentStartsAt: string;
   currentEndsAt: string;
   professionals: ProfessionalOption[];
+  canChangeProfessional: boolean;
   selectedProfessionalId: number;
   availableDates: string[];
   visibleDates: string[];
@@ -90,6 +92,9 @@ export function RescheduleForm({
   availabilityError: string;
 }) {
   const router = useRouter();
+  const selectedProfessionalId = canChangeProfessional
+    ? requestedProfessionalId
+    : currentProfessional.id;
   const [startTime, setStartTime] = useState("");
   const [reason, setReason] = useState("");
   const [requestedBy, setRequestedBy] = useState("");
@@ -142,6 +147,7 @@ export function RescheduleForm({
     const result = await rescheduleAppointment({
       appointmentId,
       newProfessionalId:
+        canChangeProfessional &&
         selectedProfessionalId !== currentProfessional.id
           ? selectedProfessionalId
           : undefined,
@@ -168,6 +174,7 @@ export function RescheduleForm({
   }, null);
 
   function handleProfessionalChange(newId: string) {
+    if (!canChangeProfessional) return;
     const params = new URLSearchParams();
     if (newId && Number(newId) !== currentProfessional.id) {
       params.set("professionalId", newId);
@@ -181,7 +188,10 @@ export function RescheduleForm({
 
   function datesHref(page: number, date?: string) {
     const params = new URLSearchParams();
-    if (selectedProfessionalId !== currentProfessional.id) {
+    if (
+      canChangeProfessional &&
+      selectedProfessionalId !== currentProfessional.id
+    ) {
       params.set("professionalId", String(selectedProfessionalId));
     }
     if (page > 1) params.set("datePage", String(page));
@@ -216,7 +226,9 @@ export function RescheduleForm({
       startTime === formatMinute(currentStartSlot.minute)
     ) {
       setValidationError(
-        "El nuevo horario o profesional debe ser diferente al actual.",
+        canChangeProfessional
+          ? "El nuevo horario o profesional debe ser diferente al actual."
+          : "El nuevo horario debe ser diferente al actual.",
       );
       return;
     }
@@ -275,7 +287,20 @@ export function RescheduleForm({
         {/* 2. Profesional */}
         <div className="rounded-lg border bg-card p-4 text-card-foreground flex flex-col gap-3">
           <h2 className="text-title-md font-semibold">1. Profesional</h2>
-          {professionals.length <= 1 ? (
+          {!canChangeProfessional ? (
+            <div className="flex flex-col gap-1 text-sm">
+              <p>
+                Atiende:{" "}
+                <strong>
+                  {currentProfessional.lastName},{" "}
+                  {currentProfessional.firstName}
+                </strong>
+              </p>
+              <p className="text-muted-foreground">
+                Solo podés reprogramar dentro de tu propia agenda.
+              </p>
+            </div>
+          ) : professionals.length <= 1 ? (
             <p className="text-sm">
               Atiende:{" "}
               <strong>

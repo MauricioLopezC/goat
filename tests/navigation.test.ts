@@ -122,5 +122,16 @@ test("canAccess replica los permisos de las páginas", () => {
   assert.equal(canAccess("/appointments/unclosed", "MANAGER"), true);
   assert.equal(canAccess("/dashboard", "MANAGER"), true);
   assert.equal(canAccess("/dashboard", "RECEPTIONIST"), false);
+
+
   assert.equal(canAccess("/dashboard", "PROFESSIONAL"), true);
-});
+
+  // Portal del paciente (HU-31)
+  assert.equal(canAccess("/portal", "PATIENT"), true);
+  assert.equal(canAccess("/portal/change-password", "PATIENT"), true);
+  assert.equal(canAccess("/portal/payments/1/receipt", "PATIENT"), true);
+  assert.equal(canAccess("/portal", "RECEPTIONIST"), false);
+  assert.equal(canAccess("/portal", "PROFESSIONAL"), false);
+  assert.equal(canAccess("/portal", "MANAGER"), false);
+  
+  });

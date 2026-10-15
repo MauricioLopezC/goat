@@ -7,7 +7,7 @@
 ## Datos
 
 - **Obligatorios:** nueva fecha y hora; motivo y quién lo solicitó (el paciente, el profesional, el centro).
-- **Opcionales:** otro profesional que preste el mismo servicio.
+- **Opcionales:** otro profesional que preste el mismo servicio, solo para mesa de entradas y gerente.
 - **Registrados por el sistema:** usuario, fecha y hora del cambio, y el horario y profesional anteriores.
 
 ## Validaciones
@@ -32,19 +32,19 @@
 
 ## Permisos
 
-- `RECEPTIONIST` y `MANAGER`: reprograman cualquier turno.
-- `PROFESSIONAL`: reprograma sus propios turnos (incorporado a partir de la revisión con el cliente).
+- `RECEPTIONIST` y `MANAGER`: reprograman cualquier turno y pueden elegir otro profesional habilitado.
+- `PROFESSIONAL`: reprograma sus propios turnos únicamente dentro de su agenda, conservando el profesional. Quién solicitó el cambio (`requestedBy`) no modifica estos permisos.
 
 ## Operaciones
 
-- `rescheduleAppointment` — errores esperados: `INVALID_STATUS_TRANSITION` si el turno no está Programado o ya comenzó, `REASON_REQUIRED`, y los mismos de `createAppointment` si el nuevo horario no está disponible (`APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`, `OUTSIDE_AVAILABILITY_WINDOW`).
+- `rescheduleAppointment` — errores esperados: `FORBIDDEN` si el profesional intenta reprogramar un turno ajeno o transferir uno propio a otro profesional, `INVALID_STATUS_TRANSITION` si el turno no está Programado o ya comenzó, `REASON_REQUIRED`, y los mismos de `createAppointment` si el nuevo horario no está disponible (`APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`, `OUTSIDE_AVAILABILITY_WINDOW`).
 - `listAvailableDates`, `listAvailableSlots` — aceptan el turno que se reprograma, para no contarlo como ocupado.
 
 ## Criterios de aceptación verificables
 
 1. Mesa de entradas, gerente y el profesional (sobre sus propios turnos) pueden reprogramar; el profesional no puede reprogramar turnos ajenos.
 2. Solo se puede reprogramar un turno en estado Programado (`SCHEDULED`) que todavía no haya comenzado (`startsAt > now`). Un turno cancelado, completado, vencido o ya comenzado se rechaza con `INVALID_STATUS_TRANSITION`.
-3. El paciente y el servicio quedan fijos. Se permite conservar el mismo profesional o elegir otro profesional activo que preste el servicio y tenga franjas habilitadas.
+3. El paciente y el servicio quedan fijos. Mesa de entradas y gerente pueden conservar el mismo profesional o elegir otro profesional activo que preste el servicio y tenga franjas habilitadas. El profesional solo puede cambiar fecha y horario de sus turnos, conservando el profesional actual.
 4. El selector de fechas y horarios ofrece bloques disponibles calculados según las reglas de [HU-09](HU-09-asignar-turno.md) (franja habilitada, sin feriados ni ausencias, dentro de los dos meses y no pasado).
 5. El turno que se reprograma no cuenta como ocupado en la consulta de fechas ni horarios (`excludeAppointmentId`), permitiendo moverlo dentro del mismo día sin que se auto-bloquee.
 6. Sin motivo (`reason`) no se reprograma (`REASON_REQUIRED`). Se registra obligatoriamente quién solicitó el cambio (`requestedBy`: paciente, profesional o centro).
@@ -52,6 +52,8 @@
 8. La transacción genera un evento inmutable en el historial (`AppointmentEvent`) con tipo `RESCHEDULED`, horario y profesional anteriores y nuevos, motivo, solicitante, usuario actor y fecha del cambio.
 9. Si otro usuario toma el mismo horario a la vez, gana el primero: las restricciones de exclusión de PostgreSQL respaldan ambos solapamientos (`APPOINTMENT_OVERLAP` o `PATIENT_APPOINTMENT_OVERLAP`) y se informa el error refrescando la grilla.
 10. La interfaz pide confirmación mostrando el horario/profesional anterior y el nuevo, y tras confirmar muestra un mensaje de éxito con el nuevo día, hora y profesional.
+11. Para `PROFESSIONAL`, la interfaz muestra el profesional fijo y explica la restricción, sin selector. Un `professionalId` manipulado en la URL se ignora: fechas, horarios, enlaces y confirmación siguen correspondiendo al profesional actual.
+12. Una solicitud directa de `PROFESSIONAL` con `newProfessionalId` distinto del actual se rechaza con `FORBIDDEN` antes de consultar la disponibilidad del destino, sin modificar el turno ni crear eventos. Omitir ese campo o enviar el ID actual permite reprogramar dentro de la agenda propia, sujeto al resto de las validaciones.
 
 ## A conversar
 
