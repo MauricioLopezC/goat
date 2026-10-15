@@ -28,6 +28,9 @@ export const voidCashPayment = defineAction({
     const result = await voidPaymentInDal(input, actor);
     revalidatePath("/cash");
     revalidatePath("/today");
+    revalidatePath("/cash/history");
+    revalidatePath("/calendar");
+    revalidatePath("/agenda");
     revalidatePath(`/appointments/${result.appointmentId}`);
     return result;
   },

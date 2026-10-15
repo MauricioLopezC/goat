@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { CloseCashDialog } from "./close-cash-dialog";
 import { VoidClosedPaymentDialog } from "./void-closed-payment-dialog";
+import { CashAutoRefresh } from "./cash-auto-refresh";
 
 export const metadata: Metadata = { title: "Caja · Goat" };
 
@@ -56,8 +57,14 @@ export default async function CashPage({
   const targetDate = date && isCalendarDate(date) ? date : today;
 
   let cashSummary;
+  let unclosedDays: string[] = [];
   try {
-    cashSummary = await getCashSummary(targetDate, actor);
+    const [summary, unclosed] = await Promise.all([
+      getCashSummary(targetDate, actor),
+      getUnclosedCashDays(actor),
+    ]);
+    cashSummary = summary;
+    unclosedDays = unclosed;
   } catch (error) {
     if (
       error instanceof DomainError &&
@@ -89,14 +96,14 @@ export default async function CashPage({
     throw error;
   }
 
-  const unclosedDays = await getUnclosedCashDays(actor);
   const isToday = targetDate === today;
 
   return (
     <div className="flex flex-col gap-6">
+      <CashAutoRefresh isClosed={cashSummary.isClosed} />
       {/* Mensaje de caja cerrada con éxito */}
       {closed && isCalendarDate(closed) && (
-        <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border print:hidden">
+        <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Caja cerrada exitosamente</AlertTitle>
           <AlertDescription>
@@ -108,7 +115,7 @@ export default async function CashPage({
 
       {/* Alerta de días anteriores sin cerrar */}
       {unclosedDays.length > 0 && (
-        <Alert className="bg-warning-soft text-warning-soft-foreground border-warning-soft-border print:hidden">
+        <Alert className="bg-warning-soft text-warning-soft-foreground border-warning-soft-border">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Cajas anteriores sin cerrar</AlertTitle>
           <AlertDescription className="text-warning-soft-foreground flex flex-col gap-1.5 mt-1">
@@ -133,7 +140,7 @@ export default async function CashPage({
 
       {/* Botón para volver a la caja de hoy cuando se consulta una fecha anterior */}
       {!isToday && (
-        <div className="print:hidden -mb-2">
+        <div className="-mb-2">
           <Button
             variant="ghost"
             size="sm"
@@ -510,7 +517,7 @@ export default async function CashPage({
                   <TableHead>Profesional · Servicio</TableHead>
                   <TableHead>Medio de pago</TableHead>
                   <TableHead className="text-right">Importe</TableHead>
-                  <TableHead className="text-right print:hidden">
+                  <TableHead className="text-right">
                     <span className="sr-only">Acciones</span>
                   </TableHead>
                 </TableRow>
@@ -554,7 +561,7 @@ export default async function CashPage({
                     <TableCell className="text-right tabular-nums font-semibold">
                       {formatAmount(p.amount)}
                     </TableCell>
-                    <TableCell className="text-right print:hidden">
+                    <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
@@ -605,7 +612,7 @@ export default async function CashPage({
                   <TableHead>Importe</TableHead>
                   <TableHead>Anulado por</TableHead>
                   <TableHead>Motivo</TableHead>
-                  <TableHead className="text-right print:hidden">
+                  <TableHead className="text-right">
                     <span className="sr-only">Comprobante</span>
                   </TableHead>
                 </TableRow>
@@ -635,7 +642,7 @@ export default async function CashPage({
                     <TableCell className="text-xs max-w-xs truncate">
                       {p.voidReason || "—"}
                     </TableCell>
-                    <TableCell className="text-right print:hidden">
+                    <TableCell className="text-right">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -680,7 +687,7 @@ export default async function CashPage({
                   <TableHead>Anulado por</TableHead>
                   <TableHead>Fecha de anulación</TableHead>
                   <TableHead>Motivo</TableHead>
-                  <TableHead className="text-right print:hidden">
+                  <TableHead className="text-right">
                     <span className="sr-only">Comprobante</span>
                   </TableHead>
                 </TableRow>
@@ -713,7 +720,7 @@ export default async function CashPage({
                     <TableCell className="text-xs">
                       {p.voidReason || "—"}
                     </TableCell>
-                    <TableCell className="text-right print:hidden">
+                    <TableCell className="text-right">
                       <Button
                         variant="ghost"
                         size="sm"

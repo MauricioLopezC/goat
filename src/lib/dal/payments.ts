@@ -14,7 +14,7 @@ import {
 import { Prisma } from "@/generated/prisma/client";
 import { isChargeable, paymentState, type PaymentState } from "@/lib/payments";
 import { appointmentInstant } from "@/lib/appointment-slots";
-import { toLocalSlot } from "@/lib/schedule";
+import { dateToDb, toLocalSlot } from "@/lib/schedule";
 import {
   registerAuthorizationSchema,
   registerPaymentSchema,
@@ -237,6 +237,7 @@ export async function listTodayAppointments(actor: Actor, now = new Date()) {
 export async function registerPayment(
   input: RegisterPaymentInput,
   actor: Actor,
+  now = new Date(),
 ) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
   const parsed = registerPaymentSchema.safeParse(input);
@@ -260,7 +261,7 @@ export async function registerPayment(
       });
       if (!appointment)
         throw new DomainError("NOT_FOUND", "El turno no existe.");
-      if (!isChargeable(appointment)) throw notChargeableError();
+      if (!isChargeable(appointment, now)) throw notChargeableError();
       if (appointment.patient.coverageType !== CoverageType.PRIVATE)
         throw new DomainError(
           "PATIENT_HAS_HEALTH_INSURANCE",
@@ -272,9 +273,22 @@ export async function registerPayment(
           "El servicio no tiene valor cargado. Pedile al gerente que lo cargue en Servicios.",
         );
       if (appointment.payments.length > 0) throw alreadyPaidError();
+
+      const todayStr = toLocalSlot(now).date;
+      const closed = await tx.cashClosing.findUnique({
+        where: { date: dateToDb(todayStr) },
+        select: { id: true },
+      });
+      if (closed) {
+        throw new DomainError(
+          "CASH_CLOSED",
+          "La caja del día ya está cerrada. No se pueden registrar cobros una vez realizada la rendición.",
+        );
+      }
+
       const method = await tx.paymentMethod.findUnique({
         where: { id: paymentMethodId },
-        select: { active: true },
+        select: { active: true, isCash: true },
       });
       if (!method?.active)
         throw new DomainError(
@@ -288,7 +302,9 @@ export async function registerPayment(
           paymentMethodId,
           // El monto del momento: si después cambia el valor, el cobro no.
           amount: appointment.service.price,
+          isCash: method.isCash,
           createdById: actor.id,
+          createdAt: now,
         },
         select: { id: true, receiptNumber: true, amount: true },
       });
@@ -316,7 +332,11 @@ function alreadyPaidError() {
   );
 }
 
-export async function voidPayment(input: VoidPaymentInput, actor: Actor) {
+export async function voidPayment(
+  input: VoidPaymentInput,
+  actor: Actor,
+  now = new Date(),
+) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER);
   const parsed = voidPaymentSchema.safeParse(input);
   if (!parsed.success)
@@ -327,7 +347,7 @@ export async function voidPayment(input: VoidPaymentInput, actor: Actor) {
       "REASON_REQUIRED",
       "El motivo de la anulación es obligatorio.",
     );
-  return prisma.$transaction(async (tx) => {
+  return serializableTransaction(async (tx) => {
     const existing = await tx.payment.findUnique({
       where: { id: paymentId },
       select: { id: true, status: true, cashClosingId: true },
@@ -345,27 +365,55 @@ export async function voidPayment(input: VoidPaymentInput, actor: Actor) {
       );
     }
 
-    // La condición de estado va en el mismo UPDATE: dos anulaciones a la vez
-    // no se pisan.
+    // La condición de estado y de caja cerrada van en el mismo UPDATE:
+    // recepción no puede ganar una carrera contra closeCash (H2).
+    const whereCondition: Prisma.PaymentWhereInput = {
+      id: paymentId,
+      status: PaymentStatus.PAID,
+    };
+    if (actor.role !== Role.MANAGER) {
+      whereCondition.cashClosingId = null;
+    }
+
     const { count } = await tx.payment.updateMany({
-      where: { id: paymentId, status: PaymentStatus.PAID },
+      where: whereCondition,
       data: {
         status: PaymentStatus.VOIDED,
-        voidedAt: new Date(),
+        voidedAt: now,
         voidedById: actor.id,
         voidReason: reason,
       },
     });
+
+    if (count === 0) {
+      const current = await tx.payment.findUnique({
+        where: { id: paymentId },
+        select: { status: true, cashClosingId: true },
+      });
+      if (!current) throw new DomainError("NOT_FOUND", "El cobro no existe.");
+      if (current.status !== PaymentStatus.PAID) {
+        throw new DomainError(
+          "INVALID_STATUS_TRANSITION",
+          "El cobro ya estaba anulado.",
+        );
+      }
+      if (current.cashClosingId !== null && actor.role !== Role.MANAGER) {
+        throw new DomainError(
+          "FORBIDDEN",
+          "Un cobro de una caja cerrada solo puede ser anulado por el gerente.",
+        );
+      }
+      throw new DomainError(
+        "INVALID_STATUS_TRANSITION",
+        "El cobro ya estaba anulado.",
+      );
+    }
+
     const payment = await tx.payment.findUnique({
       where: { id: paymentId },
       select: { id: true, appointmentId: true },
     });
     if (!payment) throw new DomainError("NOT_FOUND", "El cobro no existe.");
-    if (count === 0)
-      throw new DomainError(
-        "INVALID_STATUS_TRANSITION",
-        "El cobro ya estaba anulado.",
-      );
     return payment;
   });
 }

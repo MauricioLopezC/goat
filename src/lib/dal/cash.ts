@@ -12,7 +12,6 @@ import {
   isCalendarDate,
   toLocalSlot,
 } from "@/lib/schedule";
-import { normalizeSearchText } from "@/lib/services";
 import { appointmentInstant } from "@/lib/appointment-slots";
 import { paginate, type Page } from "@/lib/pagination";
 import { closeCashSchema, type CloseCashInput } from "@/lib/validation/cash";
@@ -37,7 +36,8 @@ export type CashPaymentRow = {
   id: number;
   receiptNumber: number;
   amount: string;
-  paymentMethod: { id: number; name: string };
+  isCash?: boolean;
+  paymentMethod: { id: number; name: string; isCash?: boolean };
   createdAt: Date;
   createdBy: { id: number; firstName: string; lastName: string };
   appointment: {
@@ -58,7 +58,8 @@ export type VoidedPaymentRow = {
   id: number;
   receiptNumber: number;
   amount: string;
-  paymentMethod: { id: number; name: string };
+  isCash?: boolean;
+  paymentMethod: { id: number; name: string; isCash?: boolean };
   createdAt: Date;
   voidedAt: Date | null;
   voidedBy: { id: number; firstName: string; lastName: string } | null;
@@ -124,8 +125,44 @@ export type CashClosingListItem = {
   correctedTotalAmount: string;
 };
 
-function isCashMethod(name: string): boolean {
-  return normalizeSearchText(name).includes("efectivo");
+import { isCashPayment } from "@/lib/payments";
+export { isCashPayment };
+
+function toVoidedRow(p: {
+  id: number;
+  receiptNumber: number;
+  amount: Prisma.Decimal;
+  isCash?: boolean;
+  paymentMethod: { id: number; name: string; isCash?: boolean };
+  createdAt: Date;
+  voidedAt: Date | null;
+  voidedBy: { id: number; firstName: string; lastName: string } | null;
+  voidReason: string | null;
+  appointment: {
+    id: number;
+    patient: {
+      id: number;
+      firstName: string;
+      lastName: string;
+      documentType: string;
+      documentNumber: string;
+    };
+    professional: { id: number; firstName: string; lastName: string };
+    service: { id: number; name: string };
+  };
+}): VoidedPaymentRow {
+  return {
+    id: p.id,
+    receiptNumber: p.receiptNumber,
+    amount: p.amount.toFixed(2),
+    isCash: isCashPayment(p),
+    paymentMethod: p.paymentMethod,
+    createdAt: p.createdAt,
+    voidedAt: p.voidedAt,
+    voidedBy: p.voidedBy,
+    voidReason: p.voidReason,
+    appointment: p.appointment,
+  };
 }
 
 /**
@@ -165,82 +202,109 @@ export async function getCashSummary(
   const dayStart = appointmentInstant(dateStr, 0);
   const dayEnd = appointmentInstant(dateStr, 1440);
 
-  // Si está cerrada, leemos los pagos asociados a ese cashClosingId.
-  // Si está abierta, leemos los pagos creados dentro del rango del día local.
-  const whereClause: Prisma.PaymentWhereInput = closing
-    ? { cashClosingId: closing.id }
-    : { createdAt: { gte: dayStart, lt: dayEnd } };
-
-  const rawPayments = await prisma.payment.findMany({
-    where: whereClause,
-    include: {
-      paymentMethod: { select: { id: true, name: true } },
-      createdBy: { select: { id: true, firstName: true, lastName: true } },
-      voidedBy: { select: { id: true, firstName: true, lastName: true } },
-      appointment: {
-        select: {
-          id: true,
-          patient: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              documentType: true,
-              documentNumber: true,
-            },
+  const paymentInclude = {
+    paymentMethod: { select: { id: true, name: true, isCash: true } },
+    createdBy: { select: { id: true, firstName: true, lastName: true } },
+    voidedBy: { select: { id: true, firstName: true, lastName: true } },
+    appointment: {
+      select: {
+        id: true,
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            documentType: true,
+            documentNumber: true,
           },
-          professional: {
-            select: { id: true, firstName: true, lastName: true },
-          },
-          service: { select: { id: true, name: true } },
         },
+        professional: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        service: { select: { id: true, name: true } },
       },
     },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-  });
+  };
 
-  // Clasificamos pagos:
-  // 1. Pagos activos vigentes (PAID)
-  // 2. Pagos anulados en el día (anulados antes o durante el día previo al cierre)
-  // 3. Ajustes posteriores (pagos vinculados a esta caja que fueron anulados DESPUÉS de cerrarla)
-  const activePayments = rawPayments.filter(
-    (p) => p.status === PaymentStatus.PAID,
-  );
+  type LoadedPayment = Prisma.PaymentGetPayload<{
+    include: typeof paymentInclude;
+  }>;
 
-  const voidedPayments: VoidedPaymentRow[] = [];
+  let activePayments: LoadedPayment[] = [];
   const subsequentAdjustments: VoidedPaymentRow[] = [];
+  let voidedPayments: VoidedPaymentRow[] = [];
+  let paymentsAtClosing: LoadedPayment[] = [];
 
-  for (const p of rawPayments) {
-    if (p.status !== PaymentStatus.VOIDED) continue;
-    const voidedRow: VoidedPaymentRow = {
-      id: p.id,
-      receiptNumber: p.receiptNumber,
-      amount: p.amount.toFixed(2),
-      paymentMethod: p.paymentMethod,
-      createdAt: p.createdAt,
-      voidedAt: p.voidedAt,
-      voidedBy: p.voidedBy,
-      voidReason: p.voidReason,
-      appointment: p.appointment,
-    };
+  if (closing) {
+    // Caja cerrada: leemos los pagos asociados a este cierre
+    const closingPayments = await prisma.payment.findMany({
+      where: { cashClosingId: closing.id },
+      include: paymentInclude,
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
 
-    if (closing && p.voidedAt && p.voidedAt > closing.closedAt) {
-      subsequentAdjustments.push(voidedRow);
-    } else {
-      voidedPayments.push(voidedRow);
+    activePayments = closingPayments.filter(
+      (p) => p.status === PaymentStatus.PAID,
+    );
+
+    // Ajustes posteriores: pagos de esta caja cerrada anulados con posterioridad a closedAt
+    for (const p of closingPayments) {
+      if (
+        p.status === PaymentStatus.VOIDED &&
+        p.voidedAt &&
+        p.voidedAt > closing.closedAt
+      ) {
+        subsequentAdjustments.push(toVoidedRow(p));
+      }
     }
-  }
 
-  // Agrupaciones por medio de pago y por profesional:
-  // Si la caja está cerrada, los pagos que estaban activos al momento del cierre eran:
-  // los activePayments actuales + los que se anularon después (subsequentAdjustments).
-  const paymentsAtClosing = closing
-    ? rawPayments.filter(
-        (p) =>
-          p.status === PaymentStatus.PAID ||
-          (p.voidedAt && p.voidedAt > closing.closedAt),
-      )
-    : activePayments;
+    // Cobros anulados en el día (anulados durante dateStr, pero no posteriores al cierre) (H4)
+    const dayVoided = await prisma.payment.findMany({
+      where: {
+        voidedAt: { gte: dayStart, lt: dayEnd },
+        status: PaymentStatus.VOIDED,
+      },
+      include: paymentInclude,
+      orderBy: [{ voidedAt: "asc" }, { id: "asc" }],
+    });
+
+    const adjustmentIds = new Set(subsequentAdjustments.map((a) => a.id));
+    for (const p of dayVoided) {
+      if (!adjustmentIds.has(p.id)) {
+        voidedPayments.push(toVoidedRow(p));
+      }
+    }
+
+    paymentsAtClosing = closingPayments.filter(
+      (p) =>
+        p.status === PaymentStatus.PAID ||
+        (p.voidedAt && p.voidedAt > closing.closedAt),
+    );
+  } else {
+    // Caja abierta:
+    // 1. Pagos activos creados en esa fecha
+    activePayments = await prisma.payment.findMany({
+      where: {
+        createdAt: { gte: dayStart, lt: dayEnd },
+        status: PaymentStatus.PAID,
+      },
+      include: paymentInclude,
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+
+    // 2. Cobros anulados en el día (H4: se consulta por voidedAt dentro del día consultado)
+    const dayVoided = await prisma.payment.findMany({
+      where: {
+        voidedAt: { gte: dayStart, lt: dayEnd },
+        status: PaymentStatus.VOIDED,
+      },
+      include: paymentInclude,
+      orderBy: [{ voidedAt: "asc" }, { id: "asc" }],
+    });
+
+    voidedPayments = dayVoided.map(toVoidedRow);
+    paymentsAtClosing = activePayments;
+  }
 
   const methodMap = new Map<
     number,
@@ -256,7 +320,7 @@ export async function getCashSummary(
 
   for (const p of paymentsAtClosing) {
     calculatedTotal = calculatedTotal.add(p.amount);
-    if (isCashMethod(p.paymentMethod.name)) {
+    if (isCashPayment(p)) {
       calculatedExpectedCash = calculatedExpectedCash.add(p.amount);
     }
 
@@ -313,7 +377,7 @@ export async function getCashSummary(
     for (const adj of subsequentAdjustments) {
       const amt = new Prisma.Decimal(adj.amount);
       deductedTotal = deductedTotal.add(amt);
-      if (isCashMethod(adj.paymentMethod.name)) {
+      if (isCashPayment(adj)) {
         deductedCash = deductedCash.add(amt);
       }
     }
@@ -344,6 +408,7 @@ export async function getCashSummary(
     id: p.id,
     receiptNumber: p.receiptNumber,
     amount: p.amount.toFixed(2),
+    isCash: isCashPayment(p),
     paymentMethod: p.paymentMethod,
     createdAt: p.createdAt,
     createdBy: p.createdBy,
@@ -434,7 +499,7 @@ export async function closeCash(
         createdAt: { gte: dayStart, lt: dayEnd },
       },
       include: {
-        paymentMethod: { select: { id: true, name: true } },
+        paymentMethod: { select: { id: true, name: true, isCash: true } },
       },
     });
 
@@ -448,7 +513,7 @@ export async function closeCash(
 
     for (const p of paidPayments) {
       totalAmount = totalAmount.add(p.amount);
-      if (isCashMethod(p.paymentMethod.name)) {
+      if (isCashPayment(p)) {
         expectedCashAmount = expectedCashAmount.add(p.amount);
       }
     }
@@ -579,20 +644,27 @@ export async function getUnclosedCashDays(
   const todayStr = toLocalSlot(now).date;
   const todayStart = appointmentInstant(todayStr, 0);
 
-  const unclosedPayments = await prisma.payment.findMany({
-    where: {
-      createdAt: { lt: todayStart },
-      cashClosingId: null,
-    },
-    select: { createdAt: true },
-    distinct: ["createdAt"],
-    orderBy: { createdAt: "asc" },
-  });
+  const [unclosedPayments, closings] = await Promise.all([
+    prisma.payment.findMany({
+      where: {
+        createdAt: { lt: todayStart },
+        cashClosingId: null,
+      },
+      select: { createdAt: true },
+      distinct: ["createdAt"],
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.cashClosing.findMany({
+      select: { date: true },
+    }),
+  ]);
+
+  const closedDates = new Set(closings.map((c) => dateFromDb(c.date)));
 
   const datesSet = new Set<string>();
   for (const p of unclosedPayments) {
     const d = toLocalSlot(p.createdAt).date;
-    if (d < todayStr) {
+    if (d < todayStr && !closedDates.has(d)) {
       datesSet.add(d);
     }
   }

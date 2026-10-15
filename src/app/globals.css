@@ -226,8 +226,8 @@
   }
 
   body {
-    background: #ffffff !important;
-    color: #000000 !important;
+    background: var(--background) !important;
+    color: var(--foreground) !important;
   }
 
   tr,

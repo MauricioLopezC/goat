@@ -29,7 +29,8 @@ export type ErrorCode =
   | "PATIENT_HAS_HEALTH_INSURANCE"
   | "AUTHORIZATION_NOT_REQUIRED"
   | "APPOINTMENT_HAS_PAYMENT"
-  | "DEADLINE_EXCEEDED";
+  | "DEADLINE_EXCEEDED"
+  | "CASH_CLOSED";
 
 export type ActionError = {
   code: ErrorCode;

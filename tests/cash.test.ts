@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { closeCashSchema } from "../src/lib/validation/cash";
-import { normalizeSearchText } from "../src/lib/services";
+import { isCashPayment } from "../src/lib/payments";
 
 test("closeCashSchema: entrada válida sin observaciones", () => {
   const result = closeCashSchema.safeParse({
@@ -66,14 +66,39 @@ test("closeCashSchema: trunca y convierte observaciones vacías a null", () => {
   assert.equal(emptyNotes.data.notes, null);
 });
 
-test("normalización de medio de pago para identificar Efectivo", () => {
-  const isCash = (name: string) => normalizeSearchText(name) === "efectivo";
+test("isCashPayment: identifica Efectivo por flag isCash o por nombre (H5)", () => {
+  // Con flag isCash en Payment o PaymentMethod (inmune a renombrados)
+  assert.equal(isCashPayment({ isCash: true }), true);
+  assert.equal(
+    isCashPayment({
+      isCash: false,
+      paymentMethod: { isCash: true, name: "Contado" },
+    }),
+    true,
+  );
+  assert.equal(
+    isCashPayment({
+      isCash: false,
+      paymentMethod: { isCash: false, name: "Contado" },
+    }),
+    false,
+  );
 
-  assert.equal(isCash("Efectivo"), true);
-  assert.equal(isCash("EFECTIVO"), true);
-  assert.equal(isCash("  efectivo  "), true);
-  assert.equal(isCash("Tarjeta de débito"), false);
-  assert.equal(isCash("Transferencia"), false);
+  // Por nombre cuando no hay flag
+  assert.equal(isCashPayment({ paymentMethod: { name: "Efectivo" } }), true);
+  assert.equal(isCashPayment({ paymentMethod: { name: "EFECTIVO" } }), true);
+  assert.equal(
+    isCashPayment({ paymentMethod: { name: "  efectivo en mano  " } }),
+    true,
+  );
+  assert.equal(
+    isCashPayment({ paymentMethod: { name: "Tarjeta de débito" } }),
+    false,
+  );
+  assert.equal(
+    isCashPayment({ paymentMethod: { name: "Transferencia" } }),
+    false,
+  );
 });
 
 test("cálculo de totales corregidos y diferencias con ajustes posteriores", () => {

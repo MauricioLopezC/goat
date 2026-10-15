@@ -150,7 +150,7 @@ export async function seedDemoHistory(
         where: {
           name: { in: ["Efectivo", "Tarjeta de débito", "Transferencia"] },
         },
-        select: { id: true, name: true },
+        select: { id: true, name: true, isCash: true },
       }),
     ]);
 
@@ -323,6 +323,7 @@ export async function seedDemoHistory(
               create: {
                 paymentMethodId: method.id,
                 amount: service.price!,
+                isCash: method.isCash,
                 createdById,
                 createdAt: startsAt,
               },
@@ -458,8 +459,9 @@ export async function seedDemoHistory(
       select: {
         id: true,
         amount: true,
+        isCash: true,
         status: true,
-        paymentMethod: { select: { name: true } },
+        paymentMethod: { select: { name: true, isCash: true } },
       },
     });
     if (payments.length === 0) continue;
@@ -471,7 +473,7 @@ export async function seedDemoHistory(
       0,
     );
     const expectedCashAmount = paid
-      .filter((payment) => payment.paymentMethod.name === "Efectivo")
+      .filter((payment) => payment.isCash || payment.paymentMethod.isCash)
       .reduce((sum, payment) => sum + Number(payment.amount), 0);
     await prisma.$transaction(async (tx) => {
       const closing = await tx.cashClosing.create({

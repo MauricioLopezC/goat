@@ -526,12 +526,12 @@ export const SERVICES: {
 
 /// Medios de pago del centro (HU-20).
 export const PAYMENT_METHODS = [
-  { name: "Efectivo", active: true },
-  { name: "Tarjeta de débito", active: true },
+  { name: "Efectivo", isCash: true, active: true },
+  { name: "Tarjeta de débito", isCash: false, active: true },
   // Inactivo: el centro no acepta tarjeta de crédito. No se borra para que
   // las bases ya sembradas lo desactiven al volver a correr el seed.
-  { name: "Tarjeta de crédito", active: false },
-  { name: "Transferencia", active: true },
+  { name: "Tarjeta de crédito", isCash: false, active: false },
+  { name: "Transferencia", isCash: false, active: true },
 ];
 
 // ─────────────────────────── Profesionales ───────────────────────────

@@ -47,8 +47,10 @@ function schedule(row: TodayRow) {
 export default async function TodayPage({ searchParams }: PageProps<"/today">) {
   const actor = await requirePageRole("RECEPTIONIST", "MANAGER");
   const { paid, authorized } = await searchParams;
-  const rows = await listTodayAppointments(actor);
-  const unclosedDays = await getUnclosedCashDays(actor);
+  const [rows, unclosedDays] = await Promise.all([
+    listTodayAppointments(actor),
+    getUnclosedCashDays(actor),
+  ]);
   const pendingPayment = rows.filter(
     (row) => row.state === "PENDING_PAYMENT",
   ).length;

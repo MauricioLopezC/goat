@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { voidPayment } from "./actions";
+import { notifyPaymentChange } from "@/lib/payments-client";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -46,6 +47,7 @@ export function VoidPaymentDialog({
       reason: String(formData.get("reason") ?? ""),
     });
     if (result.ok) {
+      notifyPaymentChange();
       setOpen(false);
       const search = new URLSearchParams(returnSearch);
       search.set("billing", "voided");

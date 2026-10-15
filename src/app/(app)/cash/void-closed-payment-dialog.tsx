@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { voidCashPayment } from "./actions";
+import { notifyPaymentChange } from "@/lib/payments-client";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -40,6 +41,7 @@ export function VoidClosedPaymentDialog({
       reason: String(formData.get("reason") ?? ""),
     });
     if (result.ok) {
+      notifyPaymentChange();
       setOpen(false);
       router.refresh();
     }

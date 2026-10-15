@@ -80,8 +80,10 @@ export async function createPaymentMethod(
     );
   }
 
+  const isCash = normalizeSearchText(trimmedName).includes("efectivo");
+
   return prisma.paymentMethod.create({
-    data: { name: trimmedName, active: true },
+    data: { name: trimmedName, isCash, active: true },
     select: { id: true, name: true, active: true },
   });
 }

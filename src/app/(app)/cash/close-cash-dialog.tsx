@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { closeCash } from "./actions";
+import { notifyPaymentChange } from "@/lib/payments-client";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -68,6 +69,7 @@ export function CloseCashDialog({
     });
 
     if (result.ok) {
+      notifyPaymentChange();
       setOpen(false);
       if (!isToday && actorRole !== "MANAGER") {
         router.push(`/cash?closed=${date}`);
