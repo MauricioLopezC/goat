@@ -354,12 +354,7 @@ export async function voidPayment(input: VoidPaymentDalInput, actor: Actor) {
   return serializableTransaction(async (tx) => {
     const existing = await tx.payment.findUnique({
       where: { id: paymentId },
-      select: {
-        id: true,
-        status: true,
-        cashClosingId: true,
-        cashClosing: { select: { closedAt: true } },
-      },
+      select: { id: true, status: true, cashClosingId: true },
     });
     if (!existing) throw new DomainError("NOT_FOUND", "El cobro no existe.");
     if (existing.status !== PaymentStatus.PAID)
@@ -374,16 +369,10 @@ export async function voidPayment(input: VoidPaymentDalInput, actor: Actor) {
       );
     }
 
-    // Instante efectivo evaluado dentro del intento que realiza la mutación (R1).
-    // Si el cobro pertenecía a una caja ya cerrada, garantizamos que voidedAt > closedAt
-    // para que quede unívocamente registrado como ajuste posterior en resumen e historial.
-    let voidedAt = input.now ?? new Date();
-    if (
-      existing.cashClosing?.closedAt &&
-      voidedAt <= existing.cashClosing.closedAt
-    ) {
-      voidedAt = new Date(existing.cashClosing.closedAt.getTime() + 1000);
-    }
+    // El instante se toma dentro de cada intento (R1): si closeCash confirma
+    // primero, este intento aborta y el reintento registra una hora posterior
+    // al cierre, así la anulación figura como ajuste posterior.
+    const voidedAt = input.now ?? new Date();
 
     // La condición de estado y de caja cerrada van en el mismo UPDATE:
     // recepción no puede ganar una carrera contra closeCash (H2).

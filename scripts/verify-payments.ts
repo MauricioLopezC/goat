@@ -991,126 +991,148 @@ async function main() {
       },
     );
 
-    // 16. Concurrencia de cierre con cobro (H1) y anulación de recepción (H2) y gerencia (R1)
+    // 16. Concurrencia del cierre con un cobro (H1), una anulación de recepción (H2)
+    // y una anulación de gerencia (R1). El orden en que se intercalan no es fijo,
+    // así que se repite la carrera y se verifican invariantes que valen en cualquier
+    // orden: el cierre confirma, ningún error llega crudo y la foto del cierre es
+    // coherente con lo que quedó vinculado a la caja.
     await verify(
       "cierre concurrente con cobro (H1) y con anulación de recepción (H2) y gerencia (R1)",
       async () => {
-        let concurDaysAgo = 60;
-        let concurDate = "";
-        while (concurDaysAgo < 365) {
-          const d = new Date();
-          d.setDate(d.getDate() - concurDaysAgo);
-          const s = toLocalSlot(d).date;
-          const closings = await prisma.cashClosing.count({
-            where: { date: dateToDb(s) },
+        const isDomainError = (reason: unknown, codes: string[]) =>
+          reason instanceof DomainError && codes.includes(reason.code);
+        // VALIDATION es el mensaje de conflicto si se agotan los reintentos.
+        const settledAs = (
+          result: PromiseSettledResult<unknown>,
+          codes: string[],
+          label: string,
+        ) => {
+          if (result.status === "rejected")
+            assert.ok(
+              isDomainError(result.reason, [...codes, "VALIDATION"]),
+              `${label}: error inesperado ${String(result.reason)}`,
+            );
+        };
+
+        let daysAgo = 60;
+        for (let round = 0; round < 5; round++) {
+          let date = "";
+          for (; daysAgo < 400 && !date; daysAgo++) {
+            const d = new Date();
+            d.setDate(d.getDate() - daysAgo);
+            const s = toLocalSlot(d).date;
+            const [closings, payments] = await Promise.all([
+              prisma.cashClosing.count({ where: { date: dateToDb(s) } }),
+              prisma.payment.count({
+                where: {
+                  createdAt: {
+                    gte: appointmentInstant(s, 0),
+                    lt: appointmentInstant(s, 1440),
+                  },
+                },
+              }),
+            ]);
+            if (closings === 0 && payments === 0) date = s;
+          }
+          assert.ok(date, "Se debe encontrar una fecha libre");
+
+          const instant = new Date(appointmentInstant(date, 600));
+          const [apptA, apptB, apptC] = [
+            await appointment({ status: "COMPLETED", date }),
+            await appointment({ status: "COMPLETED", date }),
+            await appointment({ status: "COMPLETED", date }),
+          ];
+          const payA = await registerPayment(
+            { appointmentId: apptA, paymentMethodId: cash.id, now: instant },
+            receptionist,
+          );
+          const payB = await registerPayment(
+            { appointmentId: apptB, paymentMethodId: cash.id, now: instant },
+            receptionist,
+          );
+
+          const [closeRes, payRes, voidRecepRes, voidMgrRes] =
+            await Promise.allSettled([
+              closeCash(
+                {
+                  date,
+                  countedCashAmount: 30000,
+                  notes: "Cierre concurrente de prueba",
+                },
+                receptionist,
+              ),
+              registerPayment(
+                {
+                  appointmentId: apptC,
+                  paymentMethodId: cash.id,
+                  now: instant,
+                },
+                receptionist,
+              ),
+              voidPayment(
+                { paymentId: payA.id, reason: "Anulación de recepción" },
+                receptionist,
+              ),
+              voidPayment(
+                { paymentId: payB.id, reason: "Anulación de gerencia" },
+                manager,
+              ),
+            ]);
+
+          assert.equal(
+            closeRes.status,
+            "fulfilled",
+            `El cierre debe confirmar: ${closeRes.status === "rejected" ? String(closeRes.reason) : ""}`,
+          );
+          settledAs(payRes, ["CASH_CLOSED"], "Cobro");
+          settledAs(voidRecepRes, ["FORBIDDEN"], "Anulación de recepción");
+          settledAs(voidMgrRes, [], "Anulación de gerencia");
+
+          const closing = await prisma.cashClosing.findUniqueOrThrow({
+            where: { date: dateToDb(date) },
           });
-          const payments = await prisma.payment.count({
+          const dayPayments = await prisma.payment.findMany({
             where: {
               createdAt: {
-                gte: appointmentInstant(s, 0),
-                lt: appointmentInstant(s, 1440),
+                gte: appointmentInstant(date, 0),
+                lt: appointmentInstant(date, 1440),
               },
             },
           });
-          if (closings === 0 && payments === 0) {
-            concurDate = s;
-            break;
-          }
-          concurDaysAgo++;
-        }
-        assert.ok(
-          concurDate,
-          "Se debe encontrar una fecha libre para pruebas concurrentes",
-        );
 
-        const apptC1 = await appointment({
-          status: "COMPLETED",
-          date: concurDate,
-        });
-        const apptC2 = await appointment({
-          status: "COMPLETED",
-          date: concurDate,
-        });
-        const apptC3 = await appointment({
-          status: "COMPLETED",
-          date: concurDate,
-        });
-        const concurInstant = new Date(appointmentInstant(concurDate, 600));
+          // H1: ningún cobro del día queda fuera de la caja cerrada.
+          for (const p of dayPayments)
+            assert.equal(p.cashClosingId, closing.id, "H1: cobro sin caja");
+          if (payRes.status === "rejected")
+            assert.ok(!dayPayments.some((p) => p.appointmentId === apptC));
 
-        const payC1 = await registerPayment(
-          {
-            appointmentId: apptC1,
-            paymentMethodId: cash.id,
-            now: concurInstant,
-          },
-          receptionist,
-        );
-        const payC2 = await registerPayment(
-          {
-            appointmentId: apptC2,
-            paymentMethodId: cash.id,
-            now: concurInstant,
-          },
-          receptionist,
-        );
+          // La foto cuenta exactamente los cobros vigentes al cerrar: los que
+          // siguen pagados más los anulados después del cierre (R1: una
+          // anulación con voidedAt anterior al cierre no puede estar contada).
+          const afterClose = (p: (typeof dayPayments)[number]) =>
+            p.voidedAt !== null && p.voidedAt > closing.closedAt;
+          const atClose = dayPayments.filter(
+            (p) => p.status === "PAID" || afterClose(p),
+          );
+          assert.equal(closing.paymentCount, atClose.length, "R1: foto");
 
-        // Disparamos en paralelo el cierre de caja, un nuevo cobro (H1), una anulación de recepción (H2)
-        // y una anulación de gerencia (R1)
-        const [closeRes, payRes, voidRecepRes, voidMgrRes] =
-          await Promise.allSettled([
-            closeCash(
-              { date: concurDate, countedCashAmount: 30000 },
-              receptionist,
-            ),
-            registerPayment(
-              {
-                appointmentId: apptC3,
-                paymentMethodId: cash.id,
-                now: concurInstant,
-              },
-              receptionist,
-            ),
-            voidPayment(
-              {
-                paymentId: payC1.id,
-                reason: "Anulación concurrente recepción",
-              },
-              receptionist,
-            ),
-            voidPayment(
-              { paymentId: payC2.id, reason: "Anulación concurrente gerencia" },
-              manager,
-            ),
-          ]);
+          // H2: recepción nunca anula después del cierre.
+          for (const p of dayPayments.filter(afterClose))
+            assert.equal(p.voidedById, manager.id, "H2: anulación tardía");
 
-        // Si el cierre fue exitoso:
-        if (closeRes.status === "fulfilled") {
-          // H1: El cobro concurrente debió ser rechazado si corrió después del cierre o haber sido incluido
-          if (payRes.status === "rejected") {
-            assert.equal(
-              (payRes.reason as { code?: string }).code,
-              "CASH_CLOSED",
-            );
-          }
-          // H2: La anulación de recepción sobre cobro de caja cerrada debe ser rechazada con FORBIDDEN
-          if (voidRecepRes.status === "rejected") {
-            assert.equal(
-              (voidRecepRes.reason as { code?: string }).code,
-              "FORBIDDEN",
-            );
-          }
-          // R1: Si la anulación de gerencia prosperó, debe estar debidamente registrada como ajuste
-          if (voidMgrRes.status === "fulfilled") {
-            const summary = await getCashSummary(concurDate, manager);
-            assert.ok(summary.isClosed);
-            const adj = summary.subsequentAdjustments.find(
-              (a) => a.id === payC2.id,
-            );
-            assert.ok(
-              adj,
-              "R1: La anulación de gerencia concurrente debe figurar en subsequentAdjustments",
-            );
-          }
+          // R1: la anulación de gerencia posterior al cierre figura como ajuste.
+          const summary = await getCashSummary(date, manager);
+          assert.deepEqual(
+            summary.subsequentAdjustments.map((a) => a.id).sort(),
+            dayPayments
+              .filter(afterClose)
+              .map((p) => p.id)
+              .sort(),
+          );
+          assert.equal(
+            summary.correctedTotals?.correctedPaymentCount,
+            dayPayments.filter((p) => p.status === "PAID").length,
+          );
         }
       },
     );

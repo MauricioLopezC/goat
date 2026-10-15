@@ -50,7 +50,7 @@ Los usuarios de demo están en `CONTRIBUTING.md` (recepción: `mesa@goat.local`,
 | Anulación post-cierre exclusiva de gerencia | `voidPayment` restringe cobros con `cashClosingId !== null` a `Role.MANAGER` | `scripts/verify-payments.ts` (bloque 12, H2) |
 | Ajustes posteriores y cálculo de totales corregidos | `CashSummary.subsequentAdjustments` y `correctedTotals` restando solo ajustes | `tests/cash.test.ts` y `scripts/verify-payments.ts` (bloque 12) |
 | Inmunidad del cálculo de efectivo ante renombrado (R2) | `isCashPayment` prioriza flags persistidos en `Payment` y `PaymentMethod` | `tests/cash.test.ts` y `scripts/verify-payments.ts` (bloque 12, R2) |
-| Orden temporal de ajuste posterior garantizado (R1) | `voidPayment` evalúa `voidedAt` dentro de la transacción y garantiza `voidedAt > closedAt` | `scripts/verify-payments.ts` (bloque 12 y 16, R1) |
+| Orden temporal de ajuste posterior garantizado (R1) | `voidPayment` evalúa `voidedAt` dentro de cada intento de la transacción; si el cierre confirma antes, el reintento registra una hora posterior | `scripts/verify-payments.ts` (bloque 16) |
 | Sincronización continua en vivo (R3) | `CashAutoRefresh` activo para cajas abiertas y cerradas | `src/app/(app)/cash/cash-auto-refresh.tsx` |
 | Permisos por rol en UI y DAL | `requirePageRole` y `assertRole` en `cash.ts` y `route-access.ts` | `tests/navigation.test.ts` y `scripts/verify-payments.ts` |
 
@@ -64,10 +64,15 @@ Los usuarios de demo están en `CONTRIBUTING.md` (recepción: `mesa@goat.local`,
    - *Solución:* `voidPayment` condiciona el `UPDATE` a `cashClosingId: null` para roles distintos de `MANAGER`. Si el cierre confirma primero, la anulación no actualiza registros y arroja `FORBIDDEN`.
 3. **R1 — Carrera entre anulación de gerencia y cierre:**
    - *Riesgo:* Gerencia anula concurrentemente con el cierre; si el timestamp de anulación se evaluaba previo a la transacción, quedaba `voidedAt < closedAt`, ocultando el cobro de los ajustes posteriores.
-   - *Solución:* El instante efectivo `voidedAt` se calcula dentro del intento transaccional y se garantiza `voidedAt > closedAt` para cobros cerrados.
+   - *Solución:* El instante efectivo `voidedAt` se calcula dentro de cada intento transaccional. Si el cierre confirma primero, la anulación aborta por conflicto y el reintento lee la caja cerrada y registra una hora posterior al cierre.
 4. **R2 — Protección del efectivo ante renombrado de medios de pago:**
    - *Riesgo:* Renombrar un medio de débito a un nombre que contenga "efectivo" alteraba retroactivamente el efectivo esperado y corregido si el flag `isCash = false` no se respetaba de forma temprana.
    - *Solución:* `isCashPayment` evalúa con máxima prioridad el valor booleano de `Payment.isCash` (tanto `true` como `false`), preservando la inmutabilidad histórica.
+5. **Conflictos de serialización:**
+   - *Riesgo:* Con el adapter `pg`, un conflicto detectado al confirmar (COMMIT) no llega como `P2034` sino como `DriverAdapterError` (`TransactionWriteConflict`); no se reintentaba y llegaba al usuario como error genérico.
+   - *Solución:* `serializableTransaction` reconoce ambas formas, reintenta hasta 4 veces con espera al azar y, si se agotan, devuelve un `DomainError` con mensaje en español.
+
+**Bloque 16 de la suite:** repite 5 veces la carrera entre cierre, cobro, anulación de recepción y anulación de gerencia. Como el orden en que se intercalan varía, verifica invariantes que valen en cualquier orden: el cierre confirma; los rechazos son `DomainError` esperados (`CASH_CLOSED`, `FORBIDDEN` o conflicto); ningún cobro del día queda fuera de la caja; la foto cuenta exactamente los cobros pagados más los anulados después del cierre; toda anulación posterior al cierre es de gerencia y figura en los ajustes posteriores.
 
 ## 5. Comandos reproducibles
 

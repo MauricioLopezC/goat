@@ -561,7 +561,7 @@ export async function closeCash(
     });
 
     return { id: closing.id, date };
-  });
+  }, "La caja cambió mientras confirmabas el cierre. Actualizá la página y volvé a intentar.");
 }
 
 /**

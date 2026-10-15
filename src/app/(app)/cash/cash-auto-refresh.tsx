@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 const REFRESH_INTERVAL_MS = 5000;
 
-export function CashAutoRefresh(_props?: { isClosed?: boolean }) {
+export function CashAutoRefresh() {
   const router = useRouter();
 
   useEffect(() => {

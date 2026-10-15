@@ -100,7 +100,7 @@ export default async function CashPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <CashAutoRefresh isClosed={cashSummary.isClosed} />
+      <CashAutoRefresh />
       {/* Mensaje de caja cerrada con éxito */}
       {closed && isCalendarDate(closed) && (
         <Alert className="bg-success-soft text-success-soft-foreground border-success-soft-border">
