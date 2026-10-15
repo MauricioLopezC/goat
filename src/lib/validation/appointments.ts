@@ -60,7 +60,7 @@ export const earliestSlotsSchema = z.object({
   patientId: z.number().int().positive(),
   limit: z.number().int().min(1).max(20).default(5),
 });
-export type EarliestSlotsInput = z.infer<typeof earliestSlotsSchema>;
+export type EarliestSlotsInput = z.input<typeof earliestSlotsSchema>;
 
 export const cancelAppointmentSchema = z.object({
   appointmentId: z.number().int().positive(),

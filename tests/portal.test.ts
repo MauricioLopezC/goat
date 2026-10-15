@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   PORTAL_CANCELLATION_ADVANCE_MS,
+  MAX_PORTAL_FUTURE_APPOINTMENTS,
+  canPatientBookAppointment,
   canPatientCancelAppointment,
   generateTemporaryPassword,
   hasMinimumCancellationNotice,
@@ -162,5 +164,42 @@ test("canPatientCancelAppointment bloquea la cancelación si el paciente debe ca
       mustChangePassword: false,
     }),
     true,
+  );
+});
+
+test("canPatientBookAppointment respeta el límite máximo de 2 turnos futuros y exige cambio de clave temporal resuelto", () => {
+  assert.equal(MAX_PORTAL_FUTURE_APPOINTMENTS, 2);
+
+  // Con 0 turnos futuros -> permitido
+  assert.equal(canPatientBookAppointment(0), true);
+  assert.equal(
+    canPatientBookAppointment(0, {
+      role: "PATIENT",
+      mustChangePassword: false,
+    }),
+    true,
+  );
+
+  // Con 1 turno futuro -> permitido
+  assert.equal(canPatientBookAppointment(1), true);
+
+  // Con 2 turnos futuros -> bloqueado (límite alcanzado)
+  assert.equal(canPatientBookAppointment(2), false);
+  assert.equal(canPatientBookAppointment(3), false);
+
+  // Con clave temporal pendiente -> bloqueado independientemente de la cantidad de turnos
+  assert.equal(
+    canPatientBookAppointment(0, {
+      role: "PATIENT",
+      mustChangePassword: true,
+    }),
+    false,
+  );
+  assert.equal(
+    canPatientBookAppointment(1, {
+      role: "PATIENT",
+      mustChangePassword: true,
+    }),
+    false,
   );
 });

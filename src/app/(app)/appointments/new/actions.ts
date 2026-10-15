@@ -4,13 +4,14 @@ import { defineAction } from "@/lib/actions";
 import { createAppointment as createInDal } from "@/lib/dal/appointments";
 import { createAppointmentSchema } from "@/lib/validation/appointments";
 export const createAppointment = defineAction({
-  roles: ["RECEPTIONIST", "MANAGER"],
+  roles: ["RECEPTIONIST", "MANAGER", "PATIENT"],
   input: createAppointmentSchema,
   handler: async (input, actor) => {
     const result = await createInDal(input, actor);
     revalidatePath("/calendar");
     revalidatePath("/agenda");
     revalidatePath("/appointments/new");
+    revalidatePath("/portal");
     revalidatePath(`/professionals/${input.professionalId}`);
     return result;
   },

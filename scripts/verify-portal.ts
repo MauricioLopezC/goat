@@ -1,6 +1,7 @@
-// Verificación de HU-31 sobre PostgreSQL local migrado: acceso al portal del
+// Verificación de HU-31 y HU-32 sobre PostgreSQL local migrado: acceso al portal del
 // paciente, clave temporal, cambio de contraseña, listado de turnos propios,
-// cancelación con anticipación mínima de 24 h y aislamiento de comprobantes.
+// cancelación con anticipación mínima de 24 h, comprobantes, y reserva de turnos
+// desde el portal (HU-32: franjas, límite de 2 turnos, sin orden médica, concurrencia).
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { verify as verifyPassword } from "@node-rs/argon2";
@@ -15,17 +16,26 @@ import {
 } from "../src/lib/dal/patients";
 import {
   cancelAppointment,
+  createAppointment,
+  getPortalBookingOptions,
+  listAppointments,
+  listAvailableDates,
+  listAvailableSlots,
+  listEarliestSlots,
   listMyAppointments,
 } from "../src/lib/dal/appointments";
 import { getPaymentReceipt, registerPayment } from "../src/lib/dal/payments";
 import {
   AppointmentEventType,
+  AppointmentPriority,
   AppointmentStatus,
   CoverageType,
   DocumentType,
   Gender,
   Role,
+  Weekday,
 } from "../src/generated/prisma/enums";
+import { dateToDb, toLocalSlot } from "../src/lib/schedule";
 
 async function main() {
   const host = new URL(process.env.DATABASE_URL ?? "").hostname;
@@ -469,17 +479,444 @@ async function main() {
       },
     );
 
-    console.log(`\nHU-31 verificado: ${passed} bloques OK.`);
+    await verify(
+      "HU-32: sacar turno desde el portal, reglas de negocio, límite de 2 turnos y concurrencia",
+      async () => {
+        // Setup: paciente B con credenciales definitivas y paciente C con clave temporal pendiente
+        const enableB = await enablePatientAccess(
+          { patientId: patientB.id },
+          receptionist,
+        );
+        userIds.push(enableB.userId);
+        await changePassword(
+          {
+            currentPassword: enableB.temporaryPassword,
+            newPassword: "PasswordB123",
+            confirmPassword: "PasswordB123",
+          },
+          {
+            id: enableB.userId,
+            email: enableB.email,
+            firstName: patientB.firstName,
+            lastName: patientB.lastName,
+            role: Role.PATIENT,
+            mustChangePassword: true,
+          },
+        );
+        const patientActorB: Actor = {
+          id: enableB.userId,
+          email: enableB.email,
+          firstName: patientB.firstName,
+          lastName: patientB.lastName,
+          role: Role.PATIENT,
+          mustChangePassword: false,
+        };
+
+        const patientC = await prisma.patient.create({
+          data: {
+            firstName: "Carolina",
+            lastName: "PortalC",
+            documentType: DocumentType.DNI,
+            documentNumber: String(Number(docBase) + 2),
+            birthDate: new Date("1995-12-10T00:00:00.000Z"),
+            gender: Gender.FEMALE,
+            phone: "1155550003",
+            email: `${tag.toLowerCase()}-pac-c@example.invalid`,
+            coverageType: CoverageType.PRIVATE,
+            createdById: receptionist.id,
+          },
+        });
+        patientIds.push(patientC.id);
+
+        const enableC = await enablePatientAccess(
+          { patientId: patientC.id },
+          receptionist,
+        );
+        userIds.push(enableC.userId);
+        const patientActorTemp: Actor = {
+          id: enableC.userId,
+          email: enableC.email,
+          firstName: patientC.firstName,
+          lastName: patientC.lastName,
+          role: Role.PATIENT,
+          mustChangePassword: true,
+        };
+
+        // Servicio que requiere orden médica
+        const serviceWithReferral = await prisma.service.create({
+          data: {
+            name: `${tag}-con-orden`,
+            durationMinutes: 30,
+            price: "24000.00",
+            requiresReferral: true,
+          },
+        });
+        serviceIds.push(serviceWithReferral.id);
+
+        // Conectar el profesional a ambos servicios
+        await prisma.professional.update({
+          where: { id: professionalId },
+          data: {
+            services: {
+              connect: [{ id: service.id }, { id: serviceWithReferral.id }],
+            },
+          },
+        });
+
+        // Crear franjas horarias de atención para el profesional de 08:00 a 20:00 todos los días
+        for (const weekday of [
+          Weekday.MONDAY,
+          Weekday.TUESDAY,
+          Weekday.WEDNESDAY,
+          Weekday.THURSDAY,
+          Weekday.FRIDAY,
+          Weekday.SATURDAY,
+          Weekday.SUNDAY,
+        ]) {
+          await prisma.availabilityWindow.create({
+            data: {
+              professionalId,
+              weekday,
+              startMinute: 480, // 08:00
+              endMinute: 1200, // 20:00
+            },
+          });
+        }
+
+        // Buscar una fecha hábil próxima sin feriado (al menos 7 días adelante para cumplir ventana de cancelación)
+        let day = new Date();
+        day.setUTCDate(day.getUTCDate() + 7);
+        while (
+          await prisma.holiday.findFirst({
+            where: { startDate: dateToDb(toLocalSlot(day).date) },
+          })
+        ) {
+          day = new Date(day.getTime() + 86_400_000);
+        }
+        const targetDate = toLocalSlot(day).date;
+
+        // 1. Bloqueo de operaciones para paciente con clave temporal pendiente (assertPasswordNotTemporary)
+        await rejects(
+          () => getPortalBookingOptions(patientActorTemp),
+          "FORBIDDEN",
+        );
+        await rejects(
+          () =>
+            createAppointment(
+              {
+                patientId: patientC.id,
+                professionalId,
+                serviceId: service.id,
+                date: targetDate,
+                startTime: "09:00",
+              },
+              patientActorTemp,
+            ),
+          "FORBIDDEN",
+        );
+        await rejects(
+          () =>
+            listAvailableDates(
+              { serviceId: service.id, professionalId, patientId: patientC.id },
+              patientActorTemp,
+            ),
+          "FORBIDDEN",
+        );
+        await rejects(
+          () =>
+            listAvailableSlots(
+              {
+                serviceId: service.id,
+                professionalId,
+                date: targetDate,
+                patientId: patientC.id,
+              },
+              patientActorTemp,
+            ),
+          "FORBIDDEN",
+        );
+        await rejects(
+          () =>
+            listEarliestSlots(
+              { serviceId: service.id, patientId: patientC.id },
+              patientActorTemp,
+            ),
+          "FORBIDDEN",
+        );
+
+        // 2. Servicios que requieren orden médica: excluidos del portal
+        const portalOptions = await getPortalBookingOptions(patientActorA);
+        assert.ok(
+          portalOptions.services.some((s) => s.id === service.id),
+          "El servicio sin orden debe estar disponible",
+        );
+        assert.ok(
+          !portalOptions.services.some((s) => s.id === serviceWithReferral.id),
+          "El servicio con orden médica NO debe aparecer en el portal",
+        );
+
+        await rejects(
+          () =>
+            createAppointment(
+              {
+                patientId: patientA.id,
+                professionalId,
+                serviceId: serviceWithReferral.id,
+                date: targetDate,
+                startTime: "09:00",
+              },
+              patientActorA,
+            ),
+          "VALIDATION",
+        );
+        await rejects(
+          () =>
+            listAvailableDates(
+              {
+                serviceId: serviceWithReferral.id,
+                professionalId,
+                patientId: patientA.id,
+              },
+              patientActorA,
+            ),
+          "VALIDATION",
+        );
+        await rejects(
+          () =>
+            listAvailableSlots(
+              {
+                serviceId: serviceWithReferral.id,
+                professionalId,
+                date: targetDate,
+                patientId: patientA.id,
+              },
+              patientActorA,
+            ),
+          "VALIDATION",
+        );
+        await rejects(
+          () =>
+            listEarliestSlots(
+              {
+                serviceId: serviceWithReferral.id,
+                patientId: patientA.id,
+              },
+              patientActorA,
+            ),
+          "VALIDATION",
+        );
+
+        // 3. Intento de reservar turno para otro paciente: FORBIDDEN
+        await rejects(
+          () =>
+            createAppointment(
+              {
+                patientId: patientB.id,
+                professionalId,
+                serviceId: service.id,
+                date: targetDate,
+                startTime: "09:00",
+              },
+              patientActorA,
+            ),
+          "FORBIDDEN",
+        );
+
+        // 4. Intento de solicitar turno con prioridad urgente: VALIDATION
+        await rejects(
+          () =>
+            createAppointment(
+              {
+                patientId: patientA.id,
+                professionalId,
+                serviceId: service.id,
+                date: targetDate,
+                startTime: "09:00",
+                priority: AppointmentPriority.URGENT,
+              },
+              patientActorA,
+            ),
+          "VALIDATION",
+        );
+
+        // 5. Reserva válida desde el portal: listEarliestSlots y createAppointment
+        const earliest = await listEarliestSlots(
+          { serviceId: service.id, patientId: patientA.id },
+          patientActorA,
+        );
+        assert.ok(
+          earliest.length > 0,
+          "Debe haber al menos un primer horario disponible",
+        );
+
+        const availableSlots = await listAvailableSlots(
+          {
+            serviceId: service.id,
+            professionalId,
+            date: targetDate,
+            patientId: patientA.id,
+          },
+          patientActorA,
+        );
+        assert.ok(
+          availableSlots.length >= 4,
+          "Debe haber múltiples horarios disponibles en el día",
+        );
+        const [slot0, slot1, slot2] = availableSlots;
+
+        // Reserva exitosa del primer turno
+        const appt1 = await createAppointment(
+          {
+            patientId: patientA.id,
+            professionalId,
+            serviceId: service.id,
+            date: targetDate,
+            startTime: slot0.startTime,
+            notes: "Reserva web particular",
+          },
+          patientActorA,
+        );
+        const appt1Record = await prisma.appointment.findUniqueOrThrow({
+          where: { id: appt1.id },
+        });
+        assert.equal(appt1Record.createdById, patientActorA.id);
+        assert.equal(appt1Record.priority, AppointmentPriority.NORMAL);
+        assert.equal(appt1Record.status, AppointmentStatus.SCHEDULED);
+
+        // Visible en Mis turnos (HU-31)
+        const myApptsAfter1 = await listMyAppointments(patientActorA);
+        assert.ok(
+          myApptsAfter1.upcoming.some((a) => a.id === appt1.id),
+          "El turno creado debe figurar en los próximos turnos del paciente",
+        );
+
+        // Visible en la agenda del centro con trazabilidad del portal
+        const centerAppts = await listAppointments(
+          { from: targetDate, to: targetDate },
+          receptionist,
+        );
+        const centerItem = centerAppts.find((a) => a.id === appt1.id);
+        assert.ok(centerItem, "El turno debe figurar en la agenda del centro");
+        assert.equal(
+          centerItem.createdBy.role,
+          Role.PATIENT,
+          "Debe registrar que fue creado por un paciente desde el portal",
+        );
+
+        // 6. Límite de 2 turnos futuros desde el portal
+        const optsWith1 = await getPortalBookingOptions(patientActorA);
+        assert.equal(optsWith1.futureAppointmentsCount, 1);
+        assert.equal(optsWith1.canBook, true);
+
+        // Reserva exitosa del segundo turno futuro
+        const appt2 = await createAppointment(
+          {
+            patientId: patientA.id,
+            professionalId,
+            serviceId: service.id,
+            date: targetDate,
+            startTime: slot1.startTime,
+          },
+          patientActorA,
+        );
+        const appt2Record = await prisma.appointment.findUniqueOrThrow({
+          where: { id: appt2.id },
+        });
+        assert.equal(appt2Record.createdById, patientActorA.id);
+
+        const optsWith2 = await getPortalBookingOptions(patientActorA);
+        assert.equal(optsWith2.futureAppointmentsCount, 2);
+        assert.equal(optsWith2.canBook, false);
+
+        // Intento de reservar un 3er turno futuro -> PORTAL_APPOINTMENT_LIMIT
+        await rejects(
+          () =>
+            createAppointment(
+              {
+                patientId: patientA.id,
+                professionalId,
+                serviceId: service.id,
+                date: targetDate,
+                startTime: slot2.startTime,
+              },
+              patientActorA,
+            ),
+          "PORTAL_APPOINTMENT_LIMIT",
+        );
+
+        // 7. Prueba de concurrencia: dos pacientes compiten por el mismo slot simultáneamente
+        // Paciente A cancela appt2 para recuperar cupo
+        await cancelAppointment(
+          { appointmentId: appt2.id, reason: "Libero turno para prueba" },
+          patientActorA,
+        );
+
+        // Ambos pacientes intentan reservar slot2 al mismo instante
+        const [resA, resB] = await Promise.allSettled([
+          createAppointment(
+            {
+              patientId: patientA.id,
+              professionalId,
+              serviceId: service.id,
+              date: targetDate,
+              startTime: slot2.startTime,
+            },
+            patientActorA,
+          ),
+          createAppointment(
+            {
+              patientId: patientB.id,
+              professionalId,
+              serviceId: service.id,
+              date: targetDate,
+              startTime: slot2.startTime,
+            },
+            patientActorB,
+          ),
+        ]);
+
+        const fulfilled = [resA, resB].filter((r) => r.status === "fulfilled");
+        const rejected = [resA, resB].filter((r) => r.status === "rejected");
+        assert.equal(
+          fulfilled.length,
+          1,
+          "Exactamente uno de los dos pacientes debe conseguir el turno",
+        );
+        assert.equal(
+          rejected.length,
+          1,
+          "El otro paciente debe recibir error por superposición/conflicto",
+        );
+        const rejectedReason = (rejected[0] as PromiseRejectedResult).reason;
+        assert.ok(
+          rejectedReason instanceof DomainError &&
+            rejectedReason.code === "APPOINTMENT_OVERLAP",
+          `Se esperaba APPOINTMENT_OVERLAP, pero se obtuvo: ${rejectedReason?.code}`,
+        );
+      },
+    );
+
+    console.log(`\nHU-31 y HU-32 verificados: ${passed} bloques OK.`);
   } finally {
     if (patientIds.length > 0 || professionalId > 0) {
       await prisma.payment.deleteMany({
         where: { appointment: { patientId: { in: patientIds } } },
       });
       await prisma.appointmentEvent.deleteMany({
-        where: { appointment: { patientId: { in: patientIds } } },
+        where: {
+          OR: [
+            { appointment: { patientId: { in: patientIds } } },
+            { appointment: { professionalId } },
+          ],
+        },
       });
       await prisma.appointment.deleteMany({
-        where: { patientId: { in: patientIds } },
+        where: {
+          OR: [{ patientId: { in: patientIds } }, { professionalId }],
+        },
+      });
+      await prisma.availabilityWindow.deleteMany({
+        where: { professionalId },
       });
     }
     if (patientIds.length > 0) {

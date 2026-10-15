@@ -31,7 +31,7 @@ const historySelect = {
   createdAt: true,
   service: { select: { id: true, name: true } },
   professional: { select: personSelect },
-  createdBy: { select: personSelect },
+  createdBy: { select: { ...personSelect, role: true } },
   encounter: {
     select: {
       id: true,
