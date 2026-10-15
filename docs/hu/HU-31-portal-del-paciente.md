@@ -12,13 +12,14 @@
 ## Validaciones
 
 - Mesa de entradas habilita el acceso desde la ficha del paciente ([HU-17](HU-17-ficha-completa-del-paciente.md)); el sistema genera una contraseña temporal que se muestra una sola vez y que el paciente cambia al primer ingreso.
-- Un paciente tiene como máximo un acceso. Dar de baja al paciente desactiva su acceso.
+- Un paciente tiene como máximo un acceso (`Patient.userId` único). Si el acceso estaba desactivado o el paciente olvidó su clave, volver a habilitarlo reutiliza el mismo usuario con una nueva contraseña temporal (`mustChangePassword = true`). Modificar el nombre, apellido, teléfono o email en la ficha sincroniza esos datos en su usuario del portal. Dar de baja al paciente desactiva su acceso.
 - El paciente cancela solo turnos propios, Programados, con al menos 24 h de anticipación, y con motivo. Valen las reglas de [HU-10](HU-10-cancelar-turno.md) (un turno con cobro vigente no se cancela).
 
 ## Comportamiento
 
-- Al ingresar, el paciente ve **Mis turnos**, con sus próximos turnos arriba. No ve el menú del centro.
-- La cancelación queda en el historial del turno con el paciente como solicitante y libera el horario en el calendario.
+- Al ingresar con una contraseña temporal (`mustChangePassword = true`), el sistema lleva al paciente a cambiarla antes de usar el portal.
+- Al ingresar con su contraseña definitiva, el paciente ve **Mis turnos**, con sus próximos turnos arriba. No ve el menú del centro.
+- La cancelación queda en el historial del turno con el paciente como solicitante (`"El paciente"`) y libera el horario en el calendario.
 - El paciente no ve las notas de la atención, las observaciones administrativas ni datos de otros pacientes.
 
 ## Confirmación
