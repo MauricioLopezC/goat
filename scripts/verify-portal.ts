@@ -367,9 +367,9 @@ async function main() {
             patientId: patientB.id,
             professionalId,
             serviceId: service.id,
-            startsAt: new Date(in48h.getTime() + 3600_000),
-            endsAt: new Date(in48h.getTime() + 5400_000),
-            status: AppointmentStatus.SCHEDULED,
+            startsAt: new Date(past24h.getTime() - 3600_000),
+            endsAt: new Date(past24h.getTime() - 3600_000 + 30 * 60_000),
+            status: AppointmentStatus.COMPLETED,
             createdById: receptionist.id,
           },
         });
