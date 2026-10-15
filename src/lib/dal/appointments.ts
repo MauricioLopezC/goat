@@ -1519,6 +1519,16 @@ export async function rescheduleAppointment(
           const targetProfessionalId =
             data.newProfessionalId ?? appointment.professionalId;
 
+          if (
+            actor.role === Role.PROFESSIONAL &&
+            targetProfessionalId !== appointment.professionalId
+          ) {
+            throw new DomainError(
+              "FORBIDDEN",
+              "Solo podés reprogramar turnos dentro de tu propia agenda.",
+            );
+          }
+
           const availability = await loadAvailability(
             tx,
             {
