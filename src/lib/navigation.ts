@@ -92,6 +92,12 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: CalendarCheck,
         roles: FRONT_DESK,
       },
+      {
+        href: "/dashboard",
+        label: "Mi tablero",
+        icon: LayoutDashboard,
+        roles: ["PROFESSIONAL"],
+      },
     ],
   },
   {

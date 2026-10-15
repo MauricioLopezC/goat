@@ -12,9 +12,11 @@ import {
 import {
   APPOINTMENT_STATUS_BADGE_CLASS,
   APPOINTMENT_STATUS_LABEL,
+  APPOINTMENT_STATUS_ROW_CLASS,
 } from "@/lib/appointment-status";
 import { COVERAGE_TYPE_LABEL } from "@/lib/patients";
 import { formatDate, formatMinute, toLocalSlot } from "@/lib/schedule";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -171,7 +173,10 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
               </TableHeader>
               <TableBody>
                 {rows.map((row) => (
-                  <TableRow key={row.id}>
+                  <TableRow
+                    key={row.id}
+                    className={cn(APPOINTMENT_STATUS_ROW_CLASS[row.status])}
+                  >
                     <TableCell>
                       <p className="tabular-nums">{schedule(row)}</p>
                       <Badge

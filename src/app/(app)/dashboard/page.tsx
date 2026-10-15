@@ -3,7 +3,10 @@ import Link from "next/link";
 import { CalendarClock } from "lucide-react";
 import { DomainError } from "@/lib/actions";
 import { requirePageRole } from "@/lib/dal/auth";
-import { getCenterIndicators } from "@/lib/dal/indicators";
+import {
+  getCenterIndicators,
+  getProfessionalIndicators,
+} from "@/lib/dal/indicators";
 import {
   currentPeriod,
   formatHours,
@@ -13,7 +16,10 @@ import {
   shiftMonthKey,
   type IndicatorPeriod,
 } from "@/lib/indicators";
-import { centerIndicatorsSchema } from "@/lib/validation/indicators";
+import {
+  centerIndicatorsSchema,
+  professionalIndicatorsSchema,
+} from "@/lib/validation/indicators";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +39,7 @@ import {
 } from "@/components/ui/table";
 import { IndicatorCard } from "./indicator-card";
 import { CenterMetrics } from "./center-metrics";
+import { ProfessionalDashboard } from "./professional-dashboard";
 
 export const metadata: Metadata = { title: "Tablero · GOAT" };
 
@@ -52,14 +59,38 @@ function dashboardHref(period: IndicatorPeriod, professionalId?: number) {
 export default async function DashboardPage({
   searchParams,
 }: PageProps<"/dashboard">) {
-  const actor = await requirePageRole("MANAGER");
+  const actor = await requirePageRole("MANAGER", "PROFESSIONAL");
   const params = await searchParams;
   const fallback = currentPeriod();
   const from = single(params.from) ?? fallback.from;
+  const to = single(params.to) ?? from;
+
+  if (actor.role === "PROFESSIONAL") {
+    const requested = { from, to };
+    const parsed = professionalIndicatorsSchema.safeParse(requested);
+    const periodError = parsed.success
+      ? null
+      : (parsed.error.issues[0]?.message ?? "Revisá el período elegido.");
+    const input = parsed.success ? parsed.data : fallback;
+    const { professional, period, metrics } = await getProfessionalIndicators(
+      input,
+      actor,
+    );
+    return (
+      <ProfessionalDashboard
+        professional={professional}
+        period={period}
+        metrics={metrics}
+        periodError={periodError}
+        fallbackPeriod={fallback}
+      />
+    );
+  }
+
   const professionalParam = single(params.professional);
   const requested = {
     from,
-    to: single(params.to) ?? from,
+    to,
     professionalId:
       professionalParam && /^\d{1,9}$/.test(professionalParam)
         ? Number(professionalParam)

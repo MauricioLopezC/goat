@@ -141,6 +141,7 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `PATIENT_HAS_HEALTH_INSURANCE` | Se intenta cobrar a un paciente con obra social; en el Inc. 2 solo se cobra a particulares (HU-21). |
 | `AUTHORIZATION_NOT_REQUIRED` | Se intenta registrar una autorización en un turno de un paciente particular o de un servicio que no requiere orden (HU-21). |
 | `APPOINTMENT_HAS_PAYMENT` | El turno tiene un cobro vigente y no se puede cancelar, reprogramar ni marcar Vencido: primero se anula el cobro (HU-21). |
+| `CANCELLATION_WINDOW_EXPIRED` | El paciente intenta cancelar un turno desde el portal con menos de 24 horas de anticipación (HU-31). |
 
 Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
 
@@ -267,14 +268,27 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 
 ### `cancelAppointment`
 
-**Historia de usuario:** [HU-10 — Cancelar un turno](hu/HU-10-cancelar-turno.md)
-**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
-**Entrada:** `appointmentId` (entero positivo), `reason` (1–500 caracteres, obligatorio), `requestedBy` (1–100 caracteres, obligatorio).
-**Precondiciones:** el turno existe y está en estado `SCHEDULED`. Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`).
+**Historia de usuario:** [HU-10 — Cancelar un turno](hu/HU-10-cancelar-turno.md), [HU-31 — Ingresar como paciente y ver o cancelar mis turnos](hu/HU-31-portal-del-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`, `PATIENT`.
+**Entrada:** `appointmentId` (entero positivo), `reason` (1–500 caracteres, obligatorio), `requestedBy` (1–100 caracteres; obligatorio para el personal del centro; para `PATIENT` la DAL fija `"El paciente"`).
+**Precondiciones:** el turno existe y está en estado `SCHEDULED`. Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`). Si el actor es `PATIENT`, el turno debe pertenecer a su ficha (`patient.userId === actor.id`), faltar al menos 24 horas para `startsAt` y no tener pendiente el cambio obligatorio de contraseña temporal (`mustChangePassword !== true`). El turno no tiene cobro vigente (`PAID`).
 **Efectos:** transacción `Serializable` que actualiza `Appointment.status` a `CANCELLED` y crea un `AppointmentEvent` de tipo `CANCELLED` con `reason`, `requestedBy`, `userId` (actor) y `createdAt` (ahora). El horario queda libre de inmediato.
-**Errores:** `VALIDATION` (campo vacío o ID inválido), `FORBIDDEN` (rol no autorizado o profesional intentando cancelar un turno ajeno), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`), `REASON_REQUIRED` (falta el motivo de cancelación), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente; [HU-21](hu/HU-21-cobrar-turno.md)).
-**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`.
+**Errores:** `VALIDATION` (campo vacío o ID inválido), `FORBIDDEN` (rol no autorizado, profesional/paciente intentando cancelar un turno ajeno, o paciente con cambio de contraseña temporal pendiente), `NOT_FOUND`, `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED`), `REASON_REQUIRED` (falta el motivo de cancelación), `CANCELLATION_WINDOW_EXPIRED` (el paciente intenta cancelar con menos de 24 horas de anticipación; [HU-31](hu/HU-31-portal-del-paciente.md)), `APPOINTMENT_HAS_PAYMENT` (el turno tiene un cobro vigente; [HU-21](hu/HU-21-cobrar-turno.md)).
+**Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`, `/today`, `/portal`.
 **Devuelve:** `{ id }`.
+
+### `listMyAppointments`
+
+**Historia de usuario:** [HU-31 — Ingresar como paciente y ver o cancelar mis turnos](hu/HU-31-portal-del-paciente.md)
+**Roles:** `PATIENT`.
+**Entrada:** el `actor`.
+**Precondiciones:** el actor tiene rol `PATIENT`, está vinculado a un `Patient` activo (`patient.userId === actor.id`) y no tiene pendiente el cambio obligatorio de contraseña temporal (`mustChangePassword !== true`).
+**Efectos:** ninguno. Es una lectura de todos los turnos propios del paciente. No consulta ni devuelve notas clínicas (`Encounter`), observaciones administrativas (`Appointment.notes`, `Patient.notes`) ni datos de otros pacientes.
+**Errores:** `FORBIDDEN` (el rol no es `PATIENT` o el paciente tiene pendiente el cambio de contraseña temporal), `NOT_FOUND` (el usuario no tiene ficha de paciente activa vinculada).
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ patient: { id, firstName, lastName, email, coverageType }, upcoming: PortalAppointmentItem[], past: PortalAppointmentItem[] }`. `upcoming` contiene los turnos `SCHEDULED` con `startsAt > now` ordenados del más próximo al más lejano (`startsAt` e `id` ascendentes), incluyendo `canCancel` (verdadero si faltan al menos 24 h y no tiene cobro vigente). `past` contiene el resto de los turnos ordenados del más reciente al más antiguo (`startsAt` e `id` descendentes). Cada ítem incluye `id`, `startsAt`, `endsAt`, `status`, `service` (`{ id, name, durationMinutes }`), `professional` (`{ id, firstName, lastName }`) y `activePayment` (`{ id, receiptNumber, amount }` si tiene un cobro `PAID`, o `null`).
+
+No es una Server Action: la consume el Server Component de `/portal` (ADR 0001).
 
 ### `completeAppointment`
 
@@ -307,7 +321,7 @@ Una ficha por operación. El nombre es el de la función de la DAL y de la acci�
 **Efectos:** ninguno. Lista los turnos sin cerrar (`UnclosedAppointment`): `SCHEDULED` con `endsAt` anterior a ahora, de cualquier profesional. Van del más viejo al más nuevo (`endsAt` e `id` ascendentes), de a 10.
 **Errores:** `FORBIDDEN`.
 **Revalida:** no aplica; lectura desde Server Component.
-**Devuelve:** `Page<UnclosedAppointment>`. Cada turno trae `id`, `startsAt`, `endsAt`, paciente (nombre y documento), profesional, servicio y si tiene un cobro vigente: un turno cobrado no se puede marcar Vencido ([HU-21](hu/HU-21-cobrar-turno.md)).
+**Devuelve:** `Page<UnclosedAppointment>`. Cada turno trae `id`, `startsAt`, `endsAt`, `status`, paciente (nombre y documento), profesional, servicio y si tiene un cobro vigente: un turno cobrado no se puede marcar Vencido ([HU-21](hu/HU-21-cobrar-turno.md)).
 
 No es una Server Action: la usa la pantalla `/appointments/unclosed`. Desde ahí, cada turno se cierra con `completeAppointment` o `expireAppointment`.
 
@@ -329,9 +343,9 @@ No es una Server Action: la usa el calendario para mostrar el acceso a la lista 
 **Historia de usuario:** [HU-16 — Reprogramar un turno](hu/HU-16-reprogramar-turno.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`.
 **Entrada:** `appointmentId` (entero positivo), `newProfessionalId?` (entero positivo, opcional), `date` (AAAA-MM-DD), `startTime` (HH:MM), `reason` (1–500 caracteres, obligatorio), `requestedBy` (1–100 caracteres, obligatorio).
-**Precondiciones:** el turno existe, está en estado `SCHEDULED` y todavía no comenzó (`startsAt` posterior a ahora). Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`). El profesional elegido (el actual o el nuevo) está activo y habilitado para el servicio del turno. La fecha y hora cumplen las reglas de [HU-09](hu/HU-09-asignar-turno.md) (dentro de una franja habilitada, sin feriados ni ausencias, no pasada y dentro de los dos meses). El nuevo horario no se superpone con otros turnos del profesional ni del paciente (el horario ocupado por el mismo turno no cuenta como ocupado). Al menos la fecha, la hora o el profesional deben diferir del turno actual.
+**Precondiciones:** el turno existe, está en estado `SCHEDULED` y todavía no comenzó (`startsAt` posterior a ahora). Si el actor es `PROFESSIONAL`, el turno debe pertenecer a su usuario (`professional.userId === actor.id`) y el profesional de destino debe ser el actual: `newProfessionalId` puede omitirse o coincidir con `professionalId`, pero no transferir el turno. Esta autorización se verifica dentro de la transacción antes de consultar la disponibilidad del destino y no depende de `requestedBy`. Solo `RECEPTIONIST` y `MANAGER` pueden elegir otro profesional. El profesional elegido (el actual o el nuevo) está activo y habilitado para el servicio del turno. La fecha y hora cumplen las reglas de [HU-09](hu/HU-09-asignar-turno.md) (dentro de una franja habilitada, sin feriados ni ausencias, no pasada y dentro de los dos meses). El nuevo horario no se superpone con otros turnos del profesional ni del paciente (el horario ocupado por el mismo turno no cuenta como ocupado). Al menos la fecha, la hora o el profesional deben diferir del turno actual.
 **Efectos:** transacción `Serializable` que actualiza `Appointment` (`startsAt`, `endsAt`, `professionalId`) y crea un `AppointmentEvent` de tipo `RESCHEDULED` con `previousStartsAt`, `previousEndsAt`, `previousProfessionalId`, `newStartsAt`, `newEndsAt`, `newProfessionalId`, `reason`, `requestedBy`, `userId` (actor) y `createdAt` (ahora). El turno conserva su ID, autor original y fecha de creación. El horario anterior queda libre y el nuevo ocupado. Se reintenta ante conflictos de serialización. Restricciones de exclusión de PostgreSQL respaldan la no superposición concurrente.
-**Errores:** `VALIDATION` (datos inválidos o fecha/hora/profesional idéntico al actual), `FORBIDDEN` (rol no autorizado o profesional intentando reprogramar un turno ajeno), `NOT_FOUND` (turno o profesional no encontrado), `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o ya comenzó), `REASON_REQUIRED` (motivo vacío), `OUTSIDE_AVAILABILITY_WINDOW`, `APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`.
+**Errores:** `VALIDATION` (datos inválidos o fecha/hora/profesional idéntico al actual), `FORBIDDEN` (rol no autorizado o profesional intentando reprogramar un turno ajeno o transferir uno propio a otro profesional; sin cambios ni eventos), `NOT_FOUND` (turno o profesional no encontrado), `INVALID_STATUS_TRANSITION` (el turno no está `SCHEDULED` o ya comenzó), `REASON_REQUIRED` (motivo vacío), `OUTSIDE_AVAILABILITY_WINDOW`, `APPOINTMENT_OVERLAP`, `PATIENT_APPOINTMENT_OVERLAP`.
 **Revalida:** `/calendar`, `/agenda`, `/appointments/[id]`.
 **Devuelve:** `{ id }`.
 
@@ -418,14 +432,14 @@ Una ficha por operación implementada o acordada. Se agregan a medida que se tra
 
 ### `signIn`
 
-**Historia de usuario:** [HU-01 — Ingresar al sistema con mi rol](hu/HU-01-ingresar-al-sistema.md)
+**Historia de usuario:** [HU-01 — Ingresar al sistema con mi rol](hu/HU-01-ingresar-al-sistema.md), [HU-31 — Ingresar como paciente y ver o cancelar mis turnos](hu/HU-31-portal-del-paciente.md)
 **Roles:** ninguno. Es la operación que *crea* la sesión, así que es la única —junto con `signOut`— que no pasa por `requireRole`. Ver la nota al final de la ficha.
 **Entrada:** `email`, `password`.
-**Precondiciones:** existe un `User` con ese email, está `active` y la contraseña verifica contra su `passwordHash` (argon2id, [ADR 0002](adr/0002-autenticacion-y-sesion.md)).
+**Precondiciones:** existe un `User` con ese email, está `active` (y si su rol es `PATIENT`, tiene una ficha `Patient` activa vinculada) y la contraseña verifica contra su `passwordHash` (argon2id, [ADR 0002](adr/0002-autenticacion-y-sesion.md)).
 **Efectos:** sella la cookie de sesión con `{ userId, role }`. No escribe en la base.
 **Errores:** `VALIDATION` (email mal formado o campo vacío), `INVALID_CREDENTIALS`.
 **Revalida:** nada. Redirige.
-**Devuelve:** en el camino feliz no devuelve: redirige a la pantalla inicial del rol (`RECEPTIONIST` → calendario del día del centro, `PROFESSIONAL` → su agenda del día, `MANAGER` → listado de profesionales). `ActionResult` solo viaja en el caso de error.
+**Devuelve:** en el camino feliz no devuelve: si `user.mustChangePassword` es verdadero, redirige a `/portal/change-password`; si no, redirige a la pantalla inicial del rol (`RECEPTIONIST` → `/calendar`, `PROFESSIONAL` → `/agenda`, `MANAGER` → `/dashboard`, `PATIENT` → `/portal`). `ActionResult` solo viaja en el caso de error.
 
 Dos cosas que esta ficha fija y conviene no perder al implementar:
 
@@ -442,6 +456,17 @@ Dos cosas que esta ficha fija y conviene no perder al implementar:
 **Errores:** ninguno.
 **Revalida:** nada. Redirige.
 **Devuelve:** no devuelve: redirige a `/login`.
+
+### `changePassword`
+
+**Historia de usuario:** [HU-31 — Ingresar como paciente y ver o cancelar mis turnos](hu/HU-31-portal-del-paciente.md)
+**Roles:** `PATIENT` (o cualquier rol con sesión activa).
+**Entrada:** `currentPassword` (obligatoria), `newPassword` (mínimo 8 caracteres, distinta de `currentPassword`), `confirmPassword` (debe coincidir con `newPassword`).
+**Precondiciones:** el usuario autenticado existe y está activo, y `currentPassword` verifica contra su `passwordHash`.
+**Efectos:** actualiza `User.passwordHash` con `hashPassword(newPassword)` y marca `User.mustChangePassword = false`.
+**Errores:** `VALIDATION` (contraseña nueva corta, igual a la actual o confirmación distinta), `INVALID_CREDENTIALS` (la contraseña actual no coincide).
+**Revalida:** `/portal`, `/portal/change-password`.
+**Devuelve:** `{ updated: true }`.
 
 ### `createUser`
 
@@ -740,11 +765,11 @@ No es una Server Action: es una lectura que el Server Component de `/patients` l
 
 ### `getPatient`
 
-**Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md), [HU-17 — Completar la ficha del paciente](hu/HU-17-ficha-completa-del-paciente.md)
+**Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md), [HU-17 — Completar la ficha del paciente](hu/HU-17-ficha-completa-del-paciente.md), [HU-31 — Ingresar como paciente y ver o cancelar mis turnos](hu/HU-31-portal-del-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`
 **Entrada:** `id` (identificador numérico del paciente) y el `actor`.
 **Precondiciones:** el actor pertenece a `STAFF_ROLES`.
-**Efectos:** ninguno. Es una lectura completa de la ficha del paciente, incluyendo sus datos personales, información de contacto, domicilio (`address`, `city`), contacto de emergencia (`emergencyContactName`, `emergencyContactPhone`, `emergencyContactRelationship`), observaciones administrativas (`notes`), cobertura médica (`coverage`, plan y obra social) y la información de auditoría de creación y última actualización (`createdBy` y `updatedBy`).
+**Efectos:** ninguno. Es una lectura completa de la ficha del paciente, incluyendo sus datos personales, información de contacto, domicilio (`address`, `city`), contacto de emergencia (`emergencyContactName`, `emergencyContactPhone`, `emergencyContactRelationship`), observaciones administrativas (`notes`), cobertura médica (`coverage`, plan y obra social), estado de su acceso al portal (`user`: `{ id, email, active, mustChangePassword, createdAt }` o `null`) y la información de auditoría de creación y última actualización (`createdBy` y `updatedBy`).
 **Errores:** `FORBIDDEN` si el actor no pertenece al personal del centro; `NOT_FOUND` si el paciente no existe.
 **Revalida:** no aplica.
 **Devuelve:** los datos completos del paciente para renderizar su ficha.
@@ -753,29 +778,51 @@ No es una Server Action: es una lectura que el Server Component de `/patients/[i
 
 ### `getPatientAppointmentHistory`
 
-**Historia de usuario:** [HU-18 — Ver el historial de turnos del paciente](hu/HU-18-historial-de-turnos-del-paciente.md)
+**Historia de usuario:** [HU-18 — Ver el historial de turnos del paciente](hu/HU-18-historial-de-turnos-del-paciente.md), [HU-26 — Ver la bitácora del paciente](hu/HU-26-bitacora-del-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`, `PROFESSIONAL`
-**Entrada:** `input: { patientId: number, status?: AppointmentStatus, professionalId?: number, page?: number }` y el `actor`.
+**Entrada:** `input: { patientId: number, status?: AppointmentStatus, professionalId?: number, withEncounter?: boolean, page?: number }` y el `actor`.
 **Precondiciones:**
 - El paciente existe.
-- Si `actor.role === Role.PROFESSIONAL`, la DAL limita la consulta a los turnos cuyo `professional.userId` es el del actor. Si pide el `professionalId` de otro profesional, se rechaza con `FORBIDDEN`.
-**Efectos:** ninguno. Es una lectura de los turnos del paciente, del más reciente al más antiguo (`startsAt` e `id` descendentes), filtrados por `status` y `professionalId` si vienen y paginados de a 10 ([listados paginados](#listados-paginados)). Cada turno trae servicio, profesional, estado, prioridad, observaciones, quién lo creó y sus eventos en orden cronológico (tipo, motivo, quién lo solicitó, autor, fecha y, en una reprogramación, horario y profesional de antes y después). Para `RECEPTIONIST` y `MANAGER` incluye el cobro vigente (`PAID`); al `PROFESSIONAL` el cobro no se le consulta.
-**Errores:** `FORBIDDEN` (rol no habilitado, o un `PROFESSIONAL` que filtra por otro profesional o no tiene perfil profesional), `NOT_FOUND` (el paciente no existe), `VALIDATION` (parámetros inválidos).
+- Si `actor.role === Role.PROFESSIONAL`, la DAL verifica que el profesional atienda o haya atendido al paciente (al menos un turno registrado con él). De no ser así, rechaza con `FORBIDDEN`. Si atiende al paciente, puede ver todos los turnos del centro y filtrar por cualquier colega que haya atendido al paciente.
+**Efectos:** ninguno. Es una lectura de los turnos y la bitácora del paciente, del más reciente al más antiguo (`startsAt` e `id` descendentes), filtrados por `status`, `professionalId` y `withEncounter` (solo turnos con atención registrada) si vienen y paginados de a 10 ([listados paginados](#listados-paginados)). Cada turno trae servicio, profesional, estado, prioridad, observaciones, quién lo creó, sus eventos en orden cronológico (tipo, motivo, quién lo solicitó, autor, fecha y detalles de cambios) y la atención médica registrada (`encounter`). Para `PROFESSIONAL` se incluyen el autor, fecha, notas e indicaciones de la atención; para `RECEPTIONIST` y `MANAGER`, por secreto médico, `notes` e `indications` son `null`. Para `RECEPTIONIST` y `MANAGER` incluye el cobro vigente (`PAID`); al `PROFESSIONAL` el cobro no se le consulta. Cada turno incluye además la capacidad `canViewDetail` para controlar la visualización de su detalle (`/appointments/[id]`), habilitada solo para turnos propios en caso del profesional y para todos en recepción y gerencia.
+**Errores:** `FORBIDDEN` (rol no habilitado, o un `PROFESSIONAL` que no atiende ni atendió al paciente o no tiene perfil profesional), `NOT_FOUND` (el paciente no existe), `VALIDATION` (parámetros inválidos).
 **Revalida:** no aplica.
-**Devuelve:** `{ page: Page<HistoryItem>, attendance: { completed, expired }, professionals }`. `attendance` cuenta los turnos Completados y Vencidos con el mismo alcance de rol y el mismo filtro de profesional, sin aplicar el filtro de estado ni la página. `professionals` son las opciones del filtro: los profesionales con algún turno del paciente, vacío para el `PROFESSIONAL`.
+**Devuelve:** `{ page: Page<HistoryItem>, attendance: { completed, expired }, professionals }`. `attendance` cuenta los turnos Completados y Vencidos con el mismo alcance de rol y el mismo filtro de profesional, sin aplicar el filtro de estado, `withEncounter` ni la página. `professionals` son las opciones del filtro: los profesionales con algún turno del paciente.
 
 No es una Server Action: el Server Component de `/patients/[id]` la llama directo a la DAL (ADR 0001).
 
 ### `updatePatient`
 
-**Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md), [HU-17 — Completar la ficha del paciente](hu/HU-17-ficha-completa-del-paciente.md)
+**Historia de usuario:** [HU-08 — Buscar y modificar un paciente](hu/HU-08-buscar-modificar-paciente.md), [HU-17 — Completar la ficha del paciente](hu/HU-17-ficha-completa-del-paciente.md), [HU-31 — Ingresar como paciente y ver o cancelar mis turnos](hu/HU-31-portal-del-paciente.md)
 **Roles:** `RECEPTIONIST`, `MANAGER`
 **Entrada:** `id`, `lastName`, `firstName`, `gender`, `birthDate`, `phone`, `email`, `coverageType`, `insurancePlanId` (si `coverageType` es `HEALTH_INSURANCE`), `memberNumber` (si `coverageType` es `HEALTH_INSURANCE`), `guardianName` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**), `guardianPhone` (opcional en general; **obligatorio si la edad derivada de `birthDate` es menor de 16 años**), y los campos opcionales de ficha completa: `address`, `city`, `emergencyContactName`, `emergencyContactPhone`, `emergencyContactRelationship`, `notes`. El documento no es editable: `documentType` y `documentNumber` se aceptan solo para rechazar un intento de cambiarlos.
-**Precondiciones:** el actor es `RECEPTIONIST` o `MANAGER`. El paciente existe. Si la entrada trae `documentType` o `documentNumber`, coinciden con los guardados. Si `coverageType` es `HEALTH_INSURANCE`, el `insurancePlanId` existe y está activo. Si la edad calculada a partir de `birthDate` es menor de 16 años, `guardianName` y `guardianPhone` son obligatorios. Si se indica nombre, teléfono o vínculo del contacto de emergencia, el nombre y el teléfono son obligatorios mutuamente (el contacto de emergencia requiere nombre y teléfono válidos; el vínculo es opcional pero exige que ambos datos de contacto existan); el teléfono de emergencia debe tener formato válido (`phoneRegex`).
-**Efectos:** actualiza los datos del `Patient` salvo el documento, incluyendo domicilio, contacto de emergencia y observaciones administrativas (o `null` si se limpian), registrando `updatedById` con el id del actor y actualizando `updatedAt`. Si `coverageType` es `HEALTH_INSURANCE`, actualiza o crea su `Coverage`. Si la cobertura pasa a `PRIVATE`, remueve la `Coverage` asociada.
-**Errores:** `VALIDATION` (campos obligatorios vacíos, formatos inválidos, menor de 16 años sin tutor, regla cruzada de contacto de emergencia incumplida, intento de cambiar el tipo o el número de documento), `FORBIDDEN` (profesionales u otros roles sin permiso), `NOT_FOUND` (paciente no encontrado).
+**Precondiciones:** el actor es `RECEPTIONIST` o `MANAGER`. El paciente existe. Si la entrada trae `documentType` o `documentNumber`, coinciden con los guardados. Si `coverageType` es `HEALTH_INSURANCE`, el `insurancePlanId` existe y está activo. Si la edad calculada a partir de `birthDate` es menor de 16 años, `guardianName` y `guardianPhone` son obligatorios. Si se indica nombre, teléfono o vínculo del contacto de emergencia, el nombre y el teléfono son obligatorios mutuamente (el contacto de emergencia requiere nombre y teléfono válidos; el vínculo es opcional pero exige que ambos datos de contacto existan); el teléfono de emergencia debe tener formato válido (`phoneRegex`). Si el paciente tiene usuario del portal vinculado (`userId`) y el `email` cambió, el nuevo email no debe estar en uso por otro `User`.
+**Efectos:** actualiza los datos del `Patient` salvo el documento, incluyendo domicilio, contacto de emergencia y observaciones administrativas (o `null` si se limpian), registrando `updatedById` con el id del actor y actualizando `updatedAt`. Si tiene un `User` vinculado, sincroniza `firstName`, `lastName`, `phone` y `email`. Si `coverageType` es `HEALTH_INSURANCE`, actualiza o crea su `Coverage`. Si la cobertura pasa a `PRIVATE`, remueve la `Coverage` asociada.
+**Errores:** `VALIDATION` (campos obligatorios vacíos, formatos inválidos, menor de 16 años sin tutor, regla cruzada de contacto de emergencia incumplida, intento de cambiar el tipo o el número de documento), `EMAIL_TAKEN` (el nuevo email ya pertenece a otro usuario), `FORBIDDEN` (profesionales u otros roles sin permiso), `NOT_FOUND` (paciente no encontrado).
 **Revalida:** `/patients`, `/patients/[id]` y `/patients/[id]/edit`.
 **Devuelve:** `{ id, firstName, lastName, documentType, documentNumber }`.
+
+### `enablePatientAccess`
+
+**Historia de usuario:** [HU-31 — Ingresar como paciente y ver o cancelar mis turnos](hu/HU-31-portal-del-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `patientId` (entero positivo).
+**Precondiciones:** el paciente existe, está activo (`active: true`) y tiene `email` cargado. Si aún no tiene `userId` vinculado (o su email cambió), no existe otro `User` con ese `email`.
+**Efectos:** genera una contraseña temporal aleatoria de 10 caracteres alfanuméricos y calcula su hash con argon2id. En una transacción: si el paciente no tenía usuario vinculado, crea un `User` con `role: PATIENT`, `active: true`, `mustChangePassword: true` y los datos del paciente (`email`, `firstName`, `lastName`, `phone`), y lo vincula en `Patient.userId`. Si ya tenía un `User` vinculado (por ejemplo desactivado o para restablecer la clave temporal), actualiza ese mismo registro (`active: true`, `mustChangePassword: true`, nuevo `passwordHash` y sincroniza `email`, `firstName`, `lastName`, `phone`).
+**Errores:** `VALIDATION` (ID inválido o paciente inactivo), `FORBIDDEN`, `NOT_FOUND` (paciente inexistente), `EMAIL_TAKEN` (ya existe otro usuario con el email del paciente).
+**Revalida:** `/patients/[id]`, `/users`.
+**Devuelve:** `{ patientId, email, temporaryPassword }`. La contraseña temporal en claro viaja únicamente en esta respuesta para mostrarse una sola vez en pantalla.
+
+### `disablePatientAccess`
+
+**Historia de usuario:** [HU-31 — Ingresar como paciente y ver o cancelar mis turnos](hu/HU-31-portal-del-paciente.md)
+**Roles:** `RECEPTIONIST`, `MANAGER`.
+**Entrada:** `patientId` (entero positivo).
+**Precondiciones:** el paciente existe y tiene un usuario del portal vinculado y activo (`user.active === true`).
+**Efectos:** pasa `User.active` a `false`. Cualquier sesión abierta del paciente queda invalidada en su próxima petición (`getSession()` relee `active`).
+**Errores:** `VALIDATION` (ID inválido o el paciente no tiene un acceso activo), `FORBIDDEN`, `NOT_FOUND`.
+**Revalida:** `/patients/[id]`, `/users`.
+**Devuelve:** `{ patientId, active: false }`.
 
 ### `getProfessionalAgenda`
 
@@ -923,9 +970,9 @@ No es una Server Action: la usa la pantalla *Turnos de hoy* (ADR 0001).
 **Historia de usuario:** [HU-24 — Emitir el comprobante de un cobro](hu/HU-24-comprobante-de-cobro.md)
 **Roles:** `RECEPTIONIST`, `MANAGER` (y `PATIENT` para sus propios turnos en HU-31). `PROFESSIONAL` sin acceso.
 **Entrada:** `paymentId` (entero positivo).
-**Precondiciones:** el cobro existe. Si el actor es `PATIENT`, el turno debe pertenecer al paciente. Si es `PROFESSIONAL`, se rechaza con `FORBIDDEN`.
+**Precondiciones:** el cobro existe. Si el actor es `PATIENT`, el turno debe pertenecer al paciente y no debe tener pendiente el cambio de contraseña temporal (`mustChangePassword !== true`). Si es `PROFESSIONAL`, se rechaza con `FORBIDDEN`.
 **Efectos:** ninguno.
-**Errores:** `VALIDATION` (ID inválido), `FORBIDDEN` (rol no autorizado o paciente ajeno), `NOT_FOUND` (cobro inexistente).
+**Errores:** `VALIDATION` (ID inválido), `FORBIDDEN` (rol no autorizado, paciente ajeno o paciente con contraseña temporal pendiente), `NOT_FOUND` (cobro inexistente).
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** los datos completos del comprobante: `receiptNumber`, `paymentId`, `status` (`PAID` o `VOIDED`), `amount` como texto decimal, `paymentMethod`, `createdAt`, `createdBy` (`{ id, firstName, lastName }`), datos de anulación si está anulado (`voidedAt`, `voidReason`, `voidedBy`), datos del turno (`appointment`: `{ id, startsAt, endsAt, service, professional }`), datos del paciente (`patient`: `{ id, firstName, lastName, documentType, documentNumber, email, coverageType, healthInsurer, healthPlan, affiliateNumber }`) y datos del centro (`centerProfile`).
 
@@ -967,6 +1014,25 @@ El centro suma minutos y cantidades de todos los profesionales y calcula las tas
 **Devuelve:** `{ period: { from, to }, center: Indicators, professionals: (Indicators & { id, firstName, lastName, active })[], professionalOptions, details }`. `Indicators` es `{ availableMinutes, occupiedMinutes, occupancyRate, completed, expired, absenteeismRate, cancelled, unclosed }`, con las tasas entre 0 y 1, o `null`. `details` agrega los rankings (máximo cinco), carga por profesional, tasa de cancelación, ingresos mensuales y por medio, total y variación frente al período previo, y turnos por día de semana. La tabla incluye a los profesionales con franjas o turnos en el período. `professionalOptions` son las opciones del filtro.
 
 No es una Server Action: la usa el Server Component de `/dashboard` (ADR 0001).
+
+### `getProfessionalIndicators`
+
+**Historia de usuario:** [HU-30 — Ver mi tablero de profesional](hu/HU-30-tablero-del-profesional.md)
+**Roles:** `PROFESSIONAL`.
+**Entrada:** `input: { from: string, to: string }` (período en meses `AAAA-MM`, hasta 3 meses) y el `actor`.
+**Precondiciones:** el actor tiene rol `PROFESSIONAL` y existe su perfil profesional en la base de datos (`userId === actor.id`). `from` no es posterior a `to` y el período no supera los 3 meses.
+**Efectos:** ninguno. Es una lectura de la actividad clínica y turnos propios del profesional en el período elegido, todo en hora del centro:
+- **Turnos totales y desglose por estado:** cantidad de turnos dados del profesional en el período (`startsAt` dentro del rango) y porcentajes de `COMPLETED`, `EXPIRED` y `CANCELLED` sobre el total.
+- **Turnos por servicio:** cantidad de turnos dados agrupados por prestación brindada, ordenados por cantidad descendente y nombre alfabéticamente, con su porcentaje sobre el total de turnos.
+- **Pacientes atendidos y nuevos:** cantidad de pacientes distintos con al menos un turno `COMPLETED` en el período, y cuántos son nuevos (primer turno completado con este profesional en el centro, sin turnos completados previos con él).
+- **Pacientes por sexo:** porcentaje de distribución de pacientes atendidos según su sexo (`FEMALE`, `MALE`, `OTHER`).
+- **Pacientes por edad:** porcentaje de pacientes atendidos agrupados en 4 rangos etarios calculados a la fecha del turno: menores de 18 años, 18 a 39 años, 40 a 64 años, 65 años o más.
+**Errores:** `FORBIDDEN` (si el actor no es `PROFESSIONAL`), `NOT_FOUND` (no se encuentra el perfil profesional), `VALIDATION` (período inválido o de más de 3 meses).
+**Revalida:** no aplica; lectura desde Server Component.
+**Devuelve:** `{ professional: { id, firstName, lastName }, period: { from, to }, metrics: ProfessionalMetrics }`.
+
+No es una Server Action: la usa el Server Component de `/dashboard` (ADR 0001).
+
 
 ### `createEncounter`
 

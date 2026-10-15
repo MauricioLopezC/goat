@@ -8,6 +8,13 @@ import { normalizeSearchText } from "@/lib/services";
 export type PaymentState =
   "PENDING_PAYMENT" | "PAID" | "PENDING_AUTHORIZATION" | "AUTHORIZED";
 
+export const PAYMENT_STATES: readonly PaymentState[] = [
+  "PAID",
+  "PENDING_PAYMENT",
+  "AUTHORIZED",
+  "PENDING_AUTHORIZATION",
+] as const;
+
 export type PaymentStateInput = {
   coverageType: CoverageType;
   requiresReferral: boolean;

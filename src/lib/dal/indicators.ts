@@ -6,6 +6,7 @@ import { assertRole, type Actor } from "@/lib/dal/auth";
 import { Role } from "@/generated/prisma/enums";
 import { appointmentInstant } from "@/lib/appointment-slots";
 import { calculateCenterMetrics } from "@/lib/center-metrics";
+import { calculateProfessionalMetrics } from "@/lib/professional-metrics";
 import {
   calculateIndicators,
   hasActivity,
@@ -19,6 +20,8 @@ import { addDays, dateFromDb, dateToDb, toLocalSlot } from "@/lib/schedule";
 import {
   centerIndicatorsSchema,
   type CenterIndicatorsInput,
+  professionalIndicatorsSchema,
+  type ProfessionalIndicatorsInput,
 } from "@/lib/validation/indicators";
 
 const personSelect = {
@@ -237,5 +240,103 @@ export async function getCenterIndicators(
         methodName: payment.paymentMethod.name,
       })),
     ),
+  };
+}
+
+/// Tablero del profesional (HU-30): turnos totales, porcentajes por estado,
+/// turnos por servicio, pacientes atendidos, nuevos y distribución por sexo y edad.
+export async function getProfessionalIndicators(
+  input: ProfessionalIndicatorsInput,
+  actor: Actor,
+) {
+  assertRole(actor, Role.PROFESSIONAL);
+  const parsed = professionalIndicatorsSchema.safeParse(input);
+  if (!parsed.success)
+    throw new DomainError(
+      "VALIDATION",
+      parsed.error.issues[0]?.message ?? "Revisá el período elegido.",
+    );
+
+  const own = await prisma.professional.findUnique({
+    where: { userId: actor.id },
+    select: { id: true, firstName: true, lastName: true },
+  });
+  if (!own)
+    throw new DomainError("NOT_FOUND", "No se encontró el perfil profesional.");
+
+  const { from, to } = parsed.data;
+  const period = { from, to };
+  const { first, last } = periodBounds(period);
+  const periodStart = appointmentInstant(first, 0);
+  const periodEnd = appointmentInstant(addDays(last, 1), 0);
+
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      professionalId: own.id,
+      startsAt: {
+        gte: periodStart,
+        lt: periodEnd,
+      },
+    },
+    select: {
+      id: true,
+      patientId: true,
+      serviceId: true,
+      service: { select: { name: true } },
+      startsAt: true,
+      status: true,
+    },
+    orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+  });
+
+  const completedPatientIds = Array.from(
+    new Set(
+      appointments
+        .filter((a) => a.status === "COMPLETED")
+        .map((a) => a.patientId),
+    ),
+  );
+
+  const [patients, priorAppointments] = await Promise.all([
+    completedPatientIds.length > 0
+      ? prisma.patient.findMany({
+          where: { id: { in: completedPatientIds } },
+          select: { id: true, gender: true, birthDate: true },
+        })
+      : [],
+    completedPatientIds.length > 0
+      ? prisma.appointment.findMany({
+          where: {
+            professionalId: own.id,
+            patientId: { in: completedPatientIds },
+            status: "COMPLETED",
+            startsAt: { lt: periodStart },
+          },
+          select: { patientId: true },
+          distinct: ["patientId"],
+        })
+      : [],
+  ]);
+
+  const priorPatientIds = new Set(priorAppointments.map((a) => a.patientId));
+
+  const metrics = calculateProfessionalMetrics(
+    period,
+    appointments.map((a) => ({
+      id: a.id,
+      patientId: a.patientId,
+      serviceId: a.serviceId,
+      serviceName: a.service.name,
+      startsAt: a.startsAt,
+      status: a.status,
+    })),
+    patients,
+    priorPatientIds,
+  );
+
+  return {
+    professional: own,
+    period,
+    metrics,
   };
 }

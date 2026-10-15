@@ -2,7 +2,11 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/actions";
-import { assertRole, type Actor } from "@/lib/dal/auth";
+import {
+  assertPasswordNotTemporary,
+  assertRole,
+  type Actor,
+} from "@/lib/dal/auth";
 import { serializableTransaction } from "@/lib/dal/transactions";
 import {
   AppointmentEventType,
@@ -494,6 +498,7 @@ export async function assertNoActivePayment(
 /// propios turnos (HU-31). Profesional sin acceso.
 export async function getPaymentReceipt(paymentId: number, actor: Actor) {
   assertRole(actor, Role.RECEPTIONIST, Role.MANAGER, Role.PATIENT);
+  assertPasswordNotTemporary(actor);
   if (!Number.isInteger(paymentId) || paymentId <= 0) {
     throw new DomainError("VALIDATION", "ID de cobro no válido.");
   }

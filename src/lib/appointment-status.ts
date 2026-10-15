@@ -53,6 +53,14 @@ export const APPOINTMENT_STATUS_BORDER_CLASS: Record<
   EXPIRED: "border-l-warning",
 };
 
+/// Fondo de fila en tablas y listas según estado (docs/DESIGN.md).
+export const APPOINTMENT_STATUS_ROW_CLASS: Record<AppointmentStatus, string> = {
+  SCHEDULED: "bg-scheduled-soft/30 hover:bg-scheduled-soft/50",
+  COMPLETED: "bg-success-soft/30 hover:bg-success-soft/50",
+  CANCELLED: "bg-muted/40 hover:bg-muted/60 text-muted-foreground",
+  EXPIRED: "bg-warning-soft/30 hover:bg-warning-soft/50",
+};
+
 /// Los estados que ocupan el horario. Cancelados y vencidos lo liberan.
 export function occupiesSlot(status: AppointmentStatus): boolean {
   return (

@@ -94,16 +94,24 @@ Estilo: **minimalismo de precisión clínica** — bordes definidos, superficies
 
 ### Estado del turno → color
 
-| `AppointmentStatus` | Badge (fondo suave) | Borde izquierdo del bloque en agenda |
-|---|---|---|
-| `SCHEDULED` (Programado) | `scheduled-soft` | `scheduled` |
-| `COMPLETED` (Completado) | `success-soft` | `success` |
-| `CANCELLED` (Cancelado) | neutro: `muted` + `border-input` + texto `muted-foreground` | `#94A3B8` (`placeholder`) |
-| `EXPIRED` (Vencido) | `warning-soft` | `warning` |
+| `AppointmentStatus` | Badge (fondo suave) | Borde izquierdo del bloque en agenda | Fondo de fila en tablas |
+|---|---|---|---|
+| `SCHEDULED` (Programado) | `scheduled-soft` | `scheduled` | `bg-scheduled-soft/30 hover:bg-scheduled-soft/50` |
+| `COMPLETED` (Completado) | `success-soft` | `success` | `bg-success-soft/30 hover:bg-success-soft/50` |
+| `CANCELLED` (Cancelado) | neutro: `muted` + `border-input` + texto `muted-foreground` | `#94A3B8` (`placeholder`) | `bg-muted/40 hover:bg-muted/60 text-muted-foreground` |
+| `EXPIRED` (Vencido) | `warning-soft` | `warning` | `bg-warning-soft/30 hover:bg-warning-soft/50` |
 
-La **urgencia/prioridad** es independiente del estado: se marca con un badge `destructive-soft` "Urgente". No se pinta de rojo el bloque entero.
+### Regla canónica de color e íconos
 
-Los estados de pago (Incremento 2) se definirán cuando se modelen.
+> **Una sola regla en todas las vistas: el color es el estado del turno; todo lo demás es ícono.**
+
+1. **El color define exclusivamente el estado del turno (`AppointmentStatus`):**
+   - Se expresa a través de los bordes laterales (`APPOINTMENT_STATUS_BORDER_CLASS`), badges suaves (`APPOINTMENT_STATUS_BADGE_CLASS`) y fondos de fila en tablas y listas (`APPOINTMENT_STATUS_ROW_CLASS`). Ningún otro atributo del turno puede apropiarse del color del bloque o fila.
+2. **Las propiedades y metadatos adicionales se representan siempre mediante íconos descriptivos (con título o tooltip accesible):**
+   - **Cobro y autorización:** `PaymentStateIcon` (`CircleDollarSign` / `FileCheck`), primario para completado/autorizado y cian suave para pendiente.
+   - **Prioridad urgente:** ícono de alerta (`AlertCircle` en `text-destructive`). En bloques de grilla y timelines compactos sustituye al badge textual para evitar saturación y preservar el ancho disponible. En fichas o modales de detalle puede acompañar al badge `destructive-soft`.
+   - **Atención médica registrada:** `Stethoscope` en `text-primary`.
+   - **Cancelación:** texto tachado (`line-through`) y borde `placeholder`.
 
 ### Accesibilidad de color
 

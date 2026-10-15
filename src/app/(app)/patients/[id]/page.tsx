@@ -14,10 +14,14 @@ import {
   UserCheck,
   UserX,
 } from "lucide-react";
+import { DomainError } from "@/lib/actions";
 import { requirePageRole, STAFF_ROLES } from "@/lib/dal/auth";
 import { canAccess } from "@/lib/route-access";
 import { getPatient } from "@/lib/dal/patients";
-import { getPatientAppointmentHistory } from "@/lib/dal/patient-history";
+import {
+  getPatientAppointmentHistory,
+  type PatientAppointmentHistory,
+} from "@/lib/dal/patient-history";
 import { parseHistoryQuery } from "@/lib/patient-history";
 import {
   GENDER_LABEL,
@@ -36,6 +40,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { AppointmentHistory } from "./appointment-history";
+import { PortalAccessCard } from "./portal-access-card";
 
 interface PatientDetailPageProps {
   params: Promise<{ id: string }>;
@@ -97,18 +102,21 @@ export default async function PatientDetailPage({
     notFound();
   }
 
-  const parsedHistoryQuery = parseHistoryQuery(await searchParams);
-  // El profesional no filtra por profesional: la DAL ya limita el historial a
-  // sus turnos y rechaza el de otro, así que un `professionalId` en la URL se
-  // ignora en vez de mostrar un error.
-  const historyQuery =
-    actor.role === "PROFESSIONAL"
-      ? { ...parsedHistoryQuery, professionalId: undefined }
-      : parsedHistoryQuery;
-  const history = await getPatientAppointmentHistory(
-    { patientId, ...historyQuery },
-    actor,
-  );
+  const historyQuery = parseHistoryQuery(await searchParams);
+  let history: PatientAppointmentHistory | null = null;
+  let historyForbidden = false;
+  try {
+    history = await getPatientAppointmentHistory(
+      { patientId, ...historyQuery },
+      actor,
+    );
+  } catch (error) {
+    if (error instanceof DomainError && error.code === "FORBIDDEN") {
+      historyForbidden = true;
+    } else {
+      throw error;
+    }
+  }
 
   const isManagerOrReceptionist =
     actor.role === "RECEPTIONIST" || actor.role === "MANAGER";
@@ -504,12 +512,22 @@ export default async function PatientDetailPage({
         </Card>
       </div>
 
+      {isManagerOrReceptionist && (
+        <PortalAccessCard
+          patientId={patient.id}
+          patientActive={patient.active}
+          patientEmail={patient.email}
+          user={patient.user}
+        />
+      )}
+
       <AppointmentHistory
         patientId={patient.id}
         history={history}
         query={historyQuery}
         own={actor.role === "PROFESSIONAL"}
         now={new Date()}
+        forbidden={historyForbidden}
       />
 
       {/* Bloque de Auditoría y Trazabilidad */}

@@ -23,3 +23,21 @@ export const centerIndicatorsSchema = z
     path: ["to"],
   });
 export type CenterIndicatorsInput = z.infer<typeof centerIndicatorsSchema>;
+
+/// Período del tablero del profesional (HU-30).
+export const professionalIndicatorsSchema = z
+  .object({
+    from: monthSchema,
+    to: monthSchema,
+  })
+  .refine((period) => periodMonthCount(period) >= 1, {
+    message: "El mes de inicio no puede ser posterior al de fin.",
+    path: ["to"],
+  })
+  .refine((period) => periodMonthCount(period) <= MAX_PERIOD_MONTHS, {
+    message: `El período puede abarcar hasta ${MAX_PERIOD_MONTHS} meses.`,
+    path: ["to"],
+  });
+export type ProfessionalIndicatorsInput = z.infer<
+  typeof professionalIndicatorsSchema
+>;

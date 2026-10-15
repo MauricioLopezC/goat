@@ -32,6 +32,16 @@ const historySelect = {
   service: { select: { id: true, name: true } },
   professional: { select: personSelect },
   createdBy: { select: personSelect },
+  encounter: {
+    select: {
+      id: true,
+      notes: true,
+      indications: true,
+      createdAt: true,
+      updatedAt: true,
+      professional: { select: personSelect },
+    },
+  },
   events: {
     select: {
       id: true,
@@ -55,6 +65,15 @@ type HistoryAppointment = Prisma.AppointmentGetPayload<{
   select: typeof historySelect;
 }>;
 
+export type HistoryEncounter = {
+  id: number;
+  notes: string | null;
+  indications: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  professional: { id: number; firstName: string; lastName: string };
+};
+
 /// Cobro vigente del turno (HU-21). El monto viaja como texto: `Decimal` no
 /// se serializa a componentes cliente.
 export type HistoryPayment = {
@@ -64,16 +83,20 @@ export type HistoryPayment = {
   createdBy: { id: number; firstName: string; lastName: string };
 };
 
-export type HistoryItem = HistoryAppointment & {
+export type HistoryItem = Omit<HistoryAppointment, "encounter"> & {
+  encounter: HistoryEncounter | null;
   /// Siempre `null` para el profesional: el cobro no se le consulta.
   payment: HistoryPayment | null;
+  /// Capacidad de abrir el detalle del turno (/appointments/[id]).
+  /// Para el profesional solo es true en turnos propios; recepción y gerencia ven todos.
+  canViewDetail: boolean;
 };
 
 export type PatientAppointmentHistory = {
   page: Page<HistoryItem>;
   /// Completados y Vencidos del alcance visible, sin el filtro de estado.
   attendance: { completed: number; expired: number };
-  /// Opciones del filtro de profesional; vacío para el profesional.
+  /// Opciones del filtro de profesional que tuvieron turnos con el paciente.
   professionals: { id: number; firstName: string; lastName: string }[];
 };
 
@@ -88,7 +111,8 @@ export async function getPatientAppointmentHistory(
       "VALIDATION",
       "Revisá los filtros del historial de turnos.",
     );
-  const { patientId, status, professionalId, page } = parsed.data;
+  const { patientId, status, professionalId, withEncounter, page } =
+    parsed.data;
 
   const patient = await prisma.patient.findUnique({
     where: { id: patientId },
@@ -97,19 +121,30 @@ export async function getPatientAppointmentHistory(
   if (!patient) throw new DomainError("NOT_FOUND", "El paciente no existe.");
 
   const isProfessional = actor.role === Role.PROFESSIONAL;
+  let ownProfessionalId: number | null = null;
   let scopedProfessionalId = professionalId;
   if (isProfessional) {
-    // Pertenencia: el profesional solo ve los turnos del paciente con él.
+    // Pertenencia (HU-26): el profesional ve la bitácora completa del paciente
+    // (de todos los profesionales) siempre que atienda o haya atendido al paciente.
     const own = await prisma.professional.findUnique({
       where: { userId: actor.id },
       select: { id: true },
     });
-    if (!own || (professionalId !== undefined && professionalId !== own.id))
+    if (!own)
       throw new DomainError(
         "FORBIDDEN",
-        "Solo podés ver los turnos del paciente con vos.",
+        "Solo podés ver la bitácora de pacientes que atendés.",
       );
-    scopedProfessionalId = own.id;
+    const hasAttended = await prisma.appointment.count({
+      where: { patientId, professionalId: own.id },
+    });
+    if (hasAttended === 0)
+      throw new DomainError(
+        "FORBIDDEN",
+        "Solo podés ver la bitácora de pacientes que atendés.",
+      );
+    ownProfessionalId = own.id;
+    scopedProfessionalId = professionalId;
   }
 
   const scope: Prisma.AppointmentWhereInput = {
@@ -121,6 +156,7 @@ export async function getPatientAppointmentHistory(
   const where: Prisma.AppointmentWhereInput = {
     ...scope,
     ...(status ? { status } : {}),
+    ...(withEncounter ? { encounter: { isNot: null } } : {}),
   };
 
   const [appointments, attendanceRows, professionals] = await Promise.all([
@@ -146,13 +182,11 @@ export async function getPatientAppointmentHistory(
       },
       _count: { _all: true },
     }),
-    isProfessional
-      ? Promise.resolve([])
-      : prisma.professional.findMany({
-          where: { appointments: { some: { patientId } } },
-          select: personSelect,
-          orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
-        }),
+    prisma.professional.findMany({
+      where: { appointments: { some: { patientId } } },
+      select: personSelect,
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
+    }),
   ]);
 
   const payments = isProfessional
@@ -167,7 +201,18 @@ export async function getPatientAppointmentHistory(
       ...appointments,
       items: appointments.items.map((item) => ({
         ...item,
+        encounter: item.encounter
+          ? {
+              ...item.encounter,
+              // Secreto médico (HU-26): recepción y gerencia ven si hay atención y
+              // el profesional autor, pero notas e indicaciones viajan como null.
+              notes: isProfessional ? item.encounter.notes : null,
+              indications: isProfessional ? item.encounter.indications : null,
+            }
+          : null,
         payment: payments.get(item.id) ?? null,
+        canViewDetail:
+          !isProfessional || item.professional.id === ownProfessionalId,
       })),
     },
     attendance: {

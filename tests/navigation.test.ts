@@ -41,6 +41,7 @@ test("cada rol ve exactamente sus links", () => {
   ]);
   assert.deepEqual(labels("PROFESSIONAL"), [
     "Mi agenda",
+    "Mi tablero",
     "Pacientes",
     "Mis horarios",
     "Servicios",
@@ -123,5 +124,34 @@ test("canAccess replica los permisos de las páginas", () => {
   assert.equal(canAccess("/appointments/unclosed", "MANAGER"), true);
   assert.equal(canAccess("/dashboard", "MANAGER"), true);
   assert.equal(canAccess("/dashboard", "RECEPTIONIST"), false);
-  assert.equal(canAccess("/dashboard", "PROFESSIONAL"), false);
+
+  assert.equal(canAccess("/dashboard", "PROFESSIONAL"), true);
+
+  // Portal del paciente (HU-31)
+  assert.equal(canAccess("/portal", "PATIENT"), true);
+  assert.equal(canAccess("/portal/change-password", "PATIENT"), true);
+  assert.equal(canAccess("/portal/payments/1/receipt", "PATIENT"), true);
+  assert.equal(canAccess("/portal", "RECEPTIONIST"), false);
+  assert.equal(canAccess("/portal", "PROFESSIONAL"), false);
+  assert.equal(canAccess("/portal", "MANAGER"), false);
+});
+
+test("caja conserva sus permisos y la regla específica del historial", () => {
+  const roles: Role[] = [...STAFF, "PATIENT"];
+  for (const role of roles) {
+    for (const pathname of ["/cash", "/cash/"]) {
+      assert.equal(
+        canAccess(pathname, role),
+        role === "RECEPTIONIST" || role === "MANAGER",
+        `${role}: ${pathname}`,
+      );
+    }
+    for (const pathname of ["/cash/history", "/cash/history/"]) {
+      assert.equal(
+        canAccess(pathname, role),
+        role === "MANAGER",
+        `${role}: ${pathname}`,
+      );
+    }
+  }
 });
