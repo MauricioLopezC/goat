@@ -734,6 +734,73 @@ async function main() {
         },
         receptionist,
       );
+      const ownBefore = await prisma.appointment.findUniqueOrThrow({
+        where: { id: ownProfessionalAppt.id },
+        include: { events: true },
+      });
+      const missingProfessionalId =
+        ((await prisma.professional.aggregate({ _max: { id: true } }))._max
+          .id ?? 0) + 1;
+      for (const newProfessionalId of [
+        professionals[1],
+        missingProfessionalId,
+      ]) {
+        for (const requestedBy of [
+          "el profesional",
+          "el paciente",
+          "el centro",
+        ]) {
+          await rejects(
+            () =>
+              rescheduleAppointment(
+                {
+                  appointmentId: ownProfessionalAppt.id,
+                  newProfessionalId,
+                  date: rescheduleDate,
+                  startTime: "12:00",
+                  reason: "Intento de transferir un turno propio",
+                  requestedBy,
+                },
+                professionalActor,
+              ),
+            "FORBIDDEN",
+          );
+          assert.deepEqual(
+            await prisma.appointment.findUniqueOrThrow({
+              where: { id: ownProfessionalAppt.id },
+              include: { events: true },
+            }),
+            ownBefore,
+            "Un destino prohibido no debe modificar el turno ni crear eventos",
+          );
+        }
+      }
+      const otherBefore = await prisma.appointment.findUniqueOrThrow({
+        where: { id: otherProfessionalAppt.id },
+        include: { events: true },
+      });
+      await rejects(
+        () =>
+          rescheduleAppointment(
+            {
+              appointmentId: otherProfessionalAppt.id,
+              newProfessionalId: professionals[0],
+              date: rescheduleDate,
+              startTime: "12:00",
+              reason: "Intento de tomar un turno ajeno",
+              requestedBy: "el centro",
+            },
+            professionalActor,
+          ),
+        "FORBIDDEN",
+      );
+      assert.deepEqual(
+        await prisma.appointment.findUniqueOrThrow({
+          where: { id: otherProfessionalAppt.id },
+          include: { events: true },
+        }),
+        otherBefore,
+      );
       await rescheduleAppointment(
         {
           appointmentId: ownProfessionalAppt.id,
@@ -744,6 +811,71 @@ async function main() {
         },
         professionalActor,
       );
+      await rescheduleAppointment(
+        {
+          appointmentId: ownProfessionalAppt.id,
+          newProfessionalId: professionals[0],
+          date: rescheduleDate,
+          startTime: "11:00",
+          reason: "Cambio propio con profesional explícito",
+          requestedBy: "el paciente",
+        },
+        professionalActor,
+      );
+      await rejects(
+        () =>
+          rescheduleAppointment(
+            {
+              appointmentId: ownProfessionalAppt.id,
+              date: rescheduleDate,
+              startTime: "11:00",
+              reason: "Sin cambio de horario propio",
+              requestedBy: "el profesional",
+            },
+            professionalActor,
+          ),
+        "VALIDATION",
+      );
+      const ownAfter = await prisma.appointment.findUniqueOrThrow({
+        where: { id: ownProfessionalAppt.id },
+        include: { events: { orderBy: { id: "asc" } } },
+      });
+      assert.equal(ownAfter.professionalId, ownBefore.professionalId);
+      assert.equal(ownAfter.patientId, ownBefore.patientId);
+      assert.equal(ownAfter.serviceId, ownBefore.serviceId);
+      assert.equal(ownAfter.createdById, ownBefore.createdById);
+      assert.deepEqual(ownAfter.createdAt, ownBefore.createdAt);
+      assert.equal(ownAfter.events.length, 2);
+      for (const event of ownAfter.events) {
+        assert.equal(event.type, "RESCHEDULED");
+        assert.equal(event.userId, professionalActor.id);
+        assert.equal(event.previousProfessionalId, professionals[0]);
+        assert.equal(event.newProfessionalId, professionals[0]);
+      }
+      // Mesa de entradas conserva la transferencia entre profesionales.
+      await rescheduleAppointment(
+        {
+          appointmentId: otherProfessionalAppt.id,
+          newProfessionalId: professionals[0],
+          date: rescheduleDate,
+          startTime: "11:30",
+          reason: "Transferencia autorizada por mesa de entradas",
+          requestedBy: "el centro",
+        },
+        receptionist,
+      );
+      const transferred = await prisma.appointment.findUniqueOrThrow({
+        where: { id: otherProfessionalAppt.id },
+        include: { events: { orderBy: { id: "desc" } } },
+      });
+      assert.equal(transferred.professionalId, professionals[0]);
+      assert.equal(transferred.events.length, 1);
+      assert.equal(transferred.events[0].userId, receptionist.id);
+      assert.equal(
+        transferred.events[0].previousProfessionalId,
+        professionals[1],
+      );
+      assert.equal(transferred.events[0].newProfessionalId, professionals[0]);
       await cancelAppointment(
         {
           appointmentId: ownProfessionalAppt.id,
