@@ -548,7 +548,7 @@ export function WeeklyAgendaGrid({
                     <Link
                       href={patientHistoryHref(selectedAppointment.patient.id)}
                     >
-                      Historial del paciente
+                      Bitácora del paciente
                     </Link>
                   </Button>
                 </div>

@@ -94,8 +94,9 @@ export type HistoryItem = Omit<HistoryAppointment, "encounter"> & {
 
 export type PatientAppointmentHistory = {
   page: Page<HistoryItem>;
-  /// Completados y Vencidos del alcance visible, sin el filtro de estado.
-  attendance: { completed: number; expired: number };
+  /// Completados, Vencidos y Cancelados del alcance visible, sin el filtro
+  /// de estado.
+  attendance: { completed: number; expired: number; cancelled: number };
   /// Opciones del filtro de profesional que tuvieron turnos con el paciente.
   professionals: { id: number; firstName: string; lastName: string }[];
 };
@@ -177,7 +178,11 @@ export async function getPatientAppointmentHistory(
       where: {
         ...scope,
         status: {
-          in: [AppointmentStatus.COMPLETED, AppointmentStatus.EXPIRED],
+          in: [
+            AppointmentStatus.COMPLETED,
+            AppointmentStatus.EXPIRED,
+            AppointmentStatus.CANCELLED,
+          ],
         },
       },
       _count: { _all: true },
@@ -218,6 +223,7 @@ export async function getPatientAppointmentHistory(
     attendance: {
       completed: count(AppointmentStatus.COMPLETED),
       expired: count(AppointmentStatus.EXPIRED),
+      cancelled: count(AppointmentStatus.CANCELLED),
     },
     professionals,
   };
