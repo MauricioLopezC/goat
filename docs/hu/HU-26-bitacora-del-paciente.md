@@ -19,6 +19,7 @@ Amplía el historial de [HU-18](HU-18-historial-de-turnos-del-paciente.md). Por 
 
 - Mantiene la lista de HU-18: próximos separados de pasados, de a 10, con filtro por estado y por profesional. Los próximos van del más cercano al más lejano; los pasados, del más reciente al más antiguo.
 - Cada turno pasado muestra en una línea su resultado según el estado: vino (Completado), faltó (Vencido) o canceló (Cancelado). Debajo, el texto de la atención si el usuario puede verlo.
+- Arriba, un resumen cuenta los turnos Completados, Vencidos y Cancelados del paciente, con el filtro de profesional pero sin el de estado.
 - Filtro **Solo con atención registrada**, para leer la bitácora clínica de corrido.
 - El profesional llega a la bitácora desde su agenda y desde el detalle del turno.
 

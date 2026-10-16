@@ -135,7 +135,7 @@ export function AppointmentHistory({
             </CardDescription>
           </div>
           <dl
-            className="flex gap-2"
+            className="flex flex-wrap gap-2"
             aria-label="Asistencia del paciente"
             title="Cuenta todos los turnos visibles, sin el filtro de estado."
           >
@@ -149,6 +149,12 @@ export function AppointmentHistory({
               <dt className="text-label-sm uppercase">Vencidos</dt>
               <dd className="text-title-md font-bold tabular-nums">
                 {attendance.expired}
+              </dd>
+            </div>
+            <div className="rounded-lg border border-destructive-soft-border bg-destructive-soft px-3 py-1.5 text-destructive-soft-foreground">
+              <dt className="text-label-sm uppercase">Cancelados</dt>
+              <dd className="text-title-md font-bold tabular-nums">
+                {attendance.cancelled}
               </dd>
             </div>
           </dl>
