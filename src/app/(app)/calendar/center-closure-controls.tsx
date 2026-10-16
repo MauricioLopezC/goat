@@ -26,16 +26,18 @@ export type CalendarClosure = {
   date?: string;
 };
 
-/// Cerrar el centro o quitar el cierre del día que se ve en la vista día del
-/// calendario (HU-14, HU-23). Un día pasado no se puede cerrar.
+/// Cerrar el centro desde cualquier vista del calendario (HU-14, HU-23).
+/// La vista día permite también quitar su cierre. No se cierran días pasados.
 export function CenterClosureControls({
   date,
   holiday,
   canClose,
+  selectPeriod = false,
 }: {
   date: string;
   holiday: CalendarClosure | null;
   canClose: boolean;
+  selectPeriod?: boolean;
 }) {
   // El diálogo no depende de `holiday`: al cerrar el día la página se
   // revalida y el diálogo sigue abierto para mostrar el mensaje de éxito.
@@ -100,7 +102,7 @@ export function CenterClosureControls({
           </DialogHeader>
           {/* El contenido se desmonta al cerrar: reabrir no muestra el intento
               anterior. */}
-          <CloseCenterForm date={date} />
+          <CloseCenterForm date={selectPeriod ? undefined : date} />
         </DialogContent>
       </Dialog>
     </>
