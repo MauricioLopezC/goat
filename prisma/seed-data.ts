@@ -789,7 +789,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "9377",
     phone: "387 156-8845",
     email: "valeria.aguirre@example.com",
-    photoUrl: null,
+    photoUrl: "/images/professionals/valeria-aguirre.jpg",
     notes: "Se incorpora en octubre; falta cargar la agenda.",
     titles: [KINESIOLOGIST],
     services: ["Sesión de kinesiología motora"],
