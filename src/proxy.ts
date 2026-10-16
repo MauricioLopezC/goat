@@ -11,11 +11,15 @@ import { canAccess } from "@/lib/route-access";
 // Si este archivo desapareciera, el sistema seguiría siendo seguro; solo
 // mostraría el login más tarde.
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/profesionales"];
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const response = NextResponse.next();
+
+  if (pathname.startsWith("/uploads/")) {
+    return response;
+  }
 
   const session = await getIronSession<SessionPayload>(
     nextProxyCookies(request, response),
@@ -23,10 +27,7 @@ export default async function proxy(request: NextRequest) {
   );
 
   if (PUBLIC_PATHS.includes(pathname)) {
-    // El login se deja pasar siempre. Mandar a otro lado al que ya tiene
-    // cookie sería decidir con información vieja: si lo dieron de baja, la
-    // página lo devolvería acá y quedaría un bucle. Esa decisión la toma
-    // `/login`, que relee la base.
+    // El login y las pantallas públicas se dejan pasar siempre.
     return response;
   }
 
@@ -43,5 +44,7 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.svg$).*)"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|uploads/|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)",
+  ],
 };

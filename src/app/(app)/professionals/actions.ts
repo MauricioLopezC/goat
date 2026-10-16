@@ -12,6 +12,12 @@ import {
 } from "@/lib/validation/professional";
 import { defineAction, type ActionResult } from "@/lib/actions";
 
+import {
+  validatePhotoFile,
+  saveProfessionalPhoto,
+  deleteProfessionalPhoto,
+} from "@/lib/storage/photos";
+
 /// Alta de profesional (HU-02). Ficha en docs/acciones.md.
 ///
 /// `defineAction` verifica la sesión y el rol (MANAGER), valida con Zod
@@ -23,6 +29,7 @@ const create = defineAction({
     const professional = await dal.createProfessional(input, actor);
     // Revalidar es responsabilidad de la acción, no de la DAL (ADR 0001).
     revalidatePath("/professionals");
+    revalidatePath("/profesionales");
     return professional;
   },
 });
@@ -67,6 +74,44 @@ export async function createProfessional(
   _previous: CreateProfessionalState,
   formData: FormData,
 ): Promise<CreateProfessionalState> {
+  const photoFile = formData.get("photo");
+  let photoUrl: string | null = null;
+
+  if (
+    photoFile &&
+    typeof photoFile === "object" &&
+    "size" in photoFile &&
+    (photoFile as File).size > 0
+  ) {
+    const file = photoFile as File;
+    const validation = validatePhotoFile(file);
+    if (!validation.ok) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION",
+          message: validation.error,
+          fieldErrors: { photo: [validation.error] },
+        },
+        values: submitted(formData),
+      };
+    }
+    try {
+      photoUrl = await saveProfessionalPhoto(file);
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION",
+          message:
+            error instanceof Error ? error.message : "Error al guardar la foto",
+          fieldErrors: { photo: ["No se pudo guardar la imagen"] },
+        },
+        values: submitted(formData),
+      };
+    }
+  }
+
   // En FormData, los campos de arrays vienen con getAll
   const raw = {
     lastName: formData.get("lastName"),
@@ -78,12 +123,16 @@ export async function createProfessional(
     serviceIds: formData.getAll("serviceIds").map(Number),
     phone: formData.get("phone") || null,
     email: formData.get("email") || null,
+    photoUrl,
     notes: formData.get("notes") || null,
   };
 
   const result = await create(raw);
 
   if (!result.ok) {
+    if (photoUrl) {
+      await deleteProfessionalPhoto(photoUrl);
+    }
     return { ...result, values: submitted(formData) };
   }
 
@@ -96,6 +145,7 @@ const update = defineAction({
   handler: async (input, actor) => {
     const result = await dal.updateProfessional(input, actor);
     revalidatePath("/professionals");
+    revalidatePath("/profesionales");
     revalidatePath(`/professionals/${input.id}`);
     revalidatePath(`/professionals/${input.id}/edit`);
     return result;
@@ -108,6 +158,7 @@ const deactivate = defineAction({
   handler: async (input, actor) => {
     const result = await dal.deactivateProfessional(input, actor);
     revalidatePath("/professionals");
+    revalidatePath("/profesionales");
     revalidatePath(`/professionals/${input.id}`);
     revalidatePath(`/professionals/${input.id}/edit`);
     return result;
@@ -120,6 +171,7 @@ const reactivate = defineAction({
   handler: async (input, actor) => {
     const result = await dal.reactivateProfessional(input, actor);
     revalidatePath("/professionals");
+    revalidatePath("/profesionales");
     revalidatePath(`/professionals/${input.id}`);
     revalidatePath(`/professionals/${input.id}/edit`);
     return result;
@@ -137,8 +189,57 @@ export async function updateProfessional(
   _previous: ProfessionalMutationState,
   formData: FormData,
 ): Promise<ProfessionalMutationState> {
-  return update({
-    id: Number(formData.get("id")),
+  const id = Number(formData.get("id"));
+  const removePhoto = formData.get("removePhoto") === "true";
+  const photoFile = formData.get("photo");
+  let photoUrl: string | null | undefined = undefined;
+  let previousPhotoToDelete: string | null = null;
+
+  if (removePhoto) {
+    photoUrl = null;
+    const currentPhoto = formData.get("currentPhoto");
+    if (typeof currentPhoto === "string" && currentPhoto.trim() !== "") {
+      previousPhotoToDelete = currentPhoto;
+    }
+  } else if (
+    photoFile &&
+    typeof photoFile === "object" &&
+    "size" in photoFile &&
+    (photoFile as File).size > 0
+  ) {
+    const file = photoFile as File;
+    const validation = validatePhotoFile(file);
+    if (!validation.ok) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION",
+          message: validation.error,
+          fieldErrors: { photo: [validation.error] },
+        },
+      };
+    }
+    try {
+      photoUrl = await saveProfessionalPhoto(file);
+      const currentPhoto = formData.get("currentPhoto");
+      if (typeof currentPhoto === "string" && currentPhoto.trim() !== "") {
+        previousPhotoToDelete = currentPhoto;
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION",
+          message:
+            error instanceof Error ? error.message : "Error al guardar la foto",
+          fieldErrors: { photo: ["No se pudo guardar la imagen"] },
+        },
+      };
+    }
+  }
+
+  const result = await update({
+    id,
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName"),
     documentType: formData.get("documentType"),
@@ -148,9 +249,22 @@ export async function updateProfessional(
     serviceIds: formData.getAll("serviceIds").map(Number),
     phone: formData.get("phone"),
     email: formData.get("email"),
+    photoUrl,
     notes: formData.get("notes"),
     reason: formData.get("reason"),
   });
+
+  if (result.ok) {
+    if (previousPhotoToDelete) {
+      await deleteProfessionalPhoto(previousPhotoToDelete);
+    }
+  } else {
+    if (photoUrl) {
+      await deleteProfessionalPhoto(photoUrl);
+    }
+  }
+
+  return result;
 }
 
 export async function deactivateProfessional(

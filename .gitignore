@@ -44,3 +44,6 @@ next-env.d.ts
 
 # env files: commit only the example
 !.env.example
+
+# local user uploads
+/public/uploads/

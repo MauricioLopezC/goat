@@ -10,6 +10,7 @@ import {
   PhoneCall,
   Stethoscope,
   UserRound,
+  Users,
 } from "lucide-react";
 import { Role } from "@/generated/prisma/enums";
 import { requirePageRole } from "@/lib/dal/auth";
@@ -68,21 +69,29 @@ export default async function PortalHomePage() {
           </p>
         </div>
 
-        {upcoming.length < MAX_PORTAL_FUTURE_APPOINTMENTS ? (
-          <Button asChild className="gap-1.5 shadow-xs">
-            <Link href="/portal/appointments/new">
-              <CalendarPlus className="size-4" />
-              Sacar turno
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" className="gap-1.5 shadow-xs">
+            <Link href="/profesionales">
+              <Users className="size-4 text-primary" />
+              Ver profesionales
             </Link>
           </Button>
-        ) : (
-          <div className="flex items-center gap-2 rounded-lg border border-warning-soft-border bg-warning-soft px-3 py-2 text-xs font-medium text-warning-soft-foreground">
-            <span>
-              Tenés {MAX_PORTAL_FUTURE_APPOINTMENTS} turnos futuros (límite del
-              portal alcanzado)
-            </span>
-          </div>
-        )}
+          {upcoming.length < MAX_PORTAL_FUTURE_APPOINTMENTS ? (
+            <Button asChild className="gap-1.5 shadow-xs">
+              <Link href="/portal/appointments/new">
+                <CalendarPlus className="size-4" />
+                Sacar turno
+              </Link>
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 rounded-lg border border-warning-soft-border bg-warning-soft px-3 py-2 text-xs font-medium text-warning-soft-foreground">
+              <span>
+                Tenés {MAX_PORTAL_FUTURE_APPOINTMENTS} turnos futuros (límite
+                del portal alcanzado)
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Próximos turnos */}

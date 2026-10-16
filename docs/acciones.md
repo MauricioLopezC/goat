@@ -384,7 +384,7 @@ Una ficha por operación implementada o acordada. Se agregan a medida que se tra
 **Precondiciones:** el actor es `MANAGER` (lo verifican la acción y la DAL). No existe otro `Professional` activo o inactivo con el mismo par (`documentType`, `documentNumber`). No existe otro `Professional` con la misma `licenseNumber`. Todos los `titleIds` y `serviceIds` corresponden a registros activos de `ProfessionalTitle` y `Service`.
 **Efectos:** crea un `Professional` con `active: true`, sin franjas horarias. Asocia los `ProfessionalTitle` y `Service` indicados. Registra `createdById` con el id del usuario de la sesión. El profesional no aparece como opción al dar turnos hasta que se le carguen franjas ([HU-05](hu/HU-05-franjas-de-atencion.md)).
 **Errores:** `VALIDATION` (campo obligatorio vacío, número de documento inválido para su tipo, matrícula no numérica o fuera de rango 1–8 dígitos, email con formato inválido, arrays vacíos), `FORBIDDEN` (el rol no es `MANAGER`), `NOT_FOUND` (algún `titleId` o `serviceId` no existe o no está activo), `DUPLICATE` (documento o matrícula ya registrados; incluye `fieldErrors`).
-**Revalida:** `/professionals` (listado de profesionales).
+**Revalida:** `/professionals` (listado de profesionales) y `/profesionales` (catálogo público institucional).
 **Devuelve:** `{ id, firstName, lastName }`.
 
 ### `getProfessional`
@@ -406,7 +406,7 @@ Una ficha por operación implementada o acordada. Se agregan a medida que se tra
 **Precondiciones:** profesional existente; documento y matrícula únicos; títulos y servicios activos; ningún servicio retirado tiene turnos `SCHEDULED` que todavía no comenzaron.
 **Efectos:** actualiza ficha y asociaciones; registra autor, fecha y motivo en `ProfessionalEvent` dentro de la misma transacción.
 **Errores:** `VALIDATION` (mismas reglas de formato que el alta), `FORBIDDEN`, `NOT_FOUND`, `DUPLICATE`, `FUTURE_APPOINTMENTS` (lista turnos afectados).
-**Revalida:** `/professionals`, `/professionals/[id]` y `/professionals/[id]/edit`.
+**Revalida:** `/professionals`, `/profesionales`, `/professionals/[id]` y `/professionals/[id]/edit`.
 **Devuelve:** `{ id, firstName, lastName }`.
 
 ### `deactivateProfessional`

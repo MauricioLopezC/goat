@@ -182,6 +182,7 @@ async function seedProfessionals(
       licenseNumber: input.licenseNumber,
       phone: input.phone,
       email: input.email,
+      photoUrl: input.photoUrl ?? null,
       notes: input.notes,
       userId: p.userEmail ? idOf(userIds, p.userEmail, "Usuario") : null,
       active: p.deactivation === null,
