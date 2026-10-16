@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   AlertCircle,
   ArrowLeft,
@@ -101,6 +102,16 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
 
   // Remontar los campos en cada intento para que defaultValue se aplique
   const attempt = state ? (created ? "ok" : "error") : "inicial";
+
+  useEffect(() => {
+    if (created) {
+      toast.success(
+        `Profesional ${created.firstName} ${created.lastName} creado correctamente.`,
+      );
+    } else if (failed && failed.code !== "VALIDATION") {
+      toast.error(failed.message);
+    }
+  }, [created, failed]);
 
   return (
     <div className="flex flex-col gap-6">

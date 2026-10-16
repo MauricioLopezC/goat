@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   updateProfessional,
   deactivateProfessional,
@@ -112,6 +113,34 @@ export function ProfessionalEditor({
   const active = professional.active;
   const fieldErrors =
     updateState?.ok === false ? updateState.error.fieldErrors : undefined;
+
+  useEffect(() => {
+    if (updateState?.ok) {
+      toast.success("Cambios guardados correctamente.");
+    } else if (
+      updateState &&
+      !updateState.ok &&
+      updateState.error.code !== "VALIDATION"
+    ) {
+      toast.error(updateState.error.message);
+    }
+  }, [updateState]);
+
+  useEffect(() => {
+    if (deactivateState?.ok) {
+      toast.success("Profesional dado de baja.");
+    } else if (deactivateState && !deactivateState.ok) {
+      toast.error(deactivateState.error.message);
+    }
+  }, [deactivateState]);
+
+  useEffect(() => {
+    if (reactivateState?.ok) {
+      toast.success("Profesional reactivado exitosamente.");
+    } else if (reactivateState && !reactivateState.ok) {
+      toast.error(reactivateState.error.message);
+    }
+  }, [reactivateState]);
 
   return (
     <div className="flex flex-col gap-6">

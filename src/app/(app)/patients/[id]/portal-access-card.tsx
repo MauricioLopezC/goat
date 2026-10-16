@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   AlertCircle,
   Check,
@@ -77,6 +78,7 @@ export function PortalAccessCard({
       const result = await enablePatientAccess({ patientId });
       if (!result.ok) {
         setErrorMessage(result.error.message);
+        toast.error(result.error.message);
         return;
       }
       setCopied(false);
@@ -84,6 +86,7 @@ export function PortalAccessCard({
         email: result.data.email,
         temporaryPassword: result.data.temporaryPassword,
       });
+      toast.success("Credenciales temporales generadas.");
       router.refresh();
     });
   }
@@ -94,8 +97,10 @@ export function PortalAccessCard({
       const result = await disablePatientAccess({ patientId });
       if (!result.ok) {
         setErrorMessage(result.error.message);
+        toast.error(result.error.message);
         return;
       }
+      toast.success("Acceso al portal deshabilitado.");
       router.refresh();
     });
   }
@@ -105,9 +110,11 @@ export function PortalAccessCard({
     try {
       await navigator.clipboard.writeText(credentialsModal.temporaryPassword);
       setCopied(true);
+      toast.success("Contraseña copiada al portapapeles.");
       setTimeout(() => setCopied(false), 2500);
     } catch {
       setCopied(false);
+      toast.error("No se pudo copiar al portapapeles.");
     }
   }
 

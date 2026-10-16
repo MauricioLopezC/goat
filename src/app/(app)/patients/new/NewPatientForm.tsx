@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   CalendarPlus,
   CheckCircle2,
@@ -9,7 +10,6 @@ import {
   ExternalLink,
   UserPlus,
   Loader2,
-  X,
 } from "lucide-react";
 import type { ActionResult } from "@/lib/actions";
 import type { CreatedPatientSummary } from "@/lib/dal/patients";
@@ -75,7 +75,6 @@ export function NewPatientForm({
   const [successData, setSuccessData] = useState<CreatedPatientSummary | null>(
     null,
   );
-  const [showToast, setShowToast] = useState(false);
 
   const markTouched = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -103,7 +102,6 @@ export function NewPatientForm({
     resetFields();
     setSuccessData(null);
     setState(null);
-    setShowToast(false);
   };
 
   const {
@@ -223,15 +221,17 @@ export function NewPatientForm({
         if (res.ok) {
           resetFields();
           setSuccessData(res.data);
-          setShowToast(true);
+          toast.success("Paciente registrado de forma exitosa.");
 
           // Scroll hacia arriba para visualizar inmediatamente la confirmación
           window.scrollTo({ top: 0, behavior: "smooth" });
         } else {
           setSuccessData(null);
+          toast.error(res.error.message);
           window.scrollTo({ top: 0, behavior: "smooth" });
         }
       } catch {
+        toast.error("Ocurrió un error inesperado al procesar la solicitud.");
         setState({
           ok: false,
           error: {
@@ -247,28 +247,6 @@ export function NewPatientForm({
 
   return (
     <div className="flex flex-col gap-6 relative">
-      {/* Toast flotante de éxito */}
-      {showToast && successData && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border border-success-soft-border bg-card p-4 shadow-lg animate-in fade-in slide-in-from-bottom-5 duration-300"
-        >
-          <CheckCircle2 className="size-5 text-success shrink-0" />
-          <div className="text-body-md font-medium text-foreground">
-            Paciente registrado de forma exitosa
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowToast(false)}
-            className="ml-2 text-muted-foreground hover:text-foreground"
-            aria-label="Cerrar notificación"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
-
       {/* Caso de éxito - Alerta principal */}
       {successData && (
         <Card className="border-success-soft-border bg-success-soft/30 animate-in fade-in duration-300">

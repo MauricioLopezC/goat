@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { updateAppointmentPriority } from "./actions";
 import {
   AlertDialog,
@@ -50,10 +51,17 @@ export function PriorityChangeDialog({
       reason: reason.trim() || undefined,
     });
     if (result.ok) {
+      toast.success(
+        selectedPriority === "URGENT"
+          ? "Turno marcado como urgente."
+          : "Turno marcado como prioridad normal.",
+      );
       setOpen(false);
       const search = new URLSearchParams(returnSearch);
       search.set("priorityChanged", selectedPriority);
       router.push(`/appointments/${appointmentId}?${search}`);
+    } else {
+      toast.error(result.error.message);
     }
     return result;
   }, null);

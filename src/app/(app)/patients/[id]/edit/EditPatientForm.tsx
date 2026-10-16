@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, Loader2, Save } from "lucide-react";
 import type { ActionResult } from "@/lib/actions";
 import type { UpdatedPatientSummary } from "@/lib/dal/patients";
@@ -226,10 +227,12 @@ export function EditPatientForm({
       setState(res);
 
       if (res.ok) {
+        toast.success("Paciente modificado con éxito.");
         setSuccessData(res.data);
         window.scrollTo({ top: 0, behavior: "smooth" });
         router.refresh();
       } else {
+        toast.error(res.error.message);
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     });

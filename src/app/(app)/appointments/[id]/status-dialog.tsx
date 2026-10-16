@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { completeAppointment, expireAppointment } from "./actions";
 import {
   AlertDialog,
@@ -67,7 +68,14 @@ export function StatusChangeDialog({
     });
     if (result.ok) {
       setOpen(false);
+      toast.success(
+        target === "COMPLETED"
+          ? "Turno marcado como completado."
+          : "Turno marcado como vencido.",
+      );
       router.push(successHref);
+    } else {
+      toast.error(result.error.message);
     }
     return result;
   }, null);

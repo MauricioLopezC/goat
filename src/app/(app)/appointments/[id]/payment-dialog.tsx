@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { registerPayment } from "./actions";
 import { notifyPaymentChange } from "@/lib/payments-client";
 import {
@@ -60,9 +61,14 @@ export function PaymentDialog({
       paymentMethodId: Number(methodId),
     });
     if (result.ok) {
+      toast.success(
+        `Cobro registrado por ${formatAmount(result.data.amount)}.`,
+      );
       notifyPaymentChange();
       setOpen(false);
       router.replace(successHref);
+    } else {
+      toast.error(result.error.message);
     }
     return result;
   }, null);

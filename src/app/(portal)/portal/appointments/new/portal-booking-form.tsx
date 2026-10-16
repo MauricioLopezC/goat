@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   CalendarClock,
   CalendarDays,
@@ -242,8 +243,10 @@ export function PortalBookingForm({
       });
 
       if (res.ok) {
+        toast.success("¡Turno reservado exitosamente!");
         router.push("/portal");
       } else {
+        toast.error(res.error.message);
         setConfirmError(res.error.message);
         // Si el horario se ocupó, refrescar según el modo
         if (

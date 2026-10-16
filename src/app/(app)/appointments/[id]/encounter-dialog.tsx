@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { createEncounter, updateEncounter } from "./actions";
 import {
   Dialog,
@@ -61,8 +62,15 @@ export function EncounterDialog({
     }
 
     if (result.ok) {
+      toast.success(
+        mode === "create"
+          ? "Evolución registrada correctamente."
+          : "Evolución actualizada correctamente.",
+      );
       setOpen(false);
       router.refresh();
+    } else {
+      toast.error(result.error.message);
     }
     return result;
   }, null);
