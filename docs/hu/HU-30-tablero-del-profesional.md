@@ -16,7 +16,7 @@ En el período elegido, solo de sus turnos:
 
 ## Validaciones
 
-- El período por defecto es el mes en curso; se puede elegir otro mes o un rango de hasta tres meses, como en [HU-22](HU-22-indicadores-iniciales.md).
+- El período por defecto es el mes en curso; se puede elegir otro mes o un rango de hasta doce meses, como en [HU-22](HU-22-indicadores-iniciales.md).
 - Sin datos, "sin datos".
 - La edad se calcula a la fecha del turno.
 

@@ -1008,7 +1008,7 @@ No es una Server Action: la usa la página de constancia de atención (ADR 0001)
 
 **Historia de usuario:** [HU-22 — Ver la ocupación y el ausentismo del centro](hu/HU-22-indicadores-iniciales.md) y [HU-29 — Ver los indicadores del centro](hu/HU-29-indicadores-del-centro.md)
 **Roles:** `MANAGER`.
-**Entrada:** `from` y `to` (AAAA-MM, inclusive, hasta tres meses; por defecto, el mes en curso) y `professionalId?` (entero positivo).
+**Entrada:** `from` y `to` (AAAA-MM, inclusive, hasta doce meses; por defecto, el mes en curso) y `professionalId?` (entero positivo).
 **Precondiciones:** `from` no es posterior a `to`. Si viene `professionalId`, el profesional existe.
 **Efectos:** ninguno. Lee las franjas, las excepciones, los feriados y los turnos que empiezan en el período, y calcula en memoria con funciones puras, por profesional y para el centro, todos en hora del centro:
 - **Minutos disponibles:** por cada día del período, la franja del día de la semana menos las ausencias del profesional. Los feriados no suman. Para un profesional dado de baja, solo cuentan los días anteriores a su baja.
@@ -1021,7 +1021,7 @@ No es una Server Action: la usa la página de constancia de atención (ADR 0001)
 - **Ingresos (HU-29):** suma de cobros `PAID` según `Payment.createdAt` en hora del centro, por mes y medio de pago. Compara con el período inmediatamente anterior de igual cantidad de meses; los cobros anulados no cuentan. Sin cobros previos, la variación porcentual es `null`.
 
 El centro suma minutos y cantidades de todos los profesionales y calcula las tasas sobre esas sumas, no como promedio de las tasas. Con `professionalId`, el centro y la tabla se limitan a ese profesional.
-**Errores:** `FORBIDDEN`, `VALIDATION` (período inválido, invertido o de más de tres meses), `NOT_FOUND` (el profesional no existe).
+**Errores:** `FORBIDDEN`, `VALIDATION` (período inválido, invertido o de más de doce meses), `NOT_FOUND` (el profesional no existe).
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** `{ period: { from, to }, center: Indicators, professionals: (Indicators & { id, firstName, lastName, active })[], professionalOptions, details }`. `Indicators` es `{ availableMinutes, occupiedMinutes, occupancyRate, completed, expired, absenteeismRate, cancelled, unclosed }`, con las tasas entre 0 y 1, o `null`. `details` agrega los rankings (máximo cinco), carga por profesional, tasa de cancelación, ingresos mensuales y por medio, total y variación frente al período previo, y turnos por día de semana. La tabla incluye a los profesionales con franjas o turnos en el período. `professionalOptions` son las opciones del filtro.
 

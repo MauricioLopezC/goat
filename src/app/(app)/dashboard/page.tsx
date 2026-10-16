@@ -120,9 +120,9 @@ export default async function DashboardPage({
     (professional) => professional.id === input.professionalId,
   );
 
-  // Meses para elegir: el último año y los dos próximos.
+  // Meses para elegir: los dos últimos años y los dos meses próximos.
   const month = fallback.from;
-  const months = Array.from({ length: 15 }, (_, index) =>
+  const months = Array.from({ length: 27 }, (_, index) =>
     shiftMonthKey(month, 2 - index),
   );
 
@@ -193,7 +193,7 @@ export default async function DashboardPage({
           <Link href="/dashboard">Mes en curso</Link>
         </Button>
         <p className="text-muted-foreground basis-full text-xs">
-          Un mes o un rango de hasta tres meses.
+          Un mes o un rango de hasta doce meses.
         </p>
       </form>
 
