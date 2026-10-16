@@ -130,8 +130,8 @@ export function AppointmentHistory({
             </CardTitle>
             <CardDescription>
               {own
-                ? "Bitácora clínica y turnos del paciente, del más reciente al más antiguo."
-                : "Historial de turnos y asistencias del paciente, del más reciente al más antiguo."}
+                ? "Bitácora clínica y turnos del paciente. Próximos del más cercano al más lejano; pasados del más reciente al más antiguo."
+                : "Historial de turnos y asistencias del paciente. Próximos del más cercano al más lejano; pasados del más reciente al más antiguo."}
             </CardDescription>
           </div>
           <dl
