@@ -1156,6 +1156,3 @@ No es una Server Action: la usa el Server Component del detalle del turno `/appo
 **Errores:** `FORBIDDEN` (rol no autorizado o intento de consultar rendición ajena siendo profesional), `VALIDATION` (fechas inválidas o rango superior a 3 meses), `NOT_FOUND` (profesional inexistente o sin perfil profesional vinculado).
 **Revalida:** no aplica; lectura desde Server Component.
 **Devuelve:** `ProfessionalStatementResult` con `{ period, isManager, centerTotals, professionalsSummary, professionalOptions, selectedStatement }`.
-
-
-

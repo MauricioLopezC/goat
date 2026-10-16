@@ -154,13 +154,28 @@ export async function getProfessionalStatement(
   const dayStart = appointmentInstant(from, 0);
   const dayEnd = appointmentInstant(to, 1440);
 
+  type ProfessionalBasicInfo = {
+    id: number;
+    firstName: string;
+    lastName: string;
+    licenseNumber: string;
+    active: boolean;
+  };
+
   // Determinar el profesional objetivo según el rol
   let targetProfessionalId: number | undefined;
+  let targetProfessional: ProfessionalBasicInfo | null = null;
 
   if (actor.role === Role.PROFESSIONAL) {
     const profProfile = await prisma.professional.findUnique({
       where: { userId: actor.id },
-      select: { id: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        licenseNumber: true,
+        active: true,
+      },
     });
     if (!profProfile) {
       throw new DomainError(
@@ -176,22 +191,34 @@ export async function getProfessionalStatement(
       );
     }
     targetProfessionalId = profProfile.id;
+    targetProfessional = profProfile;
   } else {
     // MANAGER puede consultar un profesional específico o todos
     targetProfessionalId = professionalId;
   }
 
-  // Traer lista de profesionales disponibles para selector de gerencia
-  const allProfessionals = await prisma.professional.findMany({
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      licenseNumber: true,
-      active: true,
-    },
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-  });
+  // Traer lista de profesionales disponibles para selector de gerencia (solo si es gerente)
+  let allProfessionals: ProfessionalBasicInfo[] = [];
+  if (isManager) {
+    allProfessionals = await prisma.professional.findMany({
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        licenseNumber: true,
+        active: true,
+      },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    });
+
+    if (targetProfessionalId) {
+      const found = allProfessionals.find((p) => p.id === targetProfessionalId);
+      if (!found) {
+        throw new DomainError("NOT_FOUND", "El profesional no existe.");
+      }
+      targetProfessional = found;
+    }
+  }
 
   const professionalOptions: ProfessionalOption[] = isManager
     ? allProfessionals.map((p) => ({
@@ -202,114 +229,77 @@ export async function getProfessionalStatement(
       }))
     : [];
 
-  // Buscar turnos completados en el período
-  // Pertenencia temporal: el turno pertenece al período por startsAt, y su cobro también
-  const appointments = await prisma.appointment.findMany({
-    where: {
-      startsAt: { gte: dayStart, lt: dayEnd },
-      status: AppointmentStatus.COMPLETED,
-      ...(targetProfessionalId ? { professionalId: targetProfessionalId } : {}),
-    },
-    include: {
-      professional: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          licenseNumber: true,
-          active: true,
-        },
+  let centerTotals: CenterStatementTotals | null = null;
+  let professionalsSummary: ProfessionalStatementItem[] | null = null;
+  let selectedStatement: ProfessionalStatementDetail | null = null;
+
+  if (!targetProfessionalId) {
+    // Caso 1: Consolidado general (solo MANAGER sin profesional seleccionado).
+    // Para optimizar rendimiento, solo traemos id, professionalId y montos de cobros vigentes,
+    // evitando relaciones profundas (paciente, servicio, medios de pago) no utilizadas en la tabla general.
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        startsAt: { gte: dayStart, lt: dayEnd },
+        status: AppointmentStatus.COMPLETED,
       },
-      service: {
-        select: { id: true, name: true, price: true },
-      },
-      patient: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          documentType: true,
-          documentNumber: true,
-          coverageType: true,
-          coverage: {
-            select: {
-              memberNumber: true,
-              insurancePlan: {
-                select: {
-                  name: true,
-                  healthInsurer: {
-                    select: { name: true },
-                  },
-                },
-              },
-            },
+      select: {
+        id: true,
+        professionalId: true,
+        payments: {
+          where: { status: PaymentStatus.PAID },
+          select: {
+            amount: true,
           },
         },
       },
-      payments: {
-        where: { status: PaymentStatus.PAID },
-        include: {
-          paymentMethod: {
-            select: { id: true, name: true, isCash: true },
-          },
-        },
-      },
-    },
-    orderBy: [{ startsAt: "asc" }, { id: "asc" }],
-  });
+      orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+    });
 
-  // Agrupador por profesional
-  type ProfAggregator = {
-    professional: (typeof allProfessionals)[number];
-    patientsAttended: number;
-    totalBilledDec: Prisma.Decimal;
-    appointments: typeof appointments;
-  };
+    type ProfSummaryAggregator = {
+      professional: ProfessionalBasicInfo;
+      patientsAttended: number;
+      totalBilledDec: Prisma.Decimal;
+    };
 
-  const profMap = new Map<number, ProfAggregator>();
+    const profMap = new Map<number, ProfSummaryAggregator>();
+    const professionalById = new Map<number, ProfessionalBasicInfo>(
+      allProfessionals.map((p) => [p.id, p]),
+    );
 
-  if (isManager && !targetProfessionalId) {
-    // Si el gerente ve todos, inicializar con todos los profesionales activos
-    for (const p of allProfessionals) {
+    // Inicializar únicamente con los profesionales ACTIVOS.
+    // Los profesionales dados de baja solo figurarán en la tabla si tuvieron atenciones en el período.
+    for (const p of allProfessionals.filter((p) => p.active)) {
       profMap.set(p.id, {
         professional: p,
         patientsAttended: 0,
         totalBilledDec: new Prisma.Decimal(0),
-        appointments: [],
       });
     }
-  }
 
-  for (const appt of appointments) {
-    const pId = appt.professionalId;
-    let entry = profMap.get(pId);
-    if (!entry) {
-      entry = {
-        professional: appt.professional,
-        patientsAttended: 0,
-        totalBilledDec: new Prisma.Decimal(0),
-        appointments: [],
-      };
-      profMap.set(pId, entry);
+    for (const appt of appointments) {
+      let entry = profMap.get(appt.professionalId);
+      if (!entry) {
+        const prof = professionalById.get(appt.professionalId);
+        if (!prof) {
+          continue;
+        }
+        entry = {
+          professional: prof,
+          patientsAttended: 0,
+          totalBilledDec: new Prisma.Decimal(0),
+        };
+        profMap.set(appt.professionalId, entry);
+      }
+      entry.patientsAttended++;
+
+      const activePayment = appt.payments[0];
+      if (activePayment) {
+        entry.totalBilledDec = entry.totalBilledDec.add(activePayment.amount);
+      }
     }
-    entry.patientsAttended++;
-    entry.appointments.push(appt);
 
-    // Sumar cobros vigentes de este turno
-    const activePayment = appt.payments[0];
-    if (activePayment) {
-      entry.totalBilledDec = entry.totalBilledDec.add(activePayment.amount);
-    }
-  }
-
-  // Generar el resumen de todos los profesionales (solo para MANAGER)
-  let professionalsSummary: ProfessionalStatementItem[] | null = null;
-  let centerTotals: CenterStatementTotals | null = null;
-
-  if (isManager) {
     let centerAttended = 0;
     let centerBilledDec = new Prisma.Decimal(0);
-
     const summaryList: ProfessionalStatementItem[] = [];
 
     for (const entry of profMap.values()) {
@@ -343,22 +333,56 @@ export async function getProfessionalStatement(
       centerCommission: centerCommissionData.commission,
       professionalNet: centerCommissionData.net,
     };
-  }
-
-  // Generar el detalle de la rendición individual si hay un profesional seleccionado o si es PROFESSIONAL
-  let selectedStatement: ProfessionalStatementDetail | null = null;
-
-  if (targetProfessionalId) {
-    const profTarget = allProfessionals.find(
-      (p) => p.id === targetProfessionalId,
-    );
-    if (!profTarget) {
+  } else {
+    // Caso 2: Rendición individual (MANAGER seleccionó un médico puntual, o rol PROFESSIONAL).
+    if (!targetProfessional) {
       throw new DomainError("NOT_FOUND", "El profesional no existe.");
     }
 
-    const profAppointments = appointments.filter(
-      (a) => a.professionalId === targetProfessionalId,
-    );
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        startsAt: { gte: dayStart, lt: dayEnd },
+        status: AppointmentStatus.COMPLETED,
+        professionalId: targetProfessionalId,
+      },
+      include: {
+        service: {
+          select: { id: true, name: true, price: true },
+        },
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            documentType: true,
+            documentNumber: true,
+            coverageType: true,
+            coverage: {
+              select: {
+                memberNumber: true,
+                insurancePlan: {
+                  select: {
+                    name: true,
+                    healthInsurer: {
+                      select: { name: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        payments: {
+          where: { status: PaymentStatus.PAID },
+          include: {
+            paymentMethod: {
+              select: { id: true, name: true, isCash: true },
+            },
+          },
+        },
+      },
+      orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+    });
 
     let profBilledDec = new Prisma.Decimal(0);
     const serviceMap = new Map<number, { name: string; count: number }>();
@@ -373,7 +397,7 @@ export async function getProfessionalStatement(
 
     const rows: AppointmentStatementRow[] = [];
 
-    for (const appt of profAppointments) {
+    for (const appt of appointments) {
       // 1. Desglose por servicio
       const svc = serviceMap.get(appt.serviceId) ?? {
         name: appt.service.name,
@@ -470,12 +494,12 @@ export async function getProfessionalStatement(
       calculateCommission(profBilledDec);
 
     const summaryItem: ProfessionalStatementItem = {
-      professionalId: profTarget.id,
-      firstName: profTarget.firstName,
-      lastName: profTarget.lastName,
-      licenseNumber: profTarget.licenseNumber,
-      active: profTarget.active,
-      patientsAttended: profAppointments.length,
+      professionalId: targetProfessional.id,
+      firstName: targetProfessional.firstName,
+      lastName: targetProfessional.lastName,
+      licenseNumber: targetProfessional.licenseNumber,
+      active: targetProfessional.active,
+      patientsAttended: appointments.length,
       totalBilled: profBilledDec.toFixed(2),
       centerCommission: profComm,
       professionalNet: profNet,
@@ -512,11 +536,11 @@ export async function getProfessionalStatement(
 
     selectedStatement = {
       professional: {
-        id: profTarget.id,
-        firstName: profTarget.firstName,
-        lastName: profTarget.lastName,
-        licenseNumber: profTarget.licenseNumber,
-        active: profTarget.active,
+        id: targetProfessional.id,
+        firstName: targetProfessional.firstName,
+        lastName: targetProfessional.lastName,
+        licenseNumber: targetProfessional.licenseNumber,
+        active: targetProfessional.active,
       },
       summary: summaryItem,
       byService,

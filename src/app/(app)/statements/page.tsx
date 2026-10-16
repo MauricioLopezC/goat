@@ -7,6 +7,7 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import { DomainError } from "@/lib/actions";
 import { requirePageRole } from "@/lib/dal/auth";
 import { getProfessionalStatement } from "@/lib/dal/statements";
 import {
@@ -104,8 +105,12 @@ export default async function StatementsPage({
   try {
     statementData = await getProfessionalStatement(inputFilter, actor);
   } catch (err) {
-    // Si el profesional seleccionado no se encontró, fallback a todos
-    if (inputFilter.professionalId) {
+    // Si el profesional seleccionado no se encontró, fallback a todos (solo ante DomainError NOT_FOUND)
+    if (
+      inputFilter.professionalId &&
+      err instanceof DomainError &&
+      err.code === "NOT_FOUND"
+    ) {
       statementData = await getProfessionalStatement(
         { ...inputFilter, professionalId: undefined },
         actor,
