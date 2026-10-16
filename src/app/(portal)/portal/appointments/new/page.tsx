@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ShieldAlert, Users } from "lucide-react";
 import { Role } from "@/generated/prisma/enums";
 import { requirePageRole } from "@/lib/dal/auth";
 import { getPortalBookingOptions } from "@/lib/dal/appointments";
@@ -29,7 +29,7 @@ export default async function NewPortalAppointmentPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Button
           asChild
           variant="ghost"
@@ -39,6 +39,12 @@ export default async function NewPortalAppointmentPage() {
           <Link href="/portal">
             <ArrowLeft className="size-4" />
             Volver a mis turnos
+          </Link>
+        </Button>
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <Link href="/profesionales" target="_blank" rel="noopener noreferrer">
+            <Users className="size-4 text-primary" />
+            Ver equipo de profesionales ↗
           </Link>
         </Button>
       </div>

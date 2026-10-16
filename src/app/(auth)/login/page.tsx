@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Users } from "lucide-react";
 import { getSession, landingPath } from "@/lib/dal/auth";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -35,6 +38,18 @@ export default async function LoginPage() {
             <LoginForm />
           </CardContent>
         </Card>
+
+        <div className="mt-4 rounded-xl border border-border bg-card p-4 text-center shadow-xs">
+          <p className="text-body-sm text-muted-foreground mb-2.5">
+            ¿Querés consultar nuestro equipo médico?
+          </p>
+          <Button asChild variant="outline" size="sm" className="w-full gap-2">
+            <Link href="/profesionales">
+              <Users className="size-4 text-primary" />
+              Conocé a nuestros profesionales
+            </Link>
+          </Button>
+        </div>
 
         <p className="text-body-sm text-muted-foreground mt-6 text-center">
           ¿No podés ingresar? Pedile al gerente que revise tu usuario.

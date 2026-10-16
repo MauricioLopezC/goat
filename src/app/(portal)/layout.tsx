@@ -1,6 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, CalendarPlus, KeyRound, LogOut } from "lucide-react";
+import {
+  CalendarDays,
+  CalendarPlus,
+  KeyRound,
+  LogOut,
+  Users,
+} from "lucide-react";
 import logo from "@/assets/logo-goat.png";
 import { Role } from "@/generated/prisma/enums";
 import { requirePageRole } from "@/lib/dal/auth";
@@ -53,6 +59,12 @@ export default async function PortalLayout({
                   </Link>
                 </Button>
                 <Button asChild variant="ghost" size="sm" className="gap-1.5">
+                  <Link href="/profesionales">
+                    <Users className="size-4" />
+                    Profesionales
+                  </Link>
+                </Button>
+                <Button asChild variant="ghost" size="sm" className="gap-1.5">
                   <Link href="/portal/change-password">
                     <KeyRound className="size-4" />
                     Cambiar contraseña
@@ -84,6 +96,18 @@ export default async function PortalLayout({
                   <Link href="/portal/appointments/new">
                     <CalendarPlus className="size-4" />
                     <span className="sr-only">Sacar turno</span>
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon-sm"
+                  className="md:hidden"
+                  title="Profesionales del centro"
+                >
+                  <Link href="/profesionales">
+                    <Users className="size-4" />
+                    <span className="sr-only">Profesionales del centro</span>
                   </Link>
                 </Button>
                 <Button
