@@ -57,6 +57,11 @@ export const createProfessionalSchema = z
       z.string().trim().toLowerCase().email().nullable(),
     ),
 
+    photoUrl: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? null : (v ?? null)),
+      z.string().trim().max(500).nullable().optional(),
+    ),
+
     notes: z.preprocess(
       (v) => (typeof v === "string" && v.trim() === "" ? null : (v ?? null)),
       z.string().trim().max(500).nullable(),

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import {
   BriefcaseMedical,
+  Globe,
   IdCard,
   Plus,
   Stethoscope,
@@ -83,14 +85,26 @@ export default async function ProfessionalsPage({
             atención en el centro.
           </p>
         </div>
-        {isManager && (
-          <Button asChild size="default" className="gap-2">
-            <Link href="/professionals/new">
-              <Plus className="size-4" />
-              Nuevo profesional
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="default" className="gap-2">
+            <Link
+              href="/profesionales"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Globe className="size-4" />
+              Catálogo público
             </Link>
           </Button>
-        )}
+          {isManager && (
+            <Button asChild size="default" className="gap-2">
+              <Link href="/professionals/new">
+                <Plus className="size-4" />
+                Nuevo profesional
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       <ProfessionalFilters
@@ -131,73 +145,91 @@ export default async function ProfessionalsPage({
               className="rounded-xl border-border bg-card shadow-xs hover:shadow-md transition-shadow overflow-hidden"
             >
               <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <h2 className="text-lg font-bold text-foreground">
-                      {prof.lastName}, {prof.firstName}
-                    </h2>
-                    {prof.active ? (
-                      <Badge className="bg-success-soft text-success-soft-foreground border-success-soft-border rounded-lg text-xs font-medium gap-1">
-                        <UserCheck className="size-3" />
-                        Activo
-                      </Badge>
+                <div className="flex items-start gap-4">
+                  <div className="relative size-12 sm:size-14 rounded-full overflow-hidden border border-border bg-tray flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                    {prof.photoUrl ? (
+                      <Image
+                        src={prof.photoUrl}
+                        alt={`${prof.firstName} ${prof.lastName}`}
+                        fill
+                        className="object-cover"
+                        sizes="56px"
+                      />
                     ) : (
-                      <Badge
-                        variant="destructive"
-                        className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border rounded-lg text-xs font-medium gap-1"
-                      >
-                        <UserX className="size-3" />
-                        Inactivo
-                      </Badge>
+                      <span className="text-body-sm font-bold text-primary">
+                        {(prof.firstName[0] ?? "") + (prof.lastName[0] ?? "")}
+                      </span>
                     )}
-                    <span className="text-xs text-muted-foreground font-mono bg-tray px-2 py-0.5 rounded-lg border border-border">
-                      {prof.documentType}: {prof.documentNumber}
-                    </span>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1.5 font-mono">
-                      <IdCard className="size-4 text-primary" />
-                      <span className="font-semibold text-foreground">
-                        M.P. {prof.licenseNumber}
-                      </span>
-                    </div>
-                    {prof.email && <span>{prof.email}</span>}
-                    {prof.phone && <span>{prof.phone}</span>}
-                  </div>
-
-                  {/* Títulos */}
-                  {prof.titles.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {prof.titles.map((t) => (
-                        <Badge
-                          key={t.id}
-                          variant="secondary"
-                          className="bg-info-soft text-info-soft-foreground border-info-soft-border text-[11px] rounded-lg"
-                        >
-                          {t.name}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h2 className="text-lg font-bold text-foreground">
+                        {prof.lastName}, {prof.firstName}
+                      </h2>
+                      {prof.active ? (
+                        <Badge className="bg-success-soft text-success-soft-foreground border-success-soft-border rounded-lg text-xs font-medium gap-1">
+                          <UserCheck className="size-3" />
+                          Activo
                         </Badge>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Servicios */}
-                  {prof.services.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
-                        <BriefcaseMedical className="size-3 text-success" />
-                        Servicios:
-                      </span>
-                      {prof.services.map((s) => (
-                        <span
-                          key={s.id}
-                          className="text-xs bg-tray text-foreground px-2 py-0.5 rounded-md border border-border"
+                      ) : (
+                        <Badge
+                          variant="destructive"
+                          className="bg-destructive-soft text-destructive-soft-foreground border-destructive-soft-border rounded-lg text-xs font-medium gap-1"
                         >
-                          {s.name}
-                        </span>
-                      ))}
+                          <UserX className="size-3" />
+                          Inactivo
+                        </Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground font-mono bg-tray px-2 py-0.5 rounded-lg border border-border">
+                        {prof.documentType}: {prof.documentNumber}
+                      </span>
                     </div>
-                  )}
+
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1.5 font-mono">
+                        <IdCard className="size-4 text-primary" />
+                        <span className="font-semibold text-foreground">
+                          M.P. {prof.licenseNumber}
+                        </span>
+                      </div>
+                      {prof.email && <span>{prof.email}</span>}
+                      {prof.phone && <span>{prof.phone}</span>}
+                    </div>
+
+                    {/* Títulos */}
+                    {prof.titles.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {prof.titles.map((t) => (
+                          <Badge
+                            key={t.id}
+                            variant="secondary"
+                            className="bg-info-soft text-info-soft-foreground border-info-soft-border text-[11px] rounded-lg"
+                          >
+                            {t.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Servicios */}
+                    {prof.services.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                          <BriefcaseMedical className="size-3 text-success" />
+                          Servicios:
+                        </span>
+                        {prof.services.map((s) => (
+                          <span
+                            key={s.id}
+                            className="text-xs bg-tray text-foreground px-2 py-0.5 rounded-md border border-border"
+                          >
+                            {s.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 self-end md:self-center shrink-0">

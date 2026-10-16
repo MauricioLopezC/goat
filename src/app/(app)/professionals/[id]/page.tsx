@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -44,15 +45,33 @@ export default async function ProfessionalDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-headline-lg">
-            {professional.lastName}, {professional.firstName}
-          </h1>
-          <p className="text-muted-foreground">
-            Matrícula {professional.licenseNumber} · {professional.documentType}{" "}
-            {professional.documentNumber}
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="relative size-16 sm:size-20 rounded-full overflow-hidden border-2 border-border bg-tray flex items-center justify-center shrink-0 shadow-sm">
+            {professional.photoUrl ? (
+              <Image
+                src={professional.photoUrl}
+                alt={`${professional.firstName} ${professional.lastName}`}
+                fill
+                className="object-cover"
+                sizes="80px"
+              />
+            ) : (
+              <span className="text-headline-sm font-bold text-primary">
+                {(professional.firstName[0] ?? "") +
+                  (professional.lastName[0] ?? "")}
+              </span>
+            )}
+          </div>
+          <div>
+            <h1 className="text-headline-lg">
+              {professional.lastName}, {professional.firstName}
+            </h1>
+            <p className="text-muted-foreground">
+              Matrícula {professional.licenseNumber} ·{" "}
+              {professional.documentType} {professional.documentNumber}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {actor.role !== "PROFESSIONAL" && (

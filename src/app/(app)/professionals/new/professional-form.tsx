@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { documentNumberFormat } from "@/lib/validation/document-number";
+import { PhotoField } from "@/components/professionals/photo-field";
 import { createProfessional, type CreateProfessionalState } from "../actions";
 
 interface TitleOption {
@@ -173,7 +174,11 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
 
       {/* Formulario principal: se oculta al registrar con éxito para evitar reenvíos */}
       {!created && (
-        <form action={formAction} className="flex flex-col gap-6">
+        <form
+          action={formAction}
+          encType="multipart/form-data"
+          className="flex flex-col gap-6"
+        >
           <div key={attempt} className="flex flex-col gap-6">
             {/* 1. Datos Personales */}
             <Card>
@@ -314,6 +319,16 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
                     aria-describedby={fields?.email ? "email-error" : undefined}
                   />
                   <FieldError id="email-error" errors={fields?.email} />
+                </div>
+
+                <div className="sm:col-span-2 pt-2 border-t border-border">
+                  <PhotoField
+                    error={fields?.photo}
+                    initials={
+                      (values?.firstName?.[0] ?? "") +
+                        (values?.lastName?.[0] ?? "") || "DR"
+                    }
+                  />
                 </div>
               </CardContent>
             </Card>

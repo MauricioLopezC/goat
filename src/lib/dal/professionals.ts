@@ -28,6 +28,7 @@ export interface CreateProfessionalInput {
   serviceIds: number[];
   phone?: string | null;
   email?: string | null;
+  photoUrl?: string | null;
   notes?: string | null;
 }
 
@@ -118,6 +119,7 @@ export async function createProfessional(
       licenseNumber: input.licenseNumber,
       phone: input.phone ?? null,
       email: input.email ?? null,
+      photoUrl: input.photoUrl ?? null,
       notes: input.notes ?? null,
       active: true,
       createdBy: { connect: { id: actor.id } },
@@ -293,6 +295,7 @@ export async function updateProfessional(
         licenseNumber: current.licenseNumber,
         phone: current.phone,
         email: current.email,
+        photoUrl: current.photoUrl,
         notes: current.notes,
         titleIds: current.titles.map((title) => title.id),
         serviceIds: current.services.map((service) => service.id),
@@ -307,6 +310,10 @@ export async function updateProfessional(
           licenseNumber: input.licenseNumber,
           phone: input.phone ?? null,
           email: input.email ?? null,
+          photoUrl:
+            input.photoUrl === undefined
+              ? current.photoUrl
+              : (input.photoUrl ?? null),
           notes: input.notes ?? null,
           titles: { set: input.titleIds.map((id) => ({ id })) },
           services: { set: input.serviceIds.map((id) => ({ id })) },
@@ -481,6 +488,7 @@ const professionalListSelect = {
   licenseNumber: true,
   phone: true,
   email: true,
+  photoUrl: true,
   active: true,
   titles: {
     select: { id: true, name: true },
@@ -493,6 +501,44 @@ const professionalListSelect = {
 export type ProfessionalListItem = Prisma.ProfessionalGetPayload<{
   select: typeof professionalListSelect;
 }>;
+
+const publicProfessionalSelect = {
+  id: true,
+  lastName: true,
+  firstName: true,
+  photoUrl: true,
+  licenseNumber: true,
+  titles: {
+    where: { active: true },
+    select: { id: true, name: true },
+  },
+  services: {
+    where: { active: true },
+    select: {
+      id: true,
+      name: true,
+      specialty: { select: { id: true, name: true } },
+    },
+  },
+} satisfies Prisma.ProfessionalSelect;
+
+export type PublicProfessionalItem = Prisma.ProfessionalGetPayload<{
+  select: typeof publicProfessionalSelect;
+}>;
+
+/**
+ * Devuelve todos los profesionales activos para la pantalla pública institucional.
+ * Solo expone datos no sensibles y no requiere autenticación.
+ */
+export async function listPublicProfessionals(): Promise<
+  PublicProfessionalItem[]
+> {
+  return prisma.professional.findMany({
+    where: { active: true },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    select: publicProfessionalSelect,
+  });
+}
 
 /**
  * Devuelve todos los profesionales que cumplen los filtros, sin paginar.

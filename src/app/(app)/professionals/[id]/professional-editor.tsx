@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { documentNumberFormat } from "@/lib/validation/document-number";
 import { getTodayDateString } from "@/lib/utils";
+import { PhotoField } from "@/components/professionals/photo-field";
 
 type Professional = {
   id: number;
@@ -40,6 +41,7 @@ type Professional = {
   licenseNumber: string;
   phone: string | null;
   email: string | null;
+  photoUrl: string | null;
   notes: string | null;
   active: boolean;
   deactivatedAt: string | null;
@@ -121,8 +123,24 @@ export function ProfessionalEditor({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={updateAction} className="flex flex-col gap-5">
+          <form
+            action={updateAction}
+            encType="multipart/form-data"
+            className="flex flex-col gap-5"
+          >
             <input type="hidden" name="id" value={professional.id} />
+
+            <div className="border-b border-border pb-4">
+              <PhotoField
+                currentPhotoUrl={professional.photoUrl}
+                error={fieldErrors?.photo}
+                initials={
+                  (professional.firstName?.[0] ?? "") +
+                    (professional.lastName?.[0] ?? "") || "DR"
+                }
+              />
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               {(
                 [
