@@ -548,6 +548,7 @@ export type SeedProfessional = {
   licenseNumber: string;
   phone: string | null;
   email: string | null;
+  photoUrl?: string | null;
   notes: string | null;
   titles: string[];
   services: string[];
@@ -566,6 +567,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "4521",
     phone: "387 431-2210",
     email: "julia.ferrari@example.com",
+    photoUrl: "/images/professionals/julia-ferrari.jpg",
     notes: "Rodilla y artroscopía.",
     titles: [TRAUMATOLOGIST],
     services: [
@@ -592,6 +594,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "2873",
     phone: "387 422-8765",
     email: "ricardo.arias@example.com",
+    photoUrl: "/images/professionals/ricardo-arias.jpg",
     notes: "Patología de columna. Cirugías programadas los viernes.",
     titles: [TRAUMATOLOGIST, ORTHOPEDIC_SURGEON],
     services: [
@@ -616,6 +619,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "5610",
     phone: "387 154-6632",
     email: "gabriela.tolaba@example.com",
+    photoUrl: "/images/professionals/gabriela-tolaba.jpg",
     notes: null,
     titles: [TRAUMATOLOGIST],
     services: [
@@ -640,6 +644,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "6344",
     phone: "387 155-0921",
     email: "martin.cruz@example.com",
+    photoUrl: "/images/professionals/martin-cruz.jpg",
     notes: "Médico de planta de un club de rugby local.",
     titles: [TRAUMATOLOGIST],
     services: [
@@ -665,6 +670,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "3312",
     phone: "387 421-3398",
     email: null,
+    photoUrl: "/images/professionals/fernando-saravia.jpg",
     notes: null,
     titles: [ORTHOPEDIC_SURGEON, TRAUMATOLOGIST],
     services: [
@@ -692,6 +698,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "8120",
     phone: "387 156-4410",
     email: "lucia.zerpa@example.com",
+    photoUrl: "/images/professionals/lucia-zerpa.jpg",
     notes: null,
     titles: [KINESIOLOGIST],
     services: [
@@ -714,6 +721,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "7985",
     phone: "387 154-7789",
     email: "diego.guzman@example.com",
+    photoUrl: "/images/professionals/diego-guzman.jpg",
     notes: null,
     titles: [KINESIOLOGIST],
     services: [
@@ -734,6 +742,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "9054",
     phone: "+54 9 387 512-3344",
     email: "andrea.colmenares@example.com",
+    photoUrl: "/images/professionals/andrea-colmenares.jpg",
     notes: "Título revalidado en Argentina.",
     titles: [KINESIOLOGIST],
     services: [
@@ -754,6 +763,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "6891",
     phone: "387 155-3120",
     email: "geronimo.rivero@example.com",
+    photoUrl: "/images/professionals/geronimo-rivero.jpg",
     notes: null,
     titles: [TRAUMATOLOGIST],
     services: [
@@ -779,6 +789,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "9377",
     phone: "387 156-8845",
     email: "valeria.aguirre@example.com",
+    photoUrl: null,
     notes: "Se incorpora en octubre; falta cargar la agenda.",
     titles: [KINESIOLOGIST],
     services: ["Sesión de kinesiología motora"],
@@ -794,6 +805,7 @@ export const PROFESSIONALS: SeedProfessional[] = [
     licenseNumber: "1187",
     phone: "387 431-0045",
     email: null,
+    photoUrl: "/images/professionals/hugo-lamas.jpg",
     notes: null,
     titles: [TRAUMATOLOGIST],
     services: ["Consulta traumatológica general", "Consulta de columna"],
