@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { createAppointment } from "./actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,8 +55,11 @@ export function AppointmentForm({
       priority,
       priorityReason: priority === "URGENT" ? priorityReason : undefined,
     });
-    if (result.ok) router.push(`/appointments/${result.data.id}?created=1`);
-    else {
+    if (result.ok) {
+      toast.success("Turno agendado correctamente.");
+      router.push(`/appointments/${result.data.id}?created=1`);
+    } else {
+      toast.error(result.error.message);
       setStartTime("");
       router.refresh();
     }

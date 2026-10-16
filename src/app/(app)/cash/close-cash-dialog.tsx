@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { closeCash } from "./actions";
 import { notifyPaymentChange } from "@/lib/payments-client";
 import {
@@ -69,6 +70,7 @@ export function CloseCashDialog({
     });
 
     if (result.ok) {
+      toast.success(`Caja del día ${date} cerrada correctamente.`);
       notifyPaymentChange();
       setOpen(false);
       if (!isToday && actorRole !== "MANAGER") {
@@ -76,6 +78,8 @@ export function CloseCashDialog({
       } else {
         router.refresh();
       }
+    } else {
+      toast.error(result.error.message);
     }
     return result;
   }, null);

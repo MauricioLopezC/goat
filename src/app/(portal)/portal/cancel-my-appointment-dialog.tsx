@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { CalendarX2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,9 +55,11 @@ export function CancelMyAppointmentDialog({
 
       if (!result.ok) {
         setError(result.error.message);
+        toast.error(result.error.message);
         return;
       }
 
+      toast.success("Turno cancelado correctamente.");
       setOpen(false);
       setReason("");
       router.refresh();

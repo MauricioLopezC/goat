@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { registerAuthorization } from "./actions";
 import {
   Dialog,
@@ -48,8 +49,15 @@ export function AuthorizationDialog({
       authorizationNumber: String(formData.get("authorizationNumber") ?? ""),
     });
     if (result.ok) {
+      toast.success(
+        correcting
+          ? "Número de autorización actualizado."
+          : "Número de autorización registrado.",
+      );
       setOpen(false);
       router.replace(successHref);
+    } else {
+      toast.error(result.error.message);
     }
     return result;
   }, null);

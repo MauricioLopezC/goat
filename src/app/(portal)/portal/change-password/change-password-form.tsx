@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AlertCircle, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,10 +40,12 @@ export function ChangePasswordForm({
           setFieldErrors(result.error.fieldErrors);
         } else {
           setErrorMessage(result.error.message);
+          toast.error(result.error.message);
         }
         return;
       }
 
+      toast.success("Contraseña actualizada exitosamente.");
       router.push("/portal");
       router.refresh();
     });

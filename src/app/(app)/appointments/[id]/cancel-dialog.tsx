@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { cancelAppointment } from "./actions";
 import {
   AlertDialog,
@@ -52,10 +53,13 @@ export function CancelAppointmentDialog({
       requestedBy,
     });
     if (result.ok) {
+      toast.success("Turno cancelado correctamente.");
       setOpen(false);
       const search = new URLSearchParams(returnSearch);
       search.set("cancelled", "1");
       router.push(`/appointments/${appointmentId}?${search}`);
+    } else {
+      toast.error(result.error.message);
     }
     return result;
   }, null);
