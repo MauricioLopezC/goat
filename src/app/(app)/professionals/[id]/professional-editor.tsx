@@ -123,11 +123,7 @@ export function ProfessionalEditor({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            action={updateAction}
-            encType="multipart/form-data"
-            className="flex flex-col gap-5"
-          >
+          <form action={updateAction} className="flex flex-col gap-5">
             <input type="hidden" name="id" value={professional.id} />
 
             <div className="border-b border-border pb-4">

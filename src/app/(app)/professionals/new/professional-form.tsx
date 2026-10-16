@@ -174,11 +174,7 @@ export function ProfessionalForm({ titles, services }: ProfessionalFormProps) {
 
       {/* Formulario principal: se oculta al registrar con éxito para evitar reenvíos */}
       {!created && (
-        <form
-          action={formAction}
-          encType="multipart/form-data"
-          className="flex flex-col gap-6"
-        >
+        <form action={formAction} className="flex flex-col gap-6">
           <div key={attempt} className="flex flex-col gap-6">
             {/* 1. Datos Personales */}
             <Card>
