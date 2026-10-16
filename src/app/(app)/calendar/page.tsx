@@ -156,13 +156,12 @@ export default async function CalendarPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {!isWeek && !isMonth && (
-            <CenterClosureControls
-              date={query.date}
-              holiday={closure ?? null}
-              canClose={query.date >= today}
-            />
-          )}
+          <CenterClosureControls
+            date={query.date}
+            holiday={!isWeek && !isMonth ? (closure ?? null) : null}
+            canClose={isWeek || isMonth || query.date >= today}
+            selectPeriod={isWeek || isMonth}
+          />
           {/* Turnos pasados que siguen Programados (HU-22). */}
           {unclosedCount > 0 && (
             <Button asChild variant="outline">

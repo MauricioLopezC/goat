@@ -728,13 +728,6 @@ export default async function AppointmentPage({
           </CardContent>
         </Card>
       )}
-      <Alert>
-        <AlertTitle>Email al paciente: PENDIENTE</AlertTitle>
-        <AlertDescription>
-          El envío de avisos por correo todavía no está implementado. No se
-          envió un email al registrar este turno.
-        </AlertDescription>
-      </Alert>
       <div className="flex flex-wrap gap-3">
         <Button asChild variant="outline">
           <Link
