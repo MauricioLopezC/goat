@@ -65,8 +65,10 @@ export function isUpcoming(
   );
 }
 
-/// Separa una página del historial en próximos y pasados, conservando el
-/// orden (del más reciente al más antiguo) dentro de cada grupo.
+/// Separa una página del historial en próximos y pasados. La página llega
+/// del más reciente al más antiguo: los pasados conservan ese orden y los
+/// próximos se invierten, para que el más cercano quede primero. El orden se
+/// invierte dentro de la página, no en toda la lista.
 export function splitByTiming<
   T extends { status: AppointmentStatus; startsAt: Date },
 >(items: T[], now: Date) {
@@ -74,5 +76,5 @@ export function splitByTiming<
   const past: T[] = [];
   for (const item of items)
     (isUpcoming(item, now) ? upcoming : past).push(item);
-  return { upcoming, past };
+  return { upcoming: upcoming.reverse(), past };
 }
