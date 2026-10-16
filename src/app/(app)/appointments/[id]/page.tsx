@@ -740,7 +740,7 @@ export default async function AppointmentPage({
         </Button>
         <Button asChild variant="outline">
           <Link href={patientHistoryHref(appointment.patient.id)}>
-            Historial del paciente
+            Bitácora del paciente
           </Link>
         </Button>
         {!own && appointment.status !== "CANCELLED" && (

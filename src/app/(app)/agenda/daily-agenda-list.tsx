@@ -403,7 +403,7 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
                       </div>
                       <Button asChild variant="ghost" size="sm">
                         <Link href={patientHistoryHref(appointment.patient.id)}>
-                          Historial del paciente
+                          Bitácora del paciente
                         </Link>
                       </Button>
                     </div>
