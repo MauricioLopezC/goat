@@ -10,7 +10,7 @@ import { addDays, toLocalSlot, weekdayOf } from "@/lib/schedule";
 // Todo va en hora del centro. El período son meses completos (`AAAA-MM`).
 
 export const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
-export const MAX_PERIOD_MONTHS = 3;
+export const MAX_PERIOD_MONTHS = 12;
 
 /// Meses completos, inclusive, en formato `AAAA-MM`.
 export type IndicatorPeriod = { from: string; to: string };

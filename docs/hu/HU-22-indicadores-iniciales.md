@@ -13,7 +13,7 @@
 
 ## Validaciones
 
-- El período por defecto es el mes en curso; se puede elegir otro mes o un rango de meses completos, de hasta tres meses.
+- El período por defecto es el mes en curso; se puede elegir otro mes o un rango de meses completos, de hasta doce meses.
 - El período abarca todos sus días, también los que todavía no pasaron: la ocupación del mes en curso incluye los turnos Programados futuros.
 - Un turno pertenece al período por su fecha de inicio. Las cancelaciones también se cuentan así, no por el día en que se canceló el turno.
 - Sin turnos cerrados en el período, el ausentismo muestra "sin datos", no 0 %.

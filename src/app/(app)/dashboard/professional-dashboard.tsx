@@ -86,9 +86,9 @@ export function ProfessionalDashboard({
   periodError: string | null;
   fallbackPeriod: IndicatorPeriod;
 }) {
-  // Selector de meses: últimos 12 meses y los 2 próximos
+  // Selector de meses: los dos últimos años y los dos meses próximos
   const month = fallbackPeriod.from;
-  const months = Array.from({ length: 15 }, (_, index) =>
+  const months = Array.from({ length: 27 }, (_, index) =>
     shiftMonthKey(month, 2 - index),
   );
 

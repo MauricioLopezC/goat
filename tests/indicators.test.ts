@@ -14,7 +14,10 @@ import {
   sumIndicators,
   type ProfessionalIndicatorsInput,
 } from "../src/lib/indicators";
-import { centerIndicatorsSchema } from "../src/lib/validation/indicators";
+import {
+  centerIndicatorsSchema,
+  professionalIndicatorsSchema,
+} from "../src/lib/validation/indicators";
 
 // Octubre de 2026: el 1 es jueves. Franja de los jueves de 9 a 12 (180 min);
 // hay cinco jueves (1, 8, 15, 22 y 29).
@@ -67,23 +70,23 @@ test("el período por defecto es el mes en curso en hora del centro", () => {
   );
 });
 
-test("el schema rechaza períodos invertidos o de más de tres meses", () => {
-  assert.ok(
-    centerIndicatorsSchema.safeParse({ from: "2026-07", to: "2026-09" })
-      .success,
-  );
-  assert.ok(
-    !centerIndicatorsSchema.safeParse({ from: "2026-06", to: "2026-09" })
-      .success,
-  );
-  assert.ok(
-    !centerIndicatorsSchema.safeParse({ from: "2026-10", to: "2026-09" })
-      .success,
-  );
-  assert.ok(
-    !centerIndicatorsSchema.safeParse({ from: "2026-13", to: "2026-13" })
-      .success,
-  );
+test("el schema rechaza períodos invertidos o de más de doce meses", () => {
+  for (const schema of [centerIndicatorsSchema, professionalIndicatorsSchema]) {
+    assert.ok(schema.safeParse({ from: "2026-07", to: "2026-09" }).success);
+    assert.ok(schema.safeParse({ from: "2026-04", to: "2026-09" }).success);
+    assert.ok(schema.safeParse({ from: "2025-10", to: "2026-09" }).success);
+    const overLimit = schema.safeParse({
+      from: "2025-09",
+      to: "2026-09",
+    });
+    assert.ok(!overLimit.success);
+    assert.equal(
+      overLimit.error.issues[0]?.message,
+      "El período puede abarcar hasta 12 meses.",
+    );
+    assert.ok(!schema.safeParse({ from: "2026-10", to: "2026-09" }).success);
+    assert.ok(!schema.safeParse({ from: "2026-13", to: "2026-13" }).success);
+  }
 });
 
 test("sin turnos, la ocupación es 0 y el ausentismo no tiene datos", () => {
