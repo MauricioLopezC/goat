@@ -17,12 +17,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import {
-  formatDate,
-  formatMinute,
-  toLocalSlot,
-  WEEKDAY_LABEL,
-} from "@/lib/schedule";
+import { formatDate, formatMinute, toLocalSlot } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import type { AgendaData } from "./agenda-types";
 
@@ -78,7 +73,7 @@ export function DailyAgendaList({ data }: { data: AgendaData }) {
           Franjas horarias y cronograma
         </h3>
         <p className="text-muted-foreground text-xs mb-3">
-          {WEEKDAY_LABEL[weekday]} {formatDate(selectedDate)}
+          {formatDate(selectedDate)}
         </p>
 
         {fullDayHoliday && (
