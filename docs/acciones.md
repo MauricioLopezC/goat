@@ -143,6 +143,7 @@ Lista inicial. Se agrega un código cuando una regla de negocio nueva lo necesit
 | `APPOINTMENT_HAS_PAYMENT` | El turno tiene un cobro vigente y no se puede cancelar, reprogramar ni marcar Vencido: primero se anula el cobro (HU-21). |
 | `CANCELLATION_WINDOW_EXPIRED` | El paciente intenta cancelar un turno desde el portal con menos de 24 horas de anticipación (HU-31). |
 | `PORTAL_APPOINTMENT_LIMIT` | El paciente intenta sacar un turno desde el portal pero ya cuenta con dos turnos futuros programados (HU-32). |
+| `TOO_MANY_REQUESTS` | Se superó el límite de solicitudes permitidas por ventana de tiempo (rate limit en `signIn` o en `defineAction`). |
 
 Sin sesión no hay `ErrorCode`: `requireRole` redirige al login.
 

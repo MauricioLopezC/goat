@@ -330,7 +330,7 @@ export async function updateProfessional(
           changes: { before, after: { ...input, reason: undefined } },
         },
       });
-      return updated;
+      return { ...updated, previousPhotoUrl: current.photoUrl };
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
   );
