@@ -830,13 +830,21 @@ async function seedAppointments(
 }
 
 async function main() {
-  if (process.env.NODE_ENV === "production") {
+  const isProduction = process.env.NODE_ENV === "production";
+  const envSeedPassword = process.env.SEED_PASSWORD;
+
+  if (
+    isProduction &&
+    (!envSeedPassword ||
+      envSeedPassword === "goat1234" ||
+      envSeedPassword.length < 12)
+  ) {
     throw new Error(
-      "El seed crea usuarios con una contraseña conocida: no se corre en producción.",
+      "En producción (NODE_ENV=production), el seed requiere definir explícitamente SEED_PASSWORD con al menos 12 caracteres y distinta de 'goat1234'.",
     );
   }
 
-  const password = process.env.SEED_PASSWORD ?? "goat1234";
+  const password = envSeedPassword ?? "goat1234";
   if (password.length < 8) {
     throw new Error("SEED_PASSWORD debe tener al menos 8 caracteres.");
   }
@@ -936,8 +944,12 @@ async function main() {
       `✓ Demo: ${demo.appointments} turnos, ${demo.payments} cobros, ${demo.encounters} atenciones y ${demo.closings} cajas nuevas (${demo.today} turnos de hoy)`,
     );
 
-    console.log(`\nContraseña de todos los usuarios: ${password}`);
-    console.log("Cambiala con SEED_PASSWORD si te molesta.");
+    if (!isProduction) {
+      console.log(`\nContraseña de todos los usuarios: ${password}`);
+      console.log("Cambiala con SEED_PASSWORD si te molesta.");
+    } else {
+      console.log("\n✓ Usuarios sembrados con SEED_PASSWORD configurada.");
+    }
   } finally {
     await prisma.$disconnect();
   }

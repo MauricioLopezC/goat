@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   validatePhotoFile,
+  validatePhotoBytes,
+  detectPhotoMimeType,
+  readProfessionalPhoto,
   MAX_PHOTO_SIZE_BYTES,
   deleteProfessionalPhoto,
 } from "../src/lib/storage/photos";
@@ -48,6 +51,34 @@ test("validatePhotoFile rechaza entradas nulas o malformadas", () => {
   assert.equal(validatePhotoFile(undefined).ok, false);
   assert.equal(validatePhotoFile("string").ok, false);
   assert.equal(validatePhotoFile({}).ok, false);
+});
+
+test("detectPhotoMimeType y validatePhotoBytes verifican la firma binaria (magic bytes)", () => {
+  const jpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+  assert.equal(detectPhotoMimeType(jpegBytes), "image/jpeg");
+  assert.deepEqual(validatePhotoBytes(jpegBytes, "image/jpeg"), { ok: true });
+
+  const pngBytes = new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00,
+  ]);
+  assert.equal(detectPhotoMimeType(pngBytes), "image/png");
+  assert.deepEqual(validatePhotoBytes(pngBytes, "image/png"), { ok: true });
+
+  const webpBytes = new Uint8Array([
+    0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+  ]);
+  assert.equal(detectPhotoMimeType(webpBytes), "image/webp");
+  assert.deepEqual(validatePhotoBytes(webpBytes, "image/webp"), { ok: true });
+
+  // Contenido falso (ej. HTML o script disfrazado de image/jpeg)
+  const fakeBytes = new TextEncoder().encode("<script>alert(1)</script>");
+  assert.equal(detectPhotoMimeType(fakeBytes), null);
+  const fakeRes = validatePhotoBytes(fakeBytes, "image/jpeg");
+  assert.equal(fakeRes.ok, false);
+
+  // Discrepancia entre firma binaria real (PNG) y tipo declarado (JPEG)
+  const mismatchRes = validatePhotoBytes(pngBytes, "image/jpeg");
+  assert.equal(mismatchRes.ok, false);
 });
 
 test("createProfessionalSchema acepta photoUrl opcional, nula o string", () => {
@@ -116,7 +147,7 @@ test("updateProfessionalSchema acepta photoUrl y reason", () => {
   }
 });
 
-test("deleteProfessionalPhoto ignora rutas no válidas o ataques de path traversal", async () => {
+test("deleteProfessionalPhoto y readProfessionalPhoto ignoran rutas no válidas o ataques de path traversal", async () => {
   // No debe lanzar error ante rutas no válidas
   await assert.doesNotReject(async () => {
     await deleteProfessionalPhoto(null);
@@ -125,4 +156,13 @@ test("deleteProfessionalPhoto ignora rutas no válidas o ataques de path travers
     await deleteProfessionalPhoto("https://externo.com/foto.jpg");
     await deleteProfessionalPhoto("/uploads/professionals/../secret.txt");
   });
+
+  assert.equal(await readProfessionalPhoto("../secret.txt"), null);
+  assert.equal(await readProfessionalPhoto("prof-123.svg"), null);
+  assert.equal(
+    await readProfessionalPhoto(
+      "prof-00000000-0000-0000-0000-000000000000.jpg",
+    ),
+    null,
+  );
 });

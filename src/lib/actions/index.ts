@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "@/lib/validation/zod";
 import type { Role } from "@/generated/prisma/enums";
 import { requireRole, type Actor } from "@/lib/dal/auth";
+import { checkMutationRateLimit } from "@/lib/rate-limit";
 
 // Contrato de las Server Actions. La especificación está en docs/acciones.md y
 // la decisión de fondo en el ADR 0001.
@@ -13,6 +14,7 @@ export type ErrorCode =
   | "NOT_FOUND"
   | "DUPLICATE"
   | "INVALID_CREDENTIALS"
+  | "TOO_MANY_REQUESTS"
   | "EMAIL_TAKEN"
   | "APPOINTMENT_OVERLAP"
   | "PATIENT_APPOINTMENT_OVERLAP"
@@ -84,7 +86,8 @@ type Handler<Input, Output> = (
 ) => Promise<Output> | Output;
 
 /// Aplica el flujo obligatorio de `docs/acciones.md`: verifica sesión y rol,
-/// valida la entrada con Zod y traduce `DomainError` a `ActionResult`.
+/// aplica rate limiting por usuario, valida la entrada con Zod y traduce
+/// `DomainError` a `ActionResult`.
 ///
 /// Los roles y el schema se declaran en la firma, así que no se puede definir
 /// una acción olvidándose de alguno de los dos.
@@ -95,6 +98,15 @@ export function defineAction<Input, Output>(config: {
 }) {
   return async (raw: unknown): Promise<ActionResult<Output>> => {
     const actor = await requireRole(...config.roles);
+
+    const { rateLimited } = checkMutationRateLimit(actor.id);
+    if (rateLimited) {
+      return fail({
+        code: "TOO_MANY_REQUESTS",
+        message:
+          "Realizaste demasiadas solicitudes seguidas. Esperá un momento e intentá de nuevo.",
+      });
+    }
 
     const parsed = config.input.safeParse(raw);
     if (!parsed.success) {

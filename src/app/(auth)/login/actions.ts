@@ -1,10 +1,12 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import * as dal from "@/lib/dal/auth";
 import { signInSchema } from "@/lib/validation/auth";
 import { z } from "@/lib/validation/zod";
 import { DomainError, type ActionResult } from "@/lib/actions";
+import { checkSignInRateLimit } from "@/lib/rate-limit";
 
 // signIn y signOut no pasan por `defineAction`: una corre sin sesión por
 // definición y la otra acepta cualquier rol, así que no tienen roles que
@@ -31,6 +33,21 @@ export async function signIn(
           string,
           string[]
         >,
+      },
+    };
+  }
+
+  const { rateLimited } = checkSignInRateLimit(
+    await headers(),
+    parsed.data.email,
+  );
+  if (rateLimited) {
+    return {
+      ok: false,
+      error: {
+        code: "TOO_MANY_REQUESTS",
+        message:
+          "Demasiados intentos de ingreso. Esperá unos minutos e intentá de nuevo.",
       },
     };
   }

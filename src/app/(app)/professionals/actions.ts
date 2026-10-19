@@ -10,7 +10,13 @@ import {
   deactivateProfessionalSchema,
   reactivateProfessionalSchema,
 } from "@/lib/validation/professional";
-import { defineAction, type ActionResult } from "@/lib/actions";
+import {
+  defineAction,
+  DomainError,
+  fail,
+  type ActionResult,
+} from "@/lib/actions";
+import { requireRole } from "@/lib/dal/auth";
 
 import {
   validatePhotoFile,
@@ -74,6 +80,18 @@ export async function createProfessional(
   _previous: CreateProfessionalState,
   formData: FormData,
 ): Promise<CreateProfessionalState> {
+  try {
+    await requireRole("MANAGER");
+  } catch (error) {
+    if (error instanceof DomainError) {
+      return {
+        ...fail({ code: error.code, message: error.message }),
+        values: submitted(formData),
+      };
+    }
+    throw error;
+  }
+
   const photoFile = formData.get("photo");
   let photoUrl: string | null = null;
 
@@ -189,18 +207,22 @@ export async function updateProfessional(
   _previous: ProfessionalMutationState,
   formData: FormData,
 ): Promise<ProfessionalMutationState> {
+  try {
+    await requireRole("MANAGER");
+  } catch (error) {
+    if (error instanceof DomainError) {
+      return fail({ code: error.code, message: error.message });
+    }
+    throw error;
+  }
+
   const id = Number(formData.get("id"));
   const removePhoto = formData.get("removePhoto") === "true";
   const photoFile = formData.get("photo");
   let photoUrl: string | null | undefined = undefined;
-  let previousPhotoToDelete: string | null = null;
 
   if (removePhoto) {
     photoUrl = null;
-    const currentPhoto = formData.get("currentPhoto");
-    if (typeof currentPhoto === "string" && currentPhoto.trim() !== "") {
-      previousPhotoToDelete = currentPhoto;
-    }
   } else if (
     photoFile &&
     typeof photoFile === "object" &&
@@ -221,10 +243,6 @@ export async function updateProfessional(
     }
     try {
       photoUrl = await saveProfessionalPhoto(file);
-      const currentPhoto = formData.get("currentPhoto");
-      if (typeof currentPhoto === "string" && currentPhoto.trim() !== "") {
-        previousPhotoToDelete = currentPhoto;
-      }
     } catch (error) {
       return {
         ok: false,
@@ -255,13 +273,26 @@ export async function updateProfessional(
   });
 
   if (result.ok) {
-    if (previousPhotoToDelete) {
+    const previousPhotoToDelete = result.data.previousPhotoUrl;
+    if (
+      (removePhoto || photoUrl !== undefined) &&
+      previousPhotoToDelete &&
+      previousPhotoToDelete !== photoUrl
+    ) {
       await deleteProfessionalPhoto(previousPhotoToDelete);
     }
-  } else {
-    if (photoUrl) {
-      await deleteProfessionalPhoto(photoUrl);
-    }
+    return {
+      ok: true,
+      data: {
+        id: result.data.id,
+        firstName: result.data.firstName,
+        lastName: result.data.lastName,
+      },
+    };
+  }
+
+  if (photoUrl) {
+    await deleteProfessionalPhoto(photoUrl);
   }
 
   return result;
