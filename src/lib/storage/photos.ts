@@ -182,14 +182,21 @@ async function s3Request(
   body?: Uint8Array,
   contentType?: string,
 ): Promise<Response> {
-  const baseUrl = config.endpoint.replace(/\/+$/, "");
+  const endpointUrl = new URL(config.endpoint);
   const encodedKey = objectKey
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/");
-  const url = new URL(
-    `${baseUrl}/${encodeURIComponent(config.bucketName)}/${encodedKey}`,
-  );
+  const isIpOrLocal =
+    endpointUrl.hostname === "localhost" ||
+    /^\d+\.\d+\.\d+\.\d+$/.test(endpointUrl.hostname);
+  const url = isIpOrLocal
+    ? new URL(
+        `${endpointUrl.origin}/${encodeURIComponent(config.bucketName)}/${encodedKey}`,
+      )
+    : new URL(
+        `${endpointUrl.protocol}//${config.bucketName}.${endpointUrl.host}/${encodedKey}`,
+      );
 
   const now = new Date();
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
