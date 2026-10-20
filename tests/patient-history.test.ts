@@ -29,7 +29,7 @@ test("próximo es un turno Programado que todavía no empezó", () => {
   );
 });
 
-test("la página se separa en próximos y pasados sin perder el orden", () => {
+test("la página se separa en próximos (del más cercano) y pasados (del más reciente)", () => {
   const items = [
     { id: 4, status: "SCHEDULED" as const, startsAt: at("2026-10-10T12:00Z") },
     { id: 3, status: "CANCELLED" as const, startsAt: at("2026-10-05T12:00Z") },
@@ -39,7 +39,7 @@ test("la página se separa en próximos y pasados sin perder el orden", () => {
   const { upcoming, past } = splitByTiming(items, now);
   assert.deepEqual(
     upcoming.map((item) => item.id),
-    [4, 2],
+    [2, 4],
   );
   assert.deepEqual(
     past.map((item) => item.id),

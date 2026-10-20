@@ -214,7 +214,11 @@ async function main() {
           starts,
           [...starts].sort((a, b) => b.getTime() - a.getTime()),
         );
-        assert.deepEqual(history.attendance, { completed: 6, expired: 4 });
+        assert.deepEqual(history.attendance, {
+          completed: 6,
+          expired: 4,
+          cancelled: 2,
+        });
         assert.deepEqual(
           history.professionals.map((professional) => professional.id).sort(),
           [professionalA.id, professionalB.id].sort(),
@@ -246,7 +250,11 @@ async function main() {
             (item) => item.status === AppointmentStatus.EXPIRED,
           ),
         );
-        assert.deepEqual(history.attendance, { completed: 6, expired: 4 });
+        assert.deepEqual(history.attendance, {
+          completed: 6,
+          expired: 4,
+          cancelled: 2,
+        });
       },
     );
 
@@ -258,7 +266,11 @@ async function main() {
           manager,
         );
         assert.equal(history.page.total, 3);
-        assert.deepEqual(history.attendance, { completed: 1, expired: 2 });
+        assert.deepEqual(history.attendance, {
+          completed: 1,
+          expired: 2,
+          cancelled: 0,
+        });
       },
     );
 
@@ -284,7 +296,11 @@ async function main() {
           professionalActor,
         );
         assert.equal(history.page.total, 15);
-        assert.deepEqual(history.attendance, { completed: 6, expired: 4 });
+        assert.deepEqual(history.attendance, {
+          completed: 6,
+          expired: 4,
+          cancelled: 2,
+        });
         assert.deepEqual(
           history.professionals.map((p) => p.id).sort(),
           [professionalA.id, professionalB.id].sort(),
@@ -316,6 +332,7 @@ async function main() {
         assert.deepEqual(colleagueFilter.attendance, {
           completed: 1,
           expired: 2,
+          cancelled: 0,
         });
       },
     );
@@ -371,7 +388,11 @@ async function main() {
         assert.equal(history.page.total, 1);
         assert.equal(history.page.items.length, 1);
         assert.equal(history.page.items[0].id, paid.id);
-        assert.deepEqual(history.attendance, { completed: 6, expired: 4 });
+        assert.deepEqual(history.attendance, {
+          completed: 6,
+          expired: 4,
+          cancelled: 2,
+        });
       },
     );
 
@@ -423,7 +444,11 @@ async function main() {
         );
         assert.equal(history.page.total, 0);
         assert.deepEqual(history.page.items, []);
-        assert.deepEqual(history.attendance, { completed: 0, expired: 0 });
+        assert.deepEqual(history.attendance, {
+          completed: 0,
+          expired: 0,
+          cancelled: 0,
+        });
       },
     );
 
