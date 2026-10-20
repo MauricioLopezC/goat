@@ -8,6 +8,9 @@ import { listPublicProfessionals } from "@/lib/dal/professionals";
 import { Button } from "@/components/ui/button";
 import { ProfessionalVitaeCard } from "@/components/professionals/professional-vitae-card";
 
+// Lee la base en cada request: en el build no hay base accesible para prerenderizar.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Cuerpo Médico · GOAT",
   description:
